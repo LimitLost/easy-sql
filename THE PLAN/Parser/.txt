@@ -1,0 +1,10 @@
+How will this work?
+
+Commands to send to backend are made in frontend.
+
+Derive macro for structs requested from database.
+
+How will this look like?
+    > example.rs
+
+    

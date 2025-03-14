@@ -1,0 +1,93 @@
+
+- allow for all String, Vec, HashSet, HashMap, int, float functions
+
+- Run Sync Command with backend on setup
+
+- Save commands to send to backend, and then, after code from user is done, send all those requests to backend
+
+1. The Parser
+
+- Update communication library
+    - Sql enum
+        - [ ] Create Table
+            - [x] Write Down Types
+            - [ ] Map Types to Sql
+            - [ ] Map Fields To Sql
+            - [ ] Postgresql
+            - [ ] Sqlite
+        - Select
+            SELECT DISTINCT * FROM X LEFT JOIN WHERE IN BETWEEN LIKE IS NULL ORDER BY GROUP BY HAVING LIMIT
+            - Write Down Potential Output Field Types
+                - Count
+                - Min
+                - Max
+            - DISTINCT
+            - Handle Joins
+            - Where Support
+                - AND
+                - OR
+                - IN
+                - BETWEEN
+                - LIKE
+                - IS NULL
+            - ORDER BY
+                - ASC
+                - DESC
+            - HAVING (Same as Where)
+            - LIMIT 
+        - EXISTS
+            - Copy almost everything from select
+        - Update
+            - SET TO VALUE
+            - Copy Where from Select
+        - Delete
+            - Copy Where from Select
+        - Insert
+            - How do I Handle Values?
+            - Returning
+        - Generate Postgresql from enum
+        - Generate Sqlite from enum
+- Update base library
+    - DatabaseSetup Trait
+    - DatabaseSetup Derive Macro
+
+    - BackendTable Trait
+    - BackendTable Macro
+        - backend struct attribute
+            - table_name
+        - backend field attribute
+            - auto_increment
+        - implements also BackendDbOutput
+
+    - BackendDbOutput Trait
+        - implement for Option<T>
+        - implement for Vec<T>
+    - BackendDbOutput Derive Macro
+        - backend struct attribute
+            - supports (Table)
+        - backend field attribute
+            - database_field
+
+
+    - setup_backend function
+        - Generic Type: Implements DatabaseSetup
+        - input: module name
+        - async
+        - output: anyhow::Result<()>
+
+        - Save module name in lazy static variable
+        - Get All Create Table Requests from Generic Type
+        - Sync data between client sqlite and server postgres
+
+    - backend function
+        - async
+    - backend_simple function
+        - async
+
+    - lazy! Macro
+        - uses the same sql handling base as the other 2 but calls for lazy sqlx loading
+    - eager! Macro
+        - uses the same sql handling base as the other 2 but calls for eager sqlx loading
+    - sql! Macro
+        - uses the same sql handling base as the other 2 but calls for (whatever) sqlx function
+- Update backend services
