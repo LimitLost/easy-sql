@@ -4,8 +4,10 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-sqlx = { version = "0.8", features = [ "runtime-tokio", "uuid","sqlite" ] }
+sqlx = { version = "0.8", features = ["runtime-tokio", "uuid", "sqlite"] }
 anyhow = "1"
+easy-macros = { path = "../easy-macros", features = ["general"] }
+
 
 [dev-dependencies]
 lazy_static = "*"

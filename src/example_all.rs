@@ -5,13 +5,13 @@ lazy_static! {
 
 fn init_example() -> anyhow::Result<()> {
     //Module name is used as a schema in database
-    let db = setup_sql::<DatabaseSetup>("module_name").await?;
+    let db = Database::setup::<DatabaseSetup>("module_name").await?;
     DB_BASE.lock().replace(db);
 
     Ok(())
 }
 #[derive(DatabaseSetup)]
-struct DatabaseSetup {
+struct DatabaseSetupMain {
     //Show error when table is used in query but not in database setup
     //Derive also implements `UsedInDatabase` Trait for types inside
     t1: ExampleTableStructure,

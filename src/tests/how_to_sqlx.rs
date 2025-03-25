@@ -6,9 +6,9 @@ async fn test() -> anyhow::Result<()> {
         .connect("sqlite://test.db")
         .await?;
 
-    let conn = pool.acquire().await?;
+    let mut conn = pool.begin().await?;
 
-    sqlx::query("SELECT 1").fetch_one(&conn).await?;
+    sqlx::query("SELECT 1").fetch_one(&mut *conn).await?;
 
     Ok(())
 }
