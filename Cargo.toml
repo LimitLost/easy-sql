@@ -4,13 +4,38 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-sqlx = { version = "0.8", features = ["runtime-tokio", "uuid", "sqlite"] }
-anyhow = "1"
+sqlx = { version = "0.8", features = [
+    "runtime-tokio",
+    "uuid",
+    "sqlite",
+    "postgres",
+    "bigdecimal",
+    "rust_decimal",
+    "chrono",
+] }
+uuid = { version = "*", features = ["serde"] }
+# Add serde impl to bigdecimal
+bigdecimal = { version = "*", features = ["serde-json"] }
+# Add serde impl to decimal
+rust_decimal = { version = "1.37.1", features = ["serde-str"] }
+
 easy-macros = { path = "../easy-macros", features = ["general"] }
+
+anyhow = "1"
+chrono = { version = "*", features = ["serde"] }
+
+serde = { version = "1", features = ["derive"] }
+bincode = { version = "2", features = ["serde"] }
+
+tokio = { version = "1", features = ["sync"] }
+async-trait = "0.1.88"
 
 
 [dev-dependencies]
 lazy_static = "*"
+
+[build-dependencies]
+easy-macros = { path = "../easy-macros", features = ["build"] }
 
 [features]
 backend = ["sqlx/postgres"]

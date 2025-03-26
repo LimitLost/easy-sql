@@ -3,6 +3,7 @@ lazy_static! {
     static ref DB: Database = DB_BASE.lock().take().unwrap();
 }
 
+#[always_context]
 fn init_example() -> anyhow::Result<()> {
     //Module name is used as a schema in database
     let db = Database::setup::<DatabaseSetup>("module_name").await?;

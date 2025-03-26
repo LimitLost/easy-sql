@@ -1,6 +1,10 @@
+use anyhow::Context;
+use easy_macros::helpers::context;
+use easy_macros::macros::always_context;
 use sqlx::sqlite::SqlitePoolOptions;
 
-async fn test() -> anyhow::Result<()> {
+#[always_context]
+async fn _test() -> anyhow::Result<()> {
     let pool = SqlitePoolOptions::new()
         .max_connections(5)
         .connect("sqlite://test.db")
