@@ -3,4 +3,5 @@ mod syntax2;
 
 mod how_to_sqlx;
 
+mod impl_sql_insert;
 mod impl_sql_output;

@@ -1,5 +1,7 @@
 use easy_macros::macros::always_context;
 
+use crate::{QueryData, Sql};
+
 struct ExampleTableStruct {
     field0: String,
     field1: String,
@@ -16,7 +18,7 @@ struct ExampleStruct {
 //Remove in derive
 #[always_context]
 impl crate::SqlOutput<ExampleTableStruct, crate::Row> for ExampleStruct {
-    fn requested_columns() -> Vec<crate::RequestedColumn> {
+    fn sql_to_query<'a>(sql: &'a Sql<'a>) -> anyhow::Result<QueryData<'a>> {
         crate::never::never_fn(|| {
             //Check for validity
             let table_instance = crate::never::never_any::<ExampleTableStruct>();
@@ -27,7 +29,8 @@ impl crate::SqlOutput<ExampleTableStruct, crate::Row> for ExampleStruct {
                 field3: table_instance.field3,
             }
         });
-        vec![
+
+        let requested_columns = vec![
             crate::RequestedColumn {
                 name: "field1".to_owned(),
                 alias: None,
@@ -40,7 +43,9 @@ impl crate::SqlOutput<ExampleTableStruct, crate::Row> for ExampleStruct {
                 name: "field3".to_owned(),
                 alias: None,
             },
-        ]
+        ];
+
+        sql.query_output(requested_columns)
     }
     //Remove in derive
     #[no_context]

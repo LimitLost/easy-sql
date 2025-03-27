@@ -2,10 +2,11 @@ use std::sync::Arc;
 
 use anyhow::Context;
 use easy_macros::{helpers::context, macros::always_context};
+use sqlx::Executor;
 use tokio::sync::Mutex;
 
 use super::{Connection, Transaction};
-use crate::{DatabaseSetup, Db, easy_executor::EasyExecutor, sql_query::Sql};
+use crate::{DatabaseSetup, Db, sql_query::Sql};
 
 /// TODO Will be used in the future to send data to the remote database
 #[derive(Debug, Default)]
@@ -13,15 +14,24 @@ pub(crate) struct DatabaseInternal;
 
 #[always_context]
 impl DatabaseInternal {
-    pub async fn sql_request(&mut self, conn: impl EasyExecutor, sql: &Sql) {
+    pub async fn sql_request<'a>(
+        &mut self,
+        conn: impl Executor<'a, Database = Db>,
+        sql: &Sql<'a>,
+    ) -> anyhow::Result<()> {
         //TODO Save it for later in the sqlite database
+
+        Ok(())
     }
-    pub async fn conn_end(&mut self) {
-        //TODO Every 1? minute send updates to the remote database
-    }
+    //TODO Use tokio::spawn in sql_request instead
+    /* pub async fn conn_end(&mut self) -> anyhow::Result<()> {
+        //Every 1? minute send updates to the remote database
+        Ok(())
+    } */
     ///Should be used when user wants to exit the program
-    pub async fn maybe_exit(&mut self) {
+    pub async fn maybe_exit(&mut self) -> anyhow::Result<()> {
         //TODO Try sending data to server if not sent yet
+        Ok(())
     }
 }
 
@@ -39,9 +49,11 @@ impl Database {
         })
     }
 
-    pub async fn maybe_exit(&self) {
+    pub async fn maybe_exit(&self) -> anyhow::Result<()> {
         let mut internal = self.internal.lock().await;
-        internal.maybe_exit().await;
+        internal.maybe_exit().await?;
+
+        Ok(())
     }
 
     pub async fn conn(&self) -> anyhow::Result<Connection> {
