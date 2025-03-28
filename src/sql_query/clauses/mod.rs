@@ -8,5 +8,5 @@ mod select;
 pub use select::*;
 mod where_having;
 pub use where_having::*;
-mod select_trait;
-pub use select_trait::*;
+mod can_be_select_clause;
+pub use can_be_select_clause::*;

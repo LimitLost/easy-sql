@@ -1,6 +1,5 @@
 use async_trait::async_trait;
 use easy_macros::macros::always_context;
-use futures::{TryStream, stream::BoxStream};
 
 use crate::{Row, SqlOutput, ToConvert, sql_query::Sql};
 
@@ -14,6 +13,10 @@ pub trait EasyExecutor {
         &mut self,
         sql: &Sql,
     ) -> anyhow::Result<O>;
+
+    async fn query_setup<O: SetupSql + Send + Sync>(&mut self, sql: O)
+    -> anyhow::Result<O::Output>;
+
     // async fn fetch_all<T, O: SqlOutput<T, Row>>(&mut self, sql: &Sql) -> anyhow::Result<Vec<O>>;
 
     ///# How to Async inside of closure
@@ -29,4 +32,15 @@ pub trait EasyExecutor {
         sql: &Sql,
         mut perform: impl FnMut(O) -> anyhow::Result<Option<Break>> + Send + Sync,
     ) -> anyhow::Result<()>;
+}
+
+#[always_context]
+#[async_trait]
+pub trait SetupSql {
+    type Output;
+
+    async fn query<'a>(
+        self,
+        exec: impl sqlx::Executor<'a, Database = crate::Db> + Send + Sync,
+    ) -> anyhow::Result<Self::Output>;
 }

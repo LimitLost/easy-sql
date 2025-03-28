@@ -3,7 +3,7 @@ use async_trait::async_trait;
 use easy_macros::{helpers::context, macros::always_context};
 use sqlx::Executor;
 
-use crate::{Db, QueryData, Row, Sql, easy_executor::EasyExecutor, sql_query::RequestedColumn};
+use crate::{Db, QueryData, Row, Sql};
 
 #[always_context]
 #[async_trait]

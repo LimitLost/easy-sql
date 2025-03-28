@@ -28,3 +28,16 @@ impl<'a> CanBeSelectClause<'a> for WhereClause<'a> {
         }
     }
 }
+#[always_context]
+impl<'a> CanBeSelectClause<'a> for Option<WhereClause<'a>> {
+    fn into_select_clauses(self) -> SelectClauses<'a> {
+        SelectClauses {
+            distinct: false,
+            where_: self,
+            group_by: None,
+            having: None,
+            order_by: None,
+            limit: None,
+        }
+    }
+}

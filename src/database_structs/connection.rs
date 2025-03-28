@@ -2,17 +2,17 @@ use std::sync::Arc;
 
 use anyhow::Context;
 use async_trait::async_trait;
-use easy_macros::{helpers::context, macros::always_context};
+use easy_macros::macros::always_context;
 use futures::{StreamExt, TryStreamExt};
 
 use tokio::sync::Mutex;
 
 use super::DatabaseInternal;
 use crate::{
-    ConnectionInternal, Row, Sql, SqlOutput, ToConvert,
+    ConnectionInternal, Row, SetupSql, Sql, SqlOutput, ToConvert,
     easy_executor::{Break, EasyExecutor},
 };
-
+#[derive(Debug)]
 pub struct Connection {
     internal: ConnectionInternal,
     db_link: Arc<Mutex<DatabaseInternal>>,
@@ -64,6 +64,13 @@ impl EasyExecutor for Connection {
 
         #[no_context_inputs]
         Ok(O::convert(row).context("Converting Row to Value")?)
+    }
+
+    async fn query_setup<O: SetupSql + Send + Sync>(
+        &mut self,
+        sql: O,
+    ) -> anyhow::Result<O::Output> {
+        sql.query(&mut *self.internal).await
     }
 
     /* async fn fetch_all<T, O: SqlOutput<T, Row>>(&mut self, sql: &Sql) -> anyhow::Result<Vec<O>> {

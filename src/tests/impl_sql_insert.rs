@@ -11,7 +11,7 @@ struct ExampleTableStruct {
     field3: i64,
     field4: i16,
 }
-
+#[derive(Debug)]
 struct ExampleStruct {
     field0: String,
     field1: String,
@@ -28,7 +28,7 @@ impl SqlInsert<ExampleTableStruct> for ExampleStruct {
             let this_instance = crate::never::never_any::<Self>();
 
             ExampleTableStruct {
-                //TODO Check if default value is set (or null or auto increment id) Use then default value
+                //TODO Check if default value is set (or is Option<> or auto increment id) Use then default value
                 id: Default::default(),
                 field0: this_instance.field0,
                 field1: this_instance.field1,
@@ -73,7 +73,6 @@ async fn test(conn: &mut Connection) -> anyhow::Result<()> {
         field3: 3,
         field4: 4,
     };
-    #[no_context_inputs]
     ExampleTableStruct::insert(conn, &to_insert).await?;
     Ok(())
 }

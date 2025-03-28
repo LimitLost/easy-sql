@@ -1,5 +1,4 @@
 use anyhow::Context;
-use easy_macros::helpers::context;
 use easy_macros::macros::always_context;
 use sqlx::sqlite::SqlitePoolOptions;
 
