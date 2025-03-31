@@ -1,6 +1,9 @@
 use std::ops::Bound;
 
+use bigdecimal::BigDecimal;
+use chrono::{NaiveDate, NaiveDateTime};
 use easy_macros::macros::always_context;
+use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use sqlx::{
     Encode,
@@ -513,6 +516,7 @@ impl sqlx::Type<crate::Db> for SqlValue {
 pub enum SqlValueMaybeRef<'a> {
     Ref(SqlValueRef<'a>),
     Value(SqlValue),
+    Vec(Vec<SqlValueMaybeRef<'a>>),
 }
 
 #[always_context]
@@ -524,6 +528,9 @@ impl<'a> Encode<'a, crate::Db> for SqlValueMaybeRef<'a> {
         match self {
             SqlValueMaybeRef::Ref(v) => v.encode_by_ref(buf),
             SqlValueMaybeRef::Value(v) => v.encode_by_ref(buf),
+            SqlValueMaybeRef::Vec(v) => {
+                <Vec<u8> as Encode<'a, crate::Db>>::encode_by_ref(&binary(v)?, buf)
+            }
         }
     }
 
@@ -537,6 +544,7 @@ impl<'a> Encode<'a, crate::Db> for SqlValueMaybeRef<'a> {
         match self {
             SqlValueMaybeRef::Ref(v) => v.encode(buf),
             SqlValueMaybeRef::Value(v) => v.encode(buf),
+            SqlValueMaybeRef::Vec(v) => <Vec<u8> as Encode<'a, crate::Db>>::encode(binary(v)?, buf),
         }
     }
 
@@ -544,6 +552,7 @@ impl<'a> Encode<'a, crate::Db> for SqlValueMaybeRef<'a> {
         match self {
             SqlValueMaybeRef::Ref(v) => v.produces(),
             SqlValueMaybeRef::Value(v) => v.produces(),
+            SqlValueMaybeRef::Vec(_) => Some(<Vec<u8> as sqlx::Type<crate::Db>>::type_info()),
         }
     }
 }
@@ -563,8 +572,36 @@ impl serde::Serialize for SqlValueMaybeRef<'_> {
         S: serde::Serializer,
     {
         match self {
-            SqlValueMaybeRef::Ref(v) => v.serialize(serializer),
-            SqlValueMaybeRef::Value(v) => v.serialize(serializer),
+            SqlValueMaybeRef::Ref(v) => {
+                serializer.serialize_newtype_variant("SqlValueMaybeRef", 0, "Value", v)
+            }
+            SqlValueMaybeRef::Value(v) => {
+                serializer.serialize_newtype_variant("SqlValueMaybeRef", 0, "Value", v)
+            }
+            SqlValueMaybeRef::Vec(v) => {
+                serializer.serialize_newtype_variant("SqlValueMaybeRef", 1, "Vec", v)
+            }
+        }
+    }
+}
+
+mod value_serialize {
+    use super::always_context;
+    use serde::Deserialize;
+
+    #[derive(Deserialize)]
+    pub enum SqlValueMaybeRef<'a> {
+        Value(super::SqlValue),
+        Vec(Vec<super::SqlValueMaybeRef<'a>>),
+    }
+
+    #[always_context]
+    impl<'a> From<SqlValueMaybeRef<'a>> for super::SqlValueMaybeRef<'a> {
+        fn from(value: SqlValueMaybeRef<'a>) -> Self {
+            match value {
+                SqlValueMaybeRef::Value(v) => Self::Value(v),
+                SqlValueMaybeRef::Vec(v) => Self::Vec(v),
+            }
         }
     }
 }
@@ -575,7 +612,187 @@ impl<'b> serde::Deserialize<'b> for SqlValueMaybeRef<'_> {
     where
         D: serde::Deserializer<'b>,
     {
-        let value = SqlValue::deserialize(deserializer)?;
-        Ok(SqlValueMaybeRef::Value(value))
+        value_serialize::SqlValueMaybeRef::deserialize(deserializer).map(|v| v.into())
+    }
+}
+// IpAddr
+#[always_context]
+impl<'a> From<&'a std::net::IpAddr> for SqlValueMaybeRef<'a> {
+    fn from(value: &'a std::net::IpAddr) -> Self {
+        Self::Ref(SqlValueRef::IpAddr(value))
+    }
+}
+// Bool
+#[always_context]
+impl<'a> From<&'a bool> for SqlValueMaybeRef<'a> {
+    fn from(value: &'a bool) -> Self {
+        Self::Ref(SqlValueRef::Bool(value))
+    }
+}
+
+// F32
+#[always_context]
+impl<'a> From<&'a f32> for SqlValueMaybeRef<'a> {
+    fn from(value: &'a f32) -> Self {
+        Self::Ref(SqlValueRef::F32(value))
+    }
+}
+// F64
+#[always_context]
+impl<'a> From<&'a f64> for SqlValueMaybeRef<'a> {
+    fn from(value: &'a f64) -> Self {
+        Self::Ref(SqlValueRef::F64(value))
+    }
+}
+// I8
+#[always_context]
+impl<'a> From<&'a i8> for SqlValueMaybeRef<'a> {
+    fn from(value: &'a i8) -> Self {
+        Self::Ref(SqlValueRef::I8(value))
+    }
+}
+// I16
+#[always_context]
+impl<'a> From<&'a i16> for SqlValueMaybeRef<'a> {
+    fn from(value: &'a i16) -> Self {
+        Self::Ref(SqlValueRef::I16(value))
+    }
+}
+// I32
+#[always_context]
+impl<'a> From<&'a i32> for SqlValueMaybeRef<'a> {
+    fn from(value: &'a i32) -> Self {
+        Self::Ref(SqlValueRef::I32(value))
+    }
+}
+// I64
+#[always_context]
+impl<'a> From<&'a i64> for SqlValueMaybeRef<'a> {
+    fn from(value: &'a i64) -> Self {
+        Self::Ref(SqlValueRef::I64(value))
+    }
+}
+// String
+#[always_context]
+impl<'a> From<&'a String> for SqlValueMaybeRef<'a> {
+    fn from(value: &'a String) -> Self {
+        Self::Ref(SqlValueRef::String(value))
+    }
+}
+// Interval
+#[always_context]
+impl<'a> From<&'a PgInterval> for SqlValueMaybeRef<'a> {
+    fn from(value: &'a PgInterval) -> Self {
+        Self::Ref(SqlValueRef::Interval(value))
+    }
+}
+// Bytes
+#[always_context]
+impl<'a> From<&'a Vec<u8>> for SqlValueMaybeRef<'a> {
+    fn from(value: &'a Vec<u8>) -> Self {
+        Self::Ref(SqlValueRef::Bytes(value))
+    }
+}
+// List
+/* #[always_context]
+impl<'a, T> From<&'a Vec<T>> for SqlValueMaybeRef<'a>
+where
+    &'a T: Into<SqlValueMaybeRef<'a>>,
+{
+    fn from(value: &'a Vec<T>) -> Self {
+        let mut v = Vec::new();
+        for i in value.iter() {
+            v.push(i.into());
+        }
+        SqlValueMaybeRef::Vec(v)
+    }
+} */
+#[always_context]
+impl<'a, T: Into<SqlValueMaybeRef<'a>>> From<Vec<T>> for SqlValueMaybeRef<'a> {
+    fn from(value: Vec<T>) -> Self {
+        let mut v = Vec::new();
+        for i in value.into_iter() {
+            v.push(i.into());
+        }
+        SqlValueMaybeRef::Vec(v)
+    }
+}
+// NaiveDate
+#[always_context]
+impl<'a> From<&'a chrono::NaiveDate> for SqlValueMaybeRef<'a> {
+    fn from(value: &'a chrono::NaiveDate) -> Self {
+        Self::Ref(SqlValueRef::NaiveDate(value))
+    }
+}
+// NaiveDateTime
+#[always_context]
+impl<'a> From<&'a chrono::NaiveDateTime> for SqlValueMaybeRef<'a> {
+    fn from(value: &'a chrono::NaiveDateTime) -> Self {
+        Self::Ref(SqlValueRef::NaiveDateTime(value))
+    }
+}
+// NaiveTime
+#[always_context]
+impl<'a> From<&'a chrono::NaiveTime> for SqlValueMaybeRef<'a> {
+    fn from(value: &'a chrono::NaiveTime) -> Self {
+        Self::Ref(SqlValueRef::NaiveTime(value))
+    }
+}
+// Uuid
+#[always_context]
+impl<'a> From<&'a uuid::Uuid> for SqlValueMaybeRef<'a> {
+    fn from(value: &'a uuid::Uuid) -> Self {
+        Self::Ref(SqlValueRef::Uuid(value))
+    }
+}
+// Decimal
+#[always_context]
+impl<'a> From<&'a sqlx::types::Decimal> for SqlValueMaybeRef<'a> {
+    fn from(value: &'a sqlx::types::Decimal) -> Self {
+        Self::Ref(SqlValueRef::Decimal(value))
+    }
+}
+// BigDecimal
+#[always_context]
+impl<'a> From<&'a sqlx::types::BigDecimal> for SqlValueMaybeRef<'a> {
+    fn from(value: &'a sqlx::types::BigDecimal) -> Self {
+        Self::Ref(SqlValueRef::BigDecimal(value))
+    }
+}
+// Range
+#[always_context]
+impl From<std::ops::Range<i32>> for SqlValueMaybeRef<'_> {
+    fn from(value: std::ops::Range<i32>) -> Self {
+        Self::Value(SqlValue::Range(SqlRangeValue::I32(value.into())))
+    }
+}
+#[always_context]
+impl From<std::ops::Range<i64>> for SqlValueMaybeRef<'_> {
+    fn from(value: std::ops::Range<i64>) -> Self {
+        Self::Value(SqlValue::Range(SqlRangeValue::I64(value.into())))
+    }
+}
+#[always_context]
+impl From<std::ops::Range<NaiveDate>> for SqlValueMaybeRef<'_> {
+    fn from(value: std::ops::Range<NaiveDate>) -> Self {
+        Self::Value(SqlValue::Range(SqlRangeValue::NaiveDate(value.into())))
+    }
+}
+#[always_context]
+impl From<std::ops::Range<NaiveDateTime>> for SqlValueMaybeRef<'_> {
+    fn from(value: std::ops::Range<NaiveDateTime>) -> Self {
+        Self::Value(SqlValue::Range(SqlRangeValue::NaiveDateTime(value.into())))
+    }
+}
+#[always_context]
+impl From<std::ops::Range<Decimal>> for SqlValueMaybeRef<'_> {
+    fn from(value: std::ops::Range<Decimal>) -> Self {
+        Self::Value(SqlValue::Range(SqlRangeValue::Decimal(value.into())))
+    }
+}
+#[always_context]
+impl From<std::ops::Range<BigDecimal>> for SqlValueMaybeRef<'_> {
+    fn from(value: std::ops::Range<BigDecimal>) -> Self {
+        Self::Value(SqlValue::Range(SqlRangeValue::BigDecimal(value.into())))
     }
 }
