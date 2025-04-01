@@ -622,11 +622,23 @@ impl<'a> From<&'a std::net::IpAddr> for SqlValueMaybeRef<'a> {
         Self::Ref(SqlValueRef::IpAddr(value))
     }
 }
+#[always_context]
+impl From<std::net::IpAddr> for SqlValueMaybeRef<'_> {
+    fn from(value: std::net::IpAddr) -> Self {
+        Self::Value(SqlValue::IpAddr(value))
+    }
+}
 // Bool
 #[always_context]
 impl<'a> From<&'a bool> for SqlValueMaybeRef<'a> {
     fn from(value: &'a bool) -> Self {
         Self::Ref(SqlValueRef::Bool(value))
+    }
+}
+#[always_context]
+impl From<bool> for SqlValueMaybeRef<'_> {
+    fn from(value: bool) -> Self {
+        Self::Value(SqlValue::Bool(value))
     }
 }
 
@@ -637,11 +649,23 @@ impl<'a> From<&'a f32> for SqlValueMaybeRef<'a> {
         Self::Ref(SqlValueRef::F32(value))
     }
 }
+#[always_context]
+impl From<f32> for SqlValueMaybeRef<'_> {
+    fn from(value: f32) -> Self {
+        Self::Value(SqlValue::F32(value))
+    }
+}
 // F64
 #[always_context]
 impl<'a> From<&'a f64> for SqlValueMaybeRef<'a> {
     fn from(value: &'a f64) -> Self {
         Self::Ref(SqlValueRef::F64(value))
+    }
+}
+#[always_context]
+impl From<f64> for SqlValueMaybeRef<'_> {
+    fn from(value: f64) -> Self {
+        Self::Value(SqlValue::F64(value))
     }
 }
 // I8
@@ -651,11 +675,23 @@ impl<'a> From<&'a i8> for SqlValueMaybeRef<'a> {
         Self::Ref(SqlValueRef::I8(value))
     }
 }
+#[always_context]
+impl From<i8> for SqlValueMaybeRef<'_> {
+    fn from(value: i8) -> Self {
+        Self::Value(SqlValue::I8(value))
+    }
+}
 // I16
 #[always_context]
 impl<'a> From<&'a i16> for SqlValueMaybeRef<'a> {
     fn from(value: &'a i16) -> Self {
         Self::Ref(SqlValueRef::I16(value))
+    }
+}
+#[always_context]
+impl From<i16> for SqlValueMaybeRef<'_> {
+    fn from(value: i16) -> Self {
+        Self::Value(SqlValue::I16(value))
     }
 }
 // I32
@@ -665,11 +701,23 @@ impl<'a> From<&'a i32> for SqlValueMaybeRef<'a> {
         Self::Ref(SqlValueRef::I32(value))
     }
 }
+#[always_context]
+impl From<i32> for SqlValueMaybeRef<'_> {
+    fn from(value: i32) -> Self {
+        Self::Value(SqlValue::I32(value))
+    }
+}
 // I64
 #[always_context]
 impl<'a> From<&'a i64> for SqlValueMaybeRef<'a> {
     fn from(value: &'a i64) -> Self {
         Self::Ref(SqlValueRef::I64(value))
+    }
+}
+#[always_context]
+impl From<i64> for SqlValueMaybeRef<'_> {
+    fn from(value: i64) -> Self {
+        Self::Value(SqlValue::I64(value))
     }
 }
 // String
@@ -679,6 +727,12 @@ impl<'a> From<&'a String> for SqlValueMaybeRef<'a> {
         Self::Ref(SqlValueRef::String(value))
     }
 }
+#[always_context]
+impl From<String> for SqlValueMaybeRef<'_> {
+    fn from(value: String) -> Self {
+        Self::Value(SqlValue::String(value))
+    }
+}
 // Interval
 #[always_context]
 impl<'a> From<&'a PgInterval> for SqlValueMaybeRef<'a> {
@@ -686,11 +740,23 @@ impl<'a> From<&'a PgInterval> for SqlValueMaybeRef<'a> {
         Self::Ref(SqlValueRef::Interval(value))
     }
 }
+#[always_context]
+impl From<PgInterval> for SqlValueMaybeRef<'_> {
+    fn from(value: PgInterval) -> Self {
+        Self::Value(SqlValue::Interval(value))
+    }
+}
 // Bytes
 #[always_context]
 impl<'a> From<&'a Vec<u8>> for SqlValueMaybeRef<'a> {
     fn from(value: &'a Vec<u8>) -> Self {
         Self::Ref(SqlValueRef::Bytes(value))
+    }
+}
+#[always_context]
+impl From<Vec<u8>> for SqlValueMaybeRef<'_> {
+    fn from(value: Vec<u8>) -> Self {
+        Self::Value(SqlValue::Bytes(value))
     }
 }
 // List
@@ -724,11 +790,23 @@ impl<'a> From<&'a chrono::NaiveDate> for SqlValueMaybeRef<'a> {
         Self::Ref(SqlValueRef::NaiveDate(value))
     }
 }
+#[always_context]
+impl From<chrono::NaiveDate> for SqlValueMaybeRef<'_> {
+    fn from(value: chrono::NaiveDate) -> Self {
+        Self::Value(SqlValue::NaiveDate(value))
+    }
+}
 // NaiveDateTime
 #[always_context]
 impl<'a> From<&'a chrono::NaiveDateTime> for SqlValueMaybeRef<'a> {
     fn from(value: &'a chrono::NaiveDateTime) -> Self {
         Self::Ref(SqlValueRef::NaiveDateTime(value))
+    }
+}
+#[always_context]
+impl From<chrono::NaiveDateTime> for SqlValueMaybeRef<'_> {
+    fn from(value: chrono::NaiveDateTime) -> Self {
+        Self::Value(SqlValue::NaiveDateTime(value))
     }
 }
 // NaiveTime
@@ -738,11 +816,23 @@ impl<'a> From<&'a chrono::NaiveTime> for SqlValueMaybeRef<'a> {
         Self::Ref(SqlValueRef::NaiveTime(value))
     }
 }
+#[always_context]
+impl From<chrono::NaiveTime> for SqlValueMaybeRef<'_> {
+    fn from(value: chrono::NaiveTime) -> Self {
+        Self::Value(SqlValue::NaiveTime(value))
+    }
+}
 // Uuid
 #[always_context]
 impl<'a> From<&'a uuid::Uuid> for SqlValueMaybeRef<'a> {
     fn from(value: &'a uuid::Uuid) -> Self {
         Self::Ref(SqlValueRef::Uuid(value))
+    }
+}
+#[always_context]
+impl From<uuid::Uuid> for SqlValueMaybeRef<'_> {
+    fn from(value: uuid::Uuid) -> Self {
+        Self::Value(SqlValue::Uuid(value))
     }
 }
 // Decimal
@@ -752,11 +842,23 @@ impl<'a> From<&'a sqlx::types::Decimal> for SqlValueMaybeRef<'a> {
         Self::Ref(SqlValueRef::Decimal(value))
     }
 }
+#[always_context]
+impl From<sqlx::types::Decimal> for SqlValueMaybeRef<'_> {
+    fn from(value: sqlx::types::Decimal) -> Self {
+        Self::Value(SqlValue::Decimal(value))
+    }
+}
 // BigDecimal
 #[always_context]
 impl<'a> From<&'a sqlx::types::BigDecimal> for SqlValueMaybeRef<'a> {
     fn from(value: &'a sqlx::types::BigDecimal) -> Self {
         Self::Ref(SqlValueRef::BigDecimal(value))
+    }
+}
+#[always_context]
+impl From<sqlx::types::BigDecimal> for SqlValueMaybeRef<'_> {
+    fn from(value: sqlx::types::BigDecimal) -> Self {
+        Self::Value(SqlValue::BigDecimal(value))
     }
 }
 // Range

@@ -3,9 +3,15 @@ use serde::{Deserialize, Serialize};
 
 use crate::SqlValueMaybeRef;
 
+pub enum AndOr {
+    And,
+    Or,
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub enum WhereExpr<'a> {
     Column(String),
+    ColumnFromTable { table: String, column: String },
     Value(SqlValueMaybeRef<'a>),
     Eq(Box<WhereExpr<'a>>, Box<WhereExpr<'a>>),
     NotEq(Box<WhereExpr<'a>>, Box<WhereExpr<'a>>),
@@ -18,8 +24,7 @@ pub enum WhereExpr<'a> {
     Between(Box<WhereExpr<'a>>, Box<WhereExpr<'a>>, Box<WhereExpr<'a>>),
     IsNull(Box<WhereExpr<'a>>),
     IsNotNull(Box<WhereExpr<'a>>),
-    And(Vec<WhereExpr<'a>>),
-    Or(Vec<WhereExpr<'a>>),
+    AndOr(Box<WhereExpr<'a>>, Vec<(AndOr, WhereExpr<'a>)>),
     Not(Box<WhereExpr<'a>>),
     Parenthesized(Box<WhereExpr<'a>>),
 }

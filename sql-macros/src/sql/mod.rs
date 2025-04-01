@@ -124,9 +124,11 @@ impl Parse for Input {
 pub fn sql(item: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let input = syn::parse_macro_input!(item as Input);
 
+    let mut checks = Vec::new();
+
     if input.only_where() {
         quote! {
-            (|t|{
+            (|___t___|{
 
             },
             easy_lib::easy_sql::WhereClause{
@@ -135,11 +137,12 @@ pub fn sql(item: proc_macro::TokenStream) -> proc_macro::TokenStream {
         }
     } else {
         quote! {
-            (|t|{
+            (|___t___|{
 
             },easy_lib::easy_sql::SelectClauses {
 
             })
         }
     }
+    .into()
 }
