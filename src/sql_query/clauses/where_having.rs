@@ -10,6 +10,7 @@ pub enum AndOr {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub enum WhereExpr<'a> {
+    Error,
     Column(String),
     ColumnFromTable { table: String, column: String },
     Value(SqlValueMaybeRef<'a>),
@@ -20,7 +21,7 @@ pub enum WhereExpr<'a> {
     Lt(Box<WhereExpr<'a>>, Box<WhereExpr<'a>>),
     LtEq(Box<WhereExpr<'a>>, Box<WhereExpr<'a>>),
     Like(Box<WhereExpr<'a>>, Box<WhereExpr<'a>>),
-    In(Box<WhereExpr<'a>>, Box<WhereExpr<'a>>),
+    In(Box<WhereExpr<'a>>, Vec<WhereExpr<'a>>),
     Between(Box<WhereExpr<'a>>, Box<WhereExpr<'a>>, Box<WhereExpr<'a>>),
     IsNull(Box<WhereExpr<'a>>),
     IsNotNull(Box<WhereExpr<'a>>),

@@ -2,8 +2,8 @@ use crate::{sql_column::SqlColumn, sql_next_clause::next_clause_token};
 
 use super::sql_keyword;
 use easy_macros::{
-    proc_macro2::TokenStream,
-    quote::{self, ToTokens, quote, quote_spanned},
+    proc_macro2::{self, TokenStream},
+    quote::{ToTokens, quote, quote_spanned},
     syn::{
         self,
         parse::{Lookahead1, Parse},
@@ -211,7 +211,56 @@ impl WhereExpr {
                     easy_lib::easy_sql::WhereExpr::Like(Box::new(#parsed), Box::new(#parsed1))
                 }
             }
-            WhereExpr::In(sql_value, sql_value_in) => {}
+            WhereExpr::In(sql_value, sql_value_in) => {
+                let parsed = sql_value.into_tokens_with_checks(checks);
+
+                match sql_value_in {
+                    SqlValueIn::Single(sql_value) => {
+                        //Iterator expected
+                        match sql_value {
+                            SqlValue::OutsideVariable(expr) => {
+                                quote_spanned! {expr.span()=>
+                                    {
+                                        fn ___collect_iterator<'a,Y:Into<easy_lib::easy_sql::SqlValueMaybeRef<'a>>,T:Iterator<Item=Y>>(i:T)->Vec<easy_lib::easy_sql::SqlValueMaybeRef<'a>>{
+                                            let collected=Vec::new();
+                                            for item in i{
+                                                collected.push(item.into());
+                                            }
+                                            collected
+                                        }
+
+                                        easy_lib::easy_sql::WhereExpr::In(Box::new(#parsed),___collect_iterator({#expr}))
+                                    }
+                                }
+                            }
+                            v => {
+                                let err_message = format!("Expected a list of values, got {:?}", v);
+
+                                checks.push(quote_spanned! {v.span()=>
+
+                                    {
+                                        compile_error!(#err_message)
+                                    }
+                                });
+
+                                quote! {
+                                    easy_lib::easy_sql::WhereExpr::Error
+                                }
+                            }
+                        }
+                    }
+                    SqlValueIn::Multiple(sql_values) => {
+                        let mut parsed_values = Vec::new();
+                        for sql_value in sql_values {
+                            let parsed_value = sql_value.into_tokens_with_checks(checks);
+                            parsed_values.push(parsed_value);
+                        }
+                        quote! {
+                            easy_lib::easy_sql::WhereExpr::In(Box::new(#parsed), vec![#(#parsed_values),*])
+                        }
+                    }
+                }
+            }
             WhereExpr::Between(sql_value, sql_value1, sql_value2) => {
                 let parsed = sql_value.into_tokens_with_checks(checks);
                 let parsed1 = sql_value1.into_tokens_with_checks(checks);
@@ -223,7 +272,7 @@ impl WhereExpr {
         }
     }
 }
-
+#[derive(Debug)]
 pub enum SqlValue {
     Column(SqlColumn),
     Lit(syn::Lit),
@@ -231,6 +280,17 @@ pub enum SqlValue {
 }
 
 impl SqlValue {
+    fn span(&self) -> proc_macro2::Span {
+        match self {
+            SqlValue::Column(sql_column) => match sql_column {
+                SqlColumn::SpecificTableColumn(path, _) => path.span(),
+                SqlColumn::Column(ident) => ident.span(),
+            },
+            SqlValue::Lit(lit) => lit.span(),
+            SqlValue::OutsideVariable(expr) => expr.span(),
+        }
+    }
+
     fn into_tokens_with_checks(
         self,
         checks: &mut Vec<TokenStream>,

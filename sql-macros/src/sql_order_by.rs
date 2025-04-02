@@ -1,5 +1,12 @@
-use crate::{sql_column::SqlColumn, sql_keyword};
-use easy_macros::syn::{self, parse::Parse};
+use crate::{
+    sql_column::SqlColumn,
+    sql_keyword::{self},
+};
+use easy_macros::{
+    proc_macro2::TokenStream,
+    quote::quote,
+    syn::{self, parse::Parse},
+};
 
 pub enum Order {
     Asc,
@@ -24,6 +31,23 @@ impl Parse for Order {
 pub struct OrderBy {
     pub column: SqlColumn,
     pub order: Order,
+}
+
+impl OrderBy {
+    pub fn into_tokens_with_checks(self, checks: &mut Vec<TokenStream>) -> TokenStream {
+        let column_parsed = self.column.into_tokens_with_checks(checks);
+        let order_parsed = match self.order {
+            Order::Asc => quote! {false},
+            Order::Desc => quote! {true},
+        };
+
+        quote! {
+            easy_lib::easy_sql::OrderBy{
+                descending: #order_parsed,
+                column: #column_parsed,
+            }
+        }
+    }
 }
 
 impl Parse for OrderBy {
