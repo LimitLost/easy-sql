@@ -1,7 +1,7 @@
 use easy_macros::{
     proc_macro2::TokenStream,
-    quote::quote,
-    syn::{self, parse::Parse},
+    quote::{quote, quote_spanned},
+    syn::{self, parse::Parse, spanned::Spanned},
 };
 
 pub enum SqlLimit {
@@ -28,7 +28,7 @@ impl Parse for SqlLimit {
 }
 
 impl SqlLimit {
-    pub fn into_tokens_with_checks(self, checks: &mut Vec<TokenStream>) -> TokenStream {
+    pub fn into_tokens_with_checks(self, _checks: &mut Vec<TokenStream>) -> TokenStream {
         match self {
             SqlLimit::Literal(l) => {
                 quote! {easy_lib::easy_sql::LimitClause{
@@ -36,7 +36,7 @@ impl SqlLimit {
                 }}
             }
             SqlLimit::Expr(expr) => {
-                quote! {easy_lib::easy_sql::LimitClause{
+                quote_spanned! {expr.span()=>easy_lib::easy_sql::LimitClause{
                     limit: {#expr},
                 } }
             }

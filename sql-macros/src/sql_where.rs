@@ -11,7 +11,7 @@ use easy_macros::{
     },
 };
 
-enum AndOr {
+pub enum AndOr {
     And,
     Or,
 }

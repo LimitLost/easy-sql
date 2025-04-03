@@ -8,15 +8,6 @@ use crate::{
     sql_where::WhereExpr,
 };
 
-enum SqlClause {
-    Distinct,
-    Where,
-    OrderBy,
-    GroupBy,
-    Having,
-    Limit,
-}
-
 struct Input {
     distinct: bool,
     where_: Option<WhereExpr>,
@@ -140,18 +131,68 @@ pub fn sql(item: proc_macro::TokenStream) -> proc_macro::TokenStream {
     } else {
         let where_ = input
             .where_
-            .map(|w| w.into_tokens_with_checks(&mut checks))
+            .map(|w| {
+                let tokens = w.into_tokens_with_checks(&mut checks);
+
+                quote! {Some(easy_lib::easy_sql::WhereClause{
+                    conditions:#tokens
+                })}
+            })
             .unwrap_or_else(|| quote! {None});
 
-        //TODO Rest of the clauses
+        let group_by = input
+            .group_by
+            .map(|g| {
+                let tokens = g
+                    .into_iter()
+                    .map(|el| el.into_tokens_with_checks(&mut checks));
+
+                quote! {Some(GroupByClause{columns: vec![#(#tokens),*]})}
+            })
+            .unwrap_or_else(|| quote! {None});
+
+        let having = input
+            .having
+            .map(|h| {
+                let tokens = h.into_tokens_with_checks(&mut checks);
+
+                quote! {Some(easy_lib::easy_sql::HavingClause{conditions: #tokens})}
+            })
+            .unwrap_or_else(|| quote! {None});
+
+        let order_by = input
+            .order_by
+            .map(|o| {
+                let tokens = o
+                    .into_iter()
+                    .map(|el| el.into_tokens_with_checks(&mut checks));
+
+                quote! {Some(easy_lib::easy_sql::OrderByClause{conditions: vec![#(#tokens),*]})}
+            })
+            .unwrap_or_else(|| quote! {None});
+        let limit = input
+            .limit
+            .map(|l| {
+                let tokens = l.into_tokens_with_checks(&mut checks);
+
+                quote! {Some(#tokens)}
+            })
+            .unwrap_or_else(|| quote! {None});
+
+        let distinct = input.distinct;
 
         quote! {
             (|___t___|{
                 #(#checks)*
             },
             easy_lib::easy_sql::SelectClauses {
+                distinct: #distinct,
 
                 where_: #where_,
+                group_by: #group_by,
+                having: #having,
+                order_by: #order_by,
+                limit: #limit,
             })
         }
     }

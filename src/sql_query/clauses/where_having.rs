@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::SqlValueMaybeRef;
 
+#[derive(Debug, Serialize, Deserialize)]
 pub enum AndOr {
     And,
     Or,
@@ -84,8 +85,12 @@ impl<'a> WhereExpr<'a> {
             }
             WhereExpr::In(where_expr, where_expr1) => {
                 let left = where_expr.to_query_data(current_binding_n, bindings_list);
-                let right = where_expr1.to_query_data(current_binding_n, bindings_list);
-                format!("({} IN {})", left, right)
+                let right = where_expr1
+                    .iter()
+                    .map(|expr| expr.to_query_data(current_binding_n, bindings_list))
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                format!("({} IN ({}))", left, right)
             }
             WhereExpr::Between(where_expr, where_expr1, where_expr2) => {
                 let left = where_expr.to_query_data(current_binding_n, bindings_list);
@@ -101,42 +106,22 @@ impl<'a> WhereExpr<'a> {
                 let left = where_expr.to_query_data(current_binding_n, bindings_list);
                 format!("({} IS NOT NULL)", left)
             }
-            WhereExpr::And(where_exprs) => {
-                let mut iter = where_exprs.iter();
-
+            WhereExpr::AndOr(first_expr, where_exprs) => {
                 let mut formatted = String::new();
-                if let Some(first) = iter.next() {
-                    formatted.push('(');
+                formatted.push('(');
 
-                    formatted.push_str(&first.to_query_data(current_binding_n, bindings_list));
+                formatted.push_str(&first_expr.to_query_data(current_binding_n, bindings_list));
 
-                    for where_expr in iter {
-                        formatted.push_str(" AND ");
-                        formatted
-                            .push_str(&where_expr.to_query_data(current_binding_n, bindings_list));
+                for (and_or, where_expr) in where_exprs.iter() {
+                    match and_or {
+                        AndOr::And => formatted.push_str(" AND "),
+                        AndOr::Or => formatted.push_str(" OR "),
                     }
-
-                    formatted.push(')');
+                    formatted.push_str(&where_expr.to_query_data(current_binding_n, bindings_list));
                 }
-                formatted
-            }
-            WhereExpr::Or(where_exprs) => {
-                let mut iter = where_exprs.iter();
 
-                let mut formatted = String::new();
-                if let Some(first) = iter.next() {
-                    formatted.push('(');
+                formatted.push(')');
 
-                    formatted.push_str(&first.to_query_data(current_binding_n, bindings_list));
-
-                    for where_expr in iter {
-                        formatted.push_str(" OR ");
-                        formatted
-                            .push_str(&where_expr.to_query_data(current_binding_n, bindings_list));
-                    }
-
-                    formatted.push(')');
-                }
                 formatted
             }
             WhereExpr::Not(where_expr) => {
@@ -148,6 +133,12 @@ impl<'a> WhereExpr<'a> {
                     "({})",
                     where_expr.to_query_data(current_binding_n, bindings_list)
                 )
+            }
+            WhereExpr::ColumnFromTable { table, column } => {
+                format!("{}.{}", table, column)
+            }
+            WhereExpr::Error => {
+                panic!("Error in WhereExpr")
             }
         }
     }
