@@ -127,20 +127,31 @@ pub fn sql(item: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let mut checks = Vec::new();
 
     if input.only_where() {
+        let where_ = input.where_.unwrap().into_tokens_with_checks(&mut checks);
+
         quote! {
             (|___t___|{
-
+                #(#checks)*
             },
             easy_lib::easy_sql::WhereClause{
-                conditions
+                conditions: #where_
             })
         }
     } else {
+        let where_ = input
+            .where_
+            .map(|w| w.into_tokens_with_checks(&mut checks))
+            .unwrap_or_else(|| quote! {None});
+
+        //TODO Rest of the clauses
+
         quote! {
             (|___t___|{
+                #(#checks)*
+            },
+            easy_lib::easy_sql::SelectClauses {
 
-            },easy_lib::easy_sql::SelectClauses {
-
+                where_: #where_,
             })
         }
     }

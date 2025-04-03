@@ -1,4 +1,8 @@
-use easy_macros::syn::{self, parse::Parse};
+use easy_macros::{
+    proc_macro2::TokenStream,
+    quote::quote,
+    syn::{self, parse::Parse},
+};
 
 pub enum SqlLimit {
     Literal(i64),
@@ -19,6 +23,23 @@ impl Parse for SqlLimit {
             Ok(SqlLimit::Expr(expr))
         } else {
             Err(lookahead.error())
+        }
+    }
+}
+
+impl SqlLimit {
+    pub fn into_tokens_with_checks(self, checks: &mut Vec<TokenStream>) -> TokenStream {
+        match self {
+            SqlLimit::Literal(l) => {
+                quote! {easy_lib::easy_sql::LimitClause{
+                    limit: #l,
+                }}
+            }
+            SqlLimit::Expr(expr) => {
+                quote! {easy_lib::easy_sql::LimitClause{
+                    limit: {#expr},
+                } }
+            }
         }
     }
 }

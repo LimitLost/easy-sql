@@ -50,7 +50,7 @@ pub enum WhereExpr {
 }
 
 impl WhereExpr {
-    fn into_tokens_with_checks(
+    pub fn into_tokens_with_checks(
         self,
         checks: &mut Vec<TokenStream>,
     ) -> easy_macros::proc_macro2::TokenStream {
