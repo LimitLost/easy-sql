@@ -3,7 +3,7 @@ use easy_macros::{
     syn::{self, parse::Parse},
 };
 
-use crate::{
+use crate::sql_macros_components::{
     sql_column::SqlColumn, sql_keyword, sql_limit::SqlLimit, sql_order_by::OrderBy,
     sql_where::WhereExpr,
 };

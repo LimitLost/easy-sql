@@ -1,6 +1,6 @@
 use easy_macros::syn::parse::Lookahead1;
 
-use crate::sql_keyword;
+use super::sql_keyword;
 
 /// Checks if the next token starts a new clause in SQL.
 pub fn next_clause_token(lookahead: &Lookahead1) -> bool {

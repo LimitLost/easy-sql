@@ -1,4 +1,4 @@
-use crate::sql_where::WhereExpr;
+use crate::sql_macros_components::sql_where::WhereExpr;
 use easy_macros::{quote::quote, syn};
 
 pub fn sql_where(item: proc_macro::TokenStream) -> proc_macro::TokenStream {

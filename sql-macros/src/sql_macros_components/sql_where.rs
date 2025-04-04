@@ -1,4 +1,4 @@
-use crate::{sql_column::SqlColumn, sql_next_clause::next_clause_token};
+use super::{sql_column::SqlColumn, sql_next_clause::next_clause_token};
 
 use super::sql_keyword;
 use easy_macros::{
