@@ -1095,6 +1095,7 @@ checksum = "30bde2b3dc3671ae49d8e2e9f044c7c005836e7a023ee57cffa25ab82764bb9e"
 name = "macro-result"
 version = "0.1.0"
 dependencies = [
+ "helpers-macro-safe",
  "proc-macro2",
  "quote",
  "syn 2.0.100",
