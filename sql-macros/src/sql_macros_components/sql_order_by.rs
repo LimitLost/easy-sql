@@ -3,6 +3,7 @@ use super::{
     sql_keyword::{self},
 };
 use easy_macros::{
+    macros::always_context,
     proc_macro2::TokenStream,
     quote::quote,
     syn::{self, parse::Parse},
@@ -13,6 +14,7 @@ pub enum Order {
     Desc,
 }
 
+#[always_context]
 impl Parse for Order {
     fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
         let lookahead = input.lookahead1();
@@ -33,6 +35,7 @@ pub struct OrderBy {
     pub order: Order,
 }
 
+#[always_context]
 impl OrderBy {
     pub fn into_tokens_with_checks(self, checks: &mut Vec<TokenStream>) -> TokenStream {
         let column_parsed = self.column.into_tokens_with_checks(checks);
@@ -50,6 +53,7 @@ impl OrderBy {
     }
 }
 
+#[always_context]
 impl Parse for OrderBy {
     fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
         let column: SqlColumn = input.parse()?;

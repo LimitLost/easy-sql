@@ -783,6 +783,21 @@ impl<'a, T: Into<SqlValueMaybeRef<'a>>> From<Vec<T>> for SqlValueMaybeRef<'a> {
         SqlValueMaybeRef::Vec(v)
     }
 }
+
+#[always_context]
+impl<'a, T> From<&Vec<T>> for SqlValueMaybeRef<'a>
+where
+    &'a T: Into<SqlValueMaybeRef<'a>>,
+{
+    fn from(value: Vec<T>) -> Self {
+        let mut v = Vec::new();
+        for i in value.iter() {
+            v.push(i.into());
+        }
+        SqlValueMaybeRef::Vec(v)
+    }
+}
+
 // NaiveDate
 #[always_context]
 impl<'a> From<&'a chrono::NaiveDate> for SqlValueMaybeRef<'a> {

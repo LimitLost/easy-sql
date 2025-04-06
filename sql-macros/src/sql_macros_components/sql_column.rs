@@ -1,4 +1,5 @@
 use easy_macros::{
+    macros::always_context,
     proc_macro2::TokenStream,
     quote::{quote, quote_spanned},
     syn::{self, parse::Parse, spanned::Spanned},
@@ -9,6 +10,7 @@ pub enum SqlColumn {
     Column(syn::Ident),
 }
 
+#[always_context]
 impl SqlColumn {
     pub fn into_tokens_with_checks(self, checks: &mut Vec<TokenStream>) -> TokenStream {
         match self {
@@ -39,6 +41,7 @@ impl SqlColumn {
     }
 }
 
+#[always_context]
 impl Parse for SqlColumn {
     fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
         let path_or_ident: syn::Path = input.parse()?;

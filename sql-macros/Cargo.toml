@@ -8,6 +8,7 @@ proc-macro = true
 
 [dependencies]
 easy-macros = { path = "../../easy-macros", features = ["for-macro"] }
+convert_case = "0.8.0"
 
 [build-dependencies]
 easy-macros = { path = "../../easy-macros", features = ["build"] }

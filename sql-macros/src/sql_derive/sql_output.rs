@@ -1,11 +1,12 @@
 use easy_macros::{
     anyhow::{self, Context},
     helpers::{context, parse_macro_input},
-    macros::get_attributes,
+    macros::{always_context, get_attributes},
     quote::{ToTokens, quote},
     syn,
 };
 
+#[always_context]
 pub fn sql_output(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::TokenStream> {
     let item = parse_macro_input!(item as syn::ItemStruct);
     let item_name = &item.ident;
@@ -41,6 +42,7 @@ pub fn sql_output(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::T
         table = Some(attr);
     }
 
+    #[no_context]
     let table = table.with_context(context!("Table attribute is required"))?;
 
     Ok(quote! {

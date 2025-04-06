@@ -1,4 +1,5 @@
 use easy_macros::{
+    macros::always_context,
     quote::quote,
     syn::{self, parse::Parse},
 };
@@ -17,6 +18,7 @@ struct Input {
     limit: Option<SqlLimit>,
 }
 
+#[always_context]
 impl Input {
     fn only_where(&self) -> bool {
         let Self {
@@ -36,6 +38,7 @@ impl Input {
     }
 }
 
+#[always_context]
 impl Parse for Input {
     fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
         let mut distinct = false;

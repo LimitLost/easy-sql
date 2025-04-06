@@ -1,10 +1,12 @@
 use easy_macros::{
     anyhow,
     helpers::parse_macro_input,
+    macros::always_context,
     quote::{ToTokens, quote},
     syn,
 };
 
+#[always_context]
 pub fn database_setup(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::TokenStream> {
     let item = parse_macro_input!(item as syn::ItemStruct);
 

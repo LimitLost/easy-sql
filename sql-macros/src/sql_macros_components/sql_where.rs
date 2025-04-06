@@ -1,6 +1,7 @@
 use super::{sql_column::SqlColumn, sql_next_clause::next_clause_token};
 
 use super::sql_keyword;
+use easy_macros::macros::always_context;
 use easy_macros::{
     proc_macro2::{self, TokenStream},
     quote::{ToTokens, quote, quote_spanned},
@@ -16,6 +17,7 @@ pub enum AndOr {
     Or,
 }
 
+#[always_context]
 impl Parse for AndOr {
     fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
         let lookahead = input.lookahead1();
@@ -49,6 +51,7 @@ pub enum WhereExpr {
     Between(SqlValue, SqlValue, SqlValue),
 }
 
+#[always_context]
 impl WhereExpr {
     pub fn into_tokens_with_checks(
         self,
@@ -279,6 +282,7 @@ pub enum SqlValue {
     OutsideVariable(syn::Expr),
 }
 
+#[always_context]
 impl SqlValue {
     fn span(&self) -> proc_macro2::Span {
         match self {
@@ -352,12 +356,14 @@ pub enum SqlValueIn {
     Multiple(Vec<SqlValue>),
 }
 
+#[always_context]
 impl SqlValue {
     fn lookahead(l: &Lookahead1<'_>) -> bool {
         l.peek(syn::Ident) || l.peek(syn::Lit) || l.peek(syn::token::Brace)
     }
 }
 
+#[always_context]
 impl Parse for SqlValue {
     fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
         let lookahead = input.lookahead1();
@@ -377,6 +383,7 @@ impl Parse for SqlValue {
     }
 }
 
+#[always_context]
 impl Parse for SqlValueIn {
     fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
         let lookahead = input.lookahead1();
@@ -552,6 +559,7 @@ fn parse_where_expr_no_continue(input: &syn::parse::ParseStream) -> syn::Result<
     }
 }
 
+#[always_context]
 impl Parse for WhereExpr {
     fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
         let lookahead = input.lookahead1();

@@ -1,4 +1,5 @@
 use easy_macros::{
+    macros::always_context,
     proc_macro2::TokenStream,
     quote::{quote, quote_spanned},
     syn::{self, parse::Parse, spanned::Spanned},
@@ -9,6 +10,7 @@ pub enum SqlLimit {
     Expr(syn::Expr),
 }
 
+#[always_context]
 impl Parse for SqlLimit {
     fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
         let lookahead = input.lookahead1();
@@ -27,6 +29,7 @@ impl Parse for SqlLimit {
     }
 }
 
+#[always_context]
 impl SqlLimit {
     pub fn into_tokens_with_checks(self, _checks: &mut Vec<TokenStream>) -> TokenStream {
         match self {
