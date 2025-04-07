@@ -19,14 +19,21 @@ pub use sql_output::*;
 pub use sql_table::*;
 pub use sql_update::*;
 
-enum IntoTy {
-    NoRef,
-    Ref,
+enum TyData {
+    Binary,
+    IntoNoRef,
+    IntoRef,
 }
 
-struct TyData {
-    into: Option<IntoTy>,
-    bytes: bool,
+#[always_context]
+impl TyData {
+    fn bytes(&self) -> bool {
+        match self {
+            TyData::Binary => true,
+            TyData::IntoNoRef => false,
+            TyData::IntoRef => false,
+        }
+    }
 }
 
 #[always_context]
@@ -39,18 +46,12 @@ fn ty_name_into_data(
         //Handle both bytes and accepted type list
         "Vec" => match generic_arg {
             Some(arg) => {
-                let subtype_bytes = ty_name_into_data(&arg, None::<String>, true)?.bytes;
+                let subtype_bytes = ty_name_into_data(&arg, None::<String>, true)?.bytes();
                 if bytes_allowed {
                     if subtype_bytes {
-                        Ok(TyData {
-                            into: None,
-                            bytes: true,
-                        })
+                        Ok(TyData::Binary)
                     } else {
-                        Ok(TyData {
-                            into: Some(IntoTy::Ref),
-                            bytes: false,
-                        })
+                        Ok(TyData::IntoRef)
                     }
                 } else if subtype_bytes {
                     anyhow::bail!(
@@ -58,10 +59,7 @@ fn ty_name_into_data(
                         arg
                     );
                 } else {
-                    Ok(TyData {
-                        into: Some(IntoTy::Ref),
-                        bytes: false,
-                    })
+                    Ok(TyData::IntoRef)
                 }
             }
             None => {
@@ -70,24 +68,15 @@ fn ty_name_into_data(
         },
         "IpAddr" | "bool" | "f32" | "f64" | "i8" | "i16" | "i32" | "i64" | "String"
         | "PgInterval" | "Array" | "NaiveDate" | "NaiveDateTime" | "NaiveTime" | "Uuid"
-        | "Decimal" | "BigDecimal" => Ok(TyData {
-            into: Some(IntoTy::Ref),
-            bytes: false,
-        }),
+        | "Decimal" | "BigDecimal" => Ok(TyData::IntoRef),
         "PgRange" => match generic_arg {
             Some(arg) => match arg.as_str() {
                 "i32" | "i64" | "NaiveDate" | "NaiveDateTime" | "BigDecimal" | "Decimal" => {
-                    Ok(TyData {
-                        into: Some(IntoTy::Ref),
-                        bytes: false,
-                    })
+                    Ok(TyData::IntoRef)
                 }
                 _ => {
                     if bytes_allowed {
-                        Ok(TyData {
-                            into: None,
-                            bytes: true,
-                        })
+                        Ok(TyData::Binary)
                     } else {
                         anyhow::bail!(
                             "PgRange Generic Argument `{}` is not supported, use #[sql(bytes)] to convert range into bytes",
@@ -103,17 +92,11 @@ fn ty_name_into_data(
         "Range" => match generic_arg {
             Some(arg) => match arg.as_str() {
                 "i32" | "i64" | "NaiveDate" | "NaiveDateTime" | "BigDecimal" | "Decimal" => {
-                    Ok(TyData {
-                        into: Some(IntoTy::NoRef),
-                        bytes: false,
-                    })
+                    Ok(TyData::IntoNoRef)
                 }
                 _ => {
                     if bytes_allowed {
-                        Ok(TyData {
-                            into: None,
-                            bytes: true,
-                        })
+                        Ok(TyData::Binary)
                     } else {
                         anyhow::bail!(
                             "Range Generic Argument `{}` is not supported, use #[sql(bytes)] to convert range into bytes",
@@ -128,10 +111,7 @@ fn ty_name_into_data(
         },
         unknown_ty => {
             if bytes_allowed {
-                Ok(TyData {
-                    into: None,
-                    bytes: true,
-                })
+                Ok(TyData::Binary)
             } else {
                 anyhow::bail!(
                     "Unknown type {} is not supported, use #[sql(bytes)] to convert it into bytes",
@@ -187,7 +167,26 @@ fn ty_to_variant(
                 syn::PathArguments::Parenthesized(parenthesized_generic_arguments) => None,
             };
 
-            ty_name_into_data(&name.ident.to_string(), generic_arg, bytes_allowed)
+            let found = ty_name_into_data(&name.ident.to_string(), generic_arg, bytes_allowed)?;
+
+            match found {
+                TyData::Binary => {
+                    //TODO Binary Value Variant
+                    quote! {
+                        easy_lib::sql::to_binary
+                    }
+                }
+                TyData::IntoNoRef => {
+                    quote! {
+                        self.#field_name.into()
+                    }
+                }
+                TyData::IntoRef => {
+                    quote! {
+                        (&self.#field_name).into()
+                    }
+                }
+            }
 
             //TODO Handle type data, generate variant
         }
