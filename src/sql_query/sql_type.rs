@@ -106,6 +106,7 @@ pub enum SqlType {
     //Time
 }
 
+#[always_context]
 impl SqlType{
     pub fn sqlite(self)->&'static str{
         match self {

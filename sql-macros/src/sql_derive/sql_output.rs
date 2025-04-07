@@ -2,12 +2,16 @@ use easy_macros::{
     anyhow::{self, Context},
     helpers::{context, parse_macro_input},
     macros::{always_context, get_attributes},
+    proc_macro2::TokenStream,
     quote::{ToTokens, quote},
-    syn,
+    syn::{self, punctuated::Punctuated},
 };
 
-pub fn sql_output_base(item_name:&syn::Ident,fields:&Punctuated<syn::Field, syn::Token![,]>, table:&TokenStream) -> proc_macro::TokenStream{
-
+pub fn sql_output_base(
+    item_name: &syn::Ident,
+    fields: &Punctuated<syn::Field, syn::Token![,]>,
+    table: &TokenStream,
+) -> TokenStream {
     let field_names = fields.iter().map(|field| field.ident.as_ref().unwrap());
     let field_names2 = field_names.clone();
     let field_names_str = field_names.clone().map(|field| field.to_string());
@@ -59,7 +63,7 @@ pub fn sql_output_base(item_name:&syn::Ident,fields:&Punctuated<syn::Field, syn:
             }
         }
 
-    }.into()
+    }
 }
 
 #[always_context]
@@ -87,5 +91,5 @@ pub fn sql_output(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::T
     #[no_context]
     let table = table.with_context(context!("Table attribute is required"))?;
 
-    Ok(sql_output_base(&item_name, &fields, &table))
+    Ok(sql_output_base(&item_name, &fields, &table).into())
 }

@@ -2,9 +2,12 @@ use easy_macros::{
     anyhow::{self, Context},
     helpers::{context, parse_macro_input},
     macros::{always_context, get_attributes},
+    proc_macro2::TokenStream,
     quote::{ToTokens, quote},
     syn::{self, parse::Parse, punctuated::Punctuated},
 };
+
+use super::ty_to_variant;
 
 struct DefaultAttr {
     fields: Punctuated<syn::Ident, syn::Token![,]>,
@@ -18,15 +21,27 @@ impl Parse for DefaultAttr {
     }
 }
 
-pub fn sql_insert_base(item_name:&syn::Ident,fields:&Punctuated<syn::Field, syn::Token![,]>, table:&TokenStream, defaults:Vec<syn::Ident>) -> proc_macro::TokenStream{
+#[always_context]
+pub fn sql_insert_base(
+    item_name: &syn::Ident,
+    fields: &Punctuated<syn::Field, syn::Token![,]>,
+    table: &TokenStream,
+    defaults: Vec<syn::Ident>,
+) -> anyhow::Result<TokenStream> {
     let field_names = fields.iter().map(|field| field.ident.as_ref().unwrap());
     let field_names_str = field_names.clone().map(|field| field.to_string());
 
-    let insert_values=fields.iter().map(|field| {
-        let field_name = field.ident.as_ref().unwrap();
-        ty_to_variant(field_name, &field.ty,quote!{easy_lib::sql},true)
-    });
+    let mut insert_values = Vec::new();
 
+    for field in fields.iter() {
+        let field_name = field.ident.as_ref().unwrap();
+        insert_values.push(ty_to_variant(
+            field_name.to_token_stream(),
+            &field.ty,
+            &quote! {easy_lib::sql},
+            true,
+        )?);
+    }
 
     Ok(quote! {
         impl easy_lib::sql::SqlInsert<#table> for #item_name {
@@ -58,8 +73,7 @@ pub fn sql_insert_base(item_name:&syn::Ident,fields:&Punctuated<syn::Field, syn:
             }
         }
 
-    }
-    .into())
+    })
 }
 
 #[always_context]
@@ -97,5 +111,5 @@ pub fn sql_insert(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::T
         defaults.extend(parsed.fields.into_iter());
     }
 
-    Ok(sql_insert_base(&item_name,&fields,&table,defaults))
+    sql_insert_base(&item_name, &fields, &table, defaults).map(|e| e.into())
 }

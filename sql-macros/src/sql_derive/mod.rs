@@ -11,7 +11,7 @@ use easy_macros::{
     helpers::context,
     macros::always_context,
     proc_macro2::{self, TokenStream},
-    quote::{self, quote},
+    quote::{self, ToTokens, quote},
     syn,
 };
 pub use sql_insert::*;
@@ -39,14 +39,14 @@ impl TyData {
 #[always_context]
 fn ty_name_into_data(
     ty: &str,
-    generic_arg: Option<String>,
+    generic_arg: &Option<String>,
     bytes_allowed: bool,
 ) -> anyhow::Result<TyData> {
     match ty {
         //Handle both bytes and accepted type list
         "Vec" => match generic_arg {
             Some(arg) => {
-                let subtype_bytes = ty_name_into_data(&arg, None::<String>, true)?.bytes();
+                let subtype_bytes = ty_name_into_data(&arg, &None::<String>, true)?.bytes();
                 if bytes_allowed {
                     if subtype_bytes {
                         Ok(TyData::Binary)
@@ -145,7 +145,7 @@ fn ty_to_variant(
                 .with_context(context!("Type path is empty | ty: {:?}", type_path))?;
 
             //Get the last segment of the path in generic arg
-            let generic_arg = match name.arguments {
+            let generic_arg = match &name.arguments {
                 syn::PathArguments::None => None,
                 syn::PathArguments::AngleBracketed(angle_bracketed_generic_arguments) => {
                     angle_bracketed_generic_arguments
@@ -167,14 +167,12 @@ fn ty_to_variant(
                 syn::PathArguments::Parenthesized(parenthesized_generic_arguments) => None,
             };
 
-            let found = ty_name_into_data(&name.ident.to_string(), generic_arg, bytes_allowed)?;
+            let found = ty_name_into_data(&name.ident.to_string(), &generic_arg, bytes_allowed)?;
 
-            
-
-            match found {
+            Ok(match found {
                 TyData::Binary => {
                     quote! {
-                        easy_lib::sql::SqlValueMaybeRef::Value(easy_lib::sql::SqlValue::Binary(easy_lib::sql::to_binary(&self.#field_name)?)) 
+                        easy_lib::sql::SqlValueMaybeRef::Value(easy_lib::sql::SqlValue::Binary(easy_lib::sql::to_binary(&self.#field_name)?))
                     }
                 }
                 TyData::IntoNoRef => {
@@ -187,14 +185,14 @@ fn ty_to_variant(
                         (&self.#field_name).into()
                     }
                 }
-            }
+            })
         }
         syn::Type::Reference(type_reference) => {
             //(&) into ref
             anyhow::bail!("References are not supported yet")
-        },
+        }
         t => {
-            anyhow::bail!("Unsupported type: {}", t.to_token_stream()) 
-        },
+            anyhow::bail!("Unsupported type: {}", t.to_token_stream())
+        }
     }
 }

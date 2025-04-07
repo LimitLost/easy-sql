@@ -37,6 +37,7 @@ pub struct CreateTable{
     pub fields: Vec<TableField>,
 }
 
+#[always_context]
 impl SetupSql for CreateTable{
     type Output = ();
     

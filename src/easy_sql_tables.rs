@@ -5,6 +5,7 @@ pub struct EasySqlTables{
     pub version: i64,
 }
 
+#[always_context]
 impl EasySqlTables{
     pub async fn create(conn: &mut (impl EasyExecutor + Send + Sync), table_id: String, version: i64) -> anyhow::Result<()>{
         EasySqlTables::insert(conn, &EasySqlTables{table_id, version}).await?;
@@ -30,6 +31,7 @@ struct EasySqlTableVersion{
     pub version:i64
 }
 
+#[always_context]
 impl SqlTable for EasySqlTables{
     fn table_name()->&'static str{
         "easy_sql_tables"
