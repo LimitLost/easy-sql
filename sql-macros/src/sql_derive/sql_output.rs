@@ -6,18 +6,7 @@ use easy_macros::{
     syn,
 };
 
-#[always_context]
-pub fn sql_output(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::TokenStream> {
-    let item = parse_macro_input!(item as syn::ItemStruct);
-    let item_name = &item.ident;
-
-    let fields = match item.fields {
-        syn::Fields::Named(fields_named) => fields_named.named,
-        syn::Fields::Unnamed(_) => {
-            anyhow::bail!("Unnamed struct fields is not supported")
-        }
-        syn::Fields::Unit => anyhow::bail!("Unit struct is not supported"),
-    };
+pub fn sql_output_base(item_name:&syn::Ident,fields:&Punctuated<syn::Field, syn::Token![,]>, table:&TokenStream) -> proc_macro::TokenStream{
 
     let field_names = fields.iter().map(|field| field.ident.as_ref().unwrap());
     let field_names2 = field_names.clone();
@@ -33,19 +22,7 @@ pub fn sql_output(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::T
         )
     });
 
-    let mut table = None;
-
-    for attr in get_attributes!(item, #[sql(table = __unknown__)]) {
-        if table.is_some() {
-            anyhow::bail!("Only one table attribute is allowed");
-        }
-        table = Some(attr);
-    }
-
-    #[no_context]
-    let table = table.with_context(context!("Table attribute is required"))?;
-
-    Ok(quote! {
+    quote! {
         impl easy_lib::sql::SqlOutput<#table, easy_lib::sql::Row> for #item_name {
             fn sql_to_query<'a>(sql: &'a easy_lib::sql::Sql<'a>) -> easy_lib::anyhow::Result<easy_lib::sql::QueryData<'a>> {
                 easy_lib::sql::never::never_fn(|| {
@@ -82,5 +59,33 @@ pub fn sql_output(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::T
             }
         }
 
-    }.into())
+    }.into()
+}
+
+#[always_context]
+pub fn sql_output(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::TokenStream> {
+    let item = parse_macro_input!(item as syn::ItemStruct);
+    let item_name = &item.ident;
+
+    let fields = match item.fields {
+        syn::Fields::Named(fields_named) => fields_named.named,
+        syn::Fields::Unnamed(_) => {
+            anyhow::bail!("Unnamed struct fields is not supported")
+        }
+        syn::Fields::Unit => anyhow::bail!("Unit struct is not supported"),
+    };
+
+    let mut table = None;
+
+    for attr in get_attributes!(item, #[sql(table = __unknown__)]) {
+        if table.is_some() {
+            anyhow::bail!("Only one table attribute is allowed");
+        }
+        table = Some(attr);
+    }
+
+    #[no_context]
+    let table = table.with_context(context!("Table attribute is required"))?;
+
+    Ok(sql_output_base(&item_name, &fields, &table))
 }

@@ -169,11 +169,12 @@ fn ty_to_variant(
 
             let found = ty_name_into_data(&name.ident.to_string(), generic_arg, bytes_allowed)?;
 
+            
+
             match found {
                 TyData::Binary => {
-                    //TODO Binary Value Variant
                     quote! {
-                        easy_lib::sql::to_binary
+                        easy_lib::sql::SqlValueMaybeRef::Value(easy_lib::sql::SqlValue::Binary(easy_lib::sql::to_binary(&self.#field_name)?)) 
                     }
                 }
                 TyData::IntoNoRef => {
@@ -187,16 +188,13 @@ fn ty_to_variant(
                     }
                 }
             }
-
-            //TODO Handle type data, generate variant
         }
-        syn::Type::Reference(type_reference) => todo!(),
-        syn::Type::Slice(type_slice) => todo!(),
-        syn::Type::TraitObject(type_trait_object) => todo!(),
-        syn::Type::Tuple(type_tuple) => todo!(),
-        syn::Type::Verbatim(token_stream) => todo!(),
-        _ => todo!(),
+        syn::Type::Reference(type_reference) => {
+            //(&) into ref
+            anyhow::bail!("References are not supported yet")
+        },
+        t => {
+            anyhow::bail!("Unsupported type: {}", t.to_token_stream()) 
+        },
     }
 }
-
-fn update_ty_to_variant(ty: &syn::Type) -> TokenStream {}

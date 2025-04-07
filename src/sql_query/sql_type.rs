@@ -105,3 +105,30 @@ pub enum SqlType {
     //PrimitiveDateTime
     //Time
 }
+
+impl SqlType{
+    pub fn sqlite(self)->&'static str{
+        match self {
+            SqlType::IpAddr => "BLOB",
+            SqlType::Bool => "BOOLEAN",
+            SqlType::F32 => "FLOAT",
+            SqlType::F64 => "DOUBLE",
+            SqlType::I8 => "INT",
+            SqlType::I16 => "INT",
+            SqlType::I32 => "INT",
+            SqlType::I64 => "INT",
+            SqlType::String => "TEXT",
+            SqlType::Interval => "BLOB",
+            SqlType::Bytes => "BLOB",
+            SqlType::List(_) => "BLOB",
+            SqlType::Array { .. } => "BLOB",
+            SqlType::NaiveDate => "BLOB",
+            SqlType::NaiveDateTime => "BLOB",
+            SqlType::NaiveTime => "BLOB",
+            SqlType::Uuid => "BLOB",
+            SqlType::Decimal => "BLOB",
+            SqlType::BigDecimal => "BLOB",
+            SqlType::Range(_) => "BLOB",
+        }
+    }
+}

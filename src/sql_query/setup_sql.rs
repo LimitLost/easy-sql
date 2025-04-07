@@ -6,7 +6,7 @@ use sqlx::Row;
 use crate::SetupSql;
 
 pub struct TableExists {
-    name: &'static str,
+    pub name: &'static str,
 }
 
 #[always_context]
@@ -29,5 +29,78 @@ impl SetupSql for TableExists {
             .with_context(context!("table_name: {:?} | query: {:?}", self.name, query))?
             .get(0);
         Ok(result)
+    }
+}
+
+pub struct CreateTable{
+    pub table_name: &'static str,
+    pub fields: Vec<TableField>,
+}
+
+impl SetupSql for CreateTable{
+    type Output = ();
+    
+    async fn query<'a>(
+        self,
+        exec: impl sqlx::Executor<'a, Database = crate::Db> + Send + Sync,
+    ) -> anyhow::Result<Self::Output> {
+
+        let mut table_fields=String::new();
+        let mut table_constrains=String::new();
+
+        for field in self.fields.into_iter(){
+            let TableField{
+                name,
+                data_type,
+                is_primary_key,
+                foreign_key,
+                is_unique,
+                is_not_null,
+            }=field;
+
+            let date_type_sqlite=data_type.sqlite();
+
+            let primary_key=if is_foreign_key{
+                "PRIMARY KET"
+            }else{
+                ""
+            };
+            let unique= if is_unique{
+                "UNIQUE"
+            }else{
+                ""
+            };
+            let not_null = if is_not_null {
+                "NOT NULL"
+            } else {
+                ""
+            };
+
+            if let Some(foreign_key)=foreign_key{
+                table_constrains.push_str(&format!("FOREIGN KEY ({}) REFERENCES {}({}),", name, foreign_key.table_name, foreign_key.referenced_field));
+            }
+
+            table_fields.push_str(&format!("{} {} {} {} {},", name, date_type_sqlite, primary_key, unique, not_null));
+        }
+
+        if table_constrains.is_empty() && !table_fields.is_empty(){
+            //Removes last ,
+            table_fields.pop();
+        }
+
+        if !table_constrains.is_empty(){
+            //Removes last ,
+            table_constrains.pop();
+
+        }
+
+        let query=format!("CREATE TABLE {} (\r\n{}\r\n{})", self.table_name, table_fields, table_constrains);
+
+       sqlx::query(&query)
+            .execute(exec)
+            .await
+            .with_context(context!("table_name: {:?} | query: {:?}", self.name, query))?;
+
+        Ok(())
     }
 }
