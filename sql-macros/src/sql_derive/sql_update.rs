@@ -4,7 +4,7 @@ use easy_macros::{
     macros::{always_context, get_attributes},
     proc_macro2::TokenStream,
     quote::{ToTokens, quote},
-    syn::{self, parse::Parse, punctuated::Punctuated},
+    syn::{self, punctuated::Punctuated},
 };
 
 use super::ty_to_variant;
@@ -16,7 +16,6 @@ pub fn sql_update_base(
     table: &TokenStream,
 ) -> anyhow::Result<TokenStream> {
     let field_names = fields.iter().map(|field| field.ident.as_ref().unwrap());
-    let field_names2 = field_names.clone();
     let field_names_str = field_names.clone().map(|field| field.to_string());
 
     let mut update_values = Vec::new();

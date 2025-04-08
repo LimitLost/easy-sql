@@ -4,7 +4,6 @@ mod sql_output;
 mod sql_table;
 mod sql_update;
 
-use convert_case::Casing;
 pub use database_setup::*;
 use easy_macros::{
     anyhow::{self, Context},

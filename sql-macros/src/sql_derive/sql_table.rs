@@ -25,7 +25,12 @@ pub fn sql_table(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::To
 
     let table_name = item_name.to_string().to_case(Case::Snake);
 
-    let insert_impl = sql_insert_base(&item_name, &fields, &item_name_tokens, vec![])?;
+    let insert_impl = sql_insert_base(
+        &item_name,
+        &fields,
+        &item_name_tokens,
+        vec![] as Vec<syn::Ident>,
+    )?;
     let update_impl = sql_update_base(&item_name, &fields, &item_name_tokens)?;
     let output_impl = sql_output_base(&item_name, &fields, &item_name_tokens);
 

@@ -31,3 +31,17 @@ pub fn database_setup(item: TokenStream) -> anyhow::Result<TokenStream> {
 pub fn sql_output(item: TokenStream) -> anyhow::Result<TokenStream> {
     sql_derive::sql_output(item)
 }
+
+#[always_context]
+#[proc_macro_derive(SqlInsert, attributes(sql))]
+#[macro_result]
+pub fn sql_insert(item: TokenStream) -> anyhow::Result<TokenStream> {
+    sql_derive::sql_insert(item)
+}
+
+#[always_context]
+#[proc_macro_derive(SqlUpdate, attributes(sql))]
+#[macro_result]
+pub fn sql_update(item: TokenStream) -> anyhow::Result<TokenStream> {
+    sql_derive::sql_update(item)
+}
