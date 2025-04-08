@@ -195,3 +195,133 @@ fn ty_to_variant(
         }
     }
 }
+
+fn ty_str_enum_value(ty_str:&str,generic_arg:&Option<String>) -> anyhow::Result<Option<TokenStream>> {
+    Ok(match name_str.as_str() {
+                "IpAddr"|"bool"|"f32"
+                |"f64"
+                |"i8"
+                |"i16"
+                |"i32"
+                |"i64"
+                |"String"
+                |"Interval"
+                |"NaiveDate"
+                |"NaiveDateTime"
+                |"NaiveTime"
+                |"Uuid"
+                |"Decimal"
+                |"BigDecimal"=>{
+                    let name_variant=quote::format_ident!("{}",name_str.to_case(Case::Pascal));
+                    
+                    Some(quote!{#name_variant})
+                }
+                "Vec" => {
+                    if let Some(arg) = generic_arg {
+                        let subtype=ty_str_enum_value(&arg,&None::<String>)?;
+                        if let Some(subtype)=subtype{
+
+                            Some(quote! { List(Box::new(#subtype)) })
+                        }else{
+                            None
+                        }
+                    } else {
+                        anyhow::bail!("No Generic argument or Invalid/Not supported argument for Vec type")
+                    }
+                }
+                "Range"|"PgRange"=>{
+                    if let Some(arg) = generic_arg {
+                        match arg.as_str(){
+                            "i32"|"i64"|"NaiveDate"|"NaiveDateTime"|"BigDecimal"|"Decimal" => {
+                                let name_variant=quote::format_ident!("{}",name_str.to_case(Case::Pascal));
+                                Some(quote!{Range(easy_sql::sql::SqlRangeType::#name_variant)})
+                            }
+                            _=>{
+                                None
+                            }
+                        }
+                    } else {
+                        anyhow::bail!("No Generic argument or Invalid/Not supported argument for Vec type")
+                    }
+                }
+                
+                })
+}
+
+
+
+///Returns only type enum variant
+fn ty_enum_value(ty: &syn::Type)->anyhow::Result<(Option<TokenStream>,bool)>{
+    match ty {
+        syn::Type::Path(type_path) => {
+            let mut last_segment = type_path
+                .path
+                .segments
+                .last()
+                .with_context(context!("Type path is empty | ty: {:?}", type_path))?;
+
+            let mut name_str=last_segment.ident.to_string();
+
+
+            let not_null=true;
+            
+
+            if name_str=="Option"{
+                match &last_segment.arguments {
+                    syn::PathArguments::None => anyhow::bail!("Option with no generic argument is not supported"),
+                    syn::PathArguments::AngleBracketed(angle_bracketed_generic_arguments) => {
+                        match angle_bracketed_generic_arguments
+                            .args
+                            .first()?{
+                                syn::GenericArgument::Type(ty) => match ty {
+                                    syn::Type::Path(type_path) => {
+                                        last_segment=type_path
+                                        .path
+                                        .segments
+                                        .last()
+                                        .with_context(context!("Type path is empty | ty: {:?}", type_path))?;
+                                    
+                                        name_str=last_segment.ident.to_string();
+
+                                        not_null=false;
+                                    }
+                                    _ => anyhow::bail!("Option with non- type path generic argument is not supported"),
+                                },
+                                _ => anyhow::bail!("Option with non-type generic argument is not supported"),
+                            }
+                    }
+                    syn::PathArguments::Parenthesized(parenthesized_generic_arguments) => anyhow::bail!("Option with parenthesized generic arguments is not supported"),
+                }
+
+            }
+
+            let generic_arg = match &last_segment.arguments {
+                syn::PathArguments::None => None,
+                syn::PathArguments::AngleBracketed(angle_bracketed_generic_arguments) => {
+                    angle_bracketed_generic_arguments
+                        .args
+                        .first()
+                        .map(|el| match el {
+                            syn::GenericArgument::Type(ty) => match ty {
+                                syn::Type::Path(type_path) => type_path
+                                    .path
+                                    .segments
+                                    .last()
+                                    .map(|name| name.ident.to_string()),
+                                _ => None,
+                            },
+                            _ => None,
+                        })
+                        .flatten()
+                }
+                syn::PathArguments::Parenthesized(parenthesized_generic_arguments) => None,
+            };
+
+
+            Ok(ty_str_enum_value(&name_str,&generic_arg)?)
+        }
+        _ => {
+            anyhow::bail!("Unsupported type: {}", ty.to_token_stream())
+        }
+    }
+}

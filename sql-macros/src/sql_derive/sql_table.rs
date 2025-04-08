@@ -22,6 +22,7 @@ pub fn sql_table(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::To
         }
         syn::Fields::Unit => anyhow::bail!("Unit struct is not supported"),
     };
+    let field_names_str = fields.iter().map(|field| field.ident.as_ref().unwrap().to_string());
 
     let table_name = item_name.to_string().to_case(Case::Snake);
 
@@ -34,6 +35,41 @@ pub fn sql_table(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::To
     let update_impl = sql_update_base(&item_name, &fields, &item_name_tokens)?;
     let output_impl = sql_output_base(&item_name, &fields, &item_name_tokens);
 
+    let mut is_primary_key=Vec::new();
+    let mut is_unique=Vec::new();
+    let mut primary_key_found=false;
+    let mut field_types = Vec::new();
+    let mut is_not_null=Vec::new();
+
+    for field in fields.iter(){
+        let (variant,is_field_not_null) = ty_enum_value(&field.ty)?;
+        is_not_null.push(is_field_not_null);
+        if let Some(variant) = variant{
+            field_types.push(variant);
+        }else{
+            let current_is_primary_key=has_attribute!(field, #[sql(primary_key)]);
+            if current_is_primary_key{
+                if !primary_key_found {
+                    primary_key_found=true;
+                    is_primary_key.push(true);
+                }else{
+                    anyhow::bail!("Only one primary key is allowed per table!.");
+                }
+            }else{
+                is_primary_key.push(false);
+            }
+            is_unique.push(has_attribute!(field, #[sql(unique)]));
+            
+            if has_attribute!(field, #[sql(bytes)]){
+                field_types.push(quote! {Bytes});
+            }else{
+                anyhow::bail!("Field type {:?} is not supported, use #[sql(bytes)] to convert it into bytes", field.ty);
+            }
+        }
+    }
+
+    let table_version=TODO;
+
     Ok(quote! {
         impl easy_lib::sql::DatabaseSetup for #item_name {
             async fn setup(
@@ -43,12 +79,16 @@ pub fn sql_table(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::To
                 use crate::EasyExecutor;
                 use easy_lib::anyhow::Context;
 
-                let table_exists = conn.query_setup(easy_lib::sql::TableExists{name: #table_name}).with_context(easy_sql::macros::context!("Checking if table exists: {:?}".#table_name))?;
+                let table_exists = conn.query_setup(easy_lib::sql::TableExists{name: #table_name}).with_context(easy_sql::macros::context!("Checking if table exists: {:?}".#table_name)).await?;
 
                 if table_exists{
                     //TODO Get Table Version and migrate (alter table + update version) if neccessary
                 }else{
-                    //TODO Create table and update version
+                    // Create table and create version in EasySqlTables
+                    conn.query_setup(CreateTable{table_name: EasySqlTables::table_name(), fields: vec![
+                        #(TableField{name: #field_names_str, data_type: easy_lib::sql::SqlType::#field_types, is_primary_key: #is_primary_key, foreign_key: None, is_unique: #is_unique, is_not_null: #is_not_null},)*
+                    ]}).await?;
+                    easy_lib::sql::EasySqlTables::create(conn, #table_name.to_string(), #table_version).await?;
 
 
                 }

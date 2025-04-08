@@ -56,3 +56,24 @@ impl SqlTable for EasySqlTables {
         "easy_sql_tables"
     }
 }
+
+impl DatabaseSetup for EasySqlTables{
+    async fn setup(
+        conn: &mut (impl EasyExecutor + Send + Sync),
+        used_table_names: &mut Vec<String>,
+    ) -> anyhow::Result<()>{
+        use crate::EasyExecutor;
+        use easy_lib::anyhow::Context;
+
+        let table_exists = conn.query_setup(TableExists{name: EasySqlTables::table_name()}).await?;
+
+        if !table_exists{
+            conn.query_setup(CreateTable{table_name: EasySqlTables::table_name(), fields: vec![
+                TableField{name: "table_id", data_type: SqlType::String, is_primary_key: true, foreign_key: None, is_unique: false, is_not_null: true},
+                TableField{name: "version", data_type: SqlType::I64, is_primary_key: false, foreign_key: None, is_unique: false, is_not_null: true},
+            ]}).await?;
+        }
+
+        Ok(())
+    }
+}
