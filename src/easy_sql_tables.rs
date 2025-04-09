@@ -18,6 +18,7 @@ pub struct EasySqlTables {
 }
 
 #[always_context]
+//TODO Make this (#[sql]) a part of sql build function
 #[sql]
 impl EasySqlTables {
     pub async fn create(
