@@ -1,3 +1,5 @@
+use std::fmt::Debug;
+
 use async_trait::async_trait;
 use easy_macros::macros::always_context;
 
@@ -7,7 +9,7 @@ pub struct Break;
 
 #[always_context]
 #[async_trait]
-pub trait EasyExecutor {
+pub trait EasyExecutor: Debug {
     // async fn query(&mut self, sql: &Sql) -> anyhow::Result<()>;
     async fn query<Y: ToConvert + Send + Sync, T, O: SqlOutput<T, Y>>(
         &mut self,

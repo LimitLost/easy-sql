@@ -10,15 +10,15 @@ pub fn sql_where(item: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let conditions_parsed = input.into_tokens_with_checks(&mut checks, &sql_crate);
 
     let result = quote! {
-        (|___t___|{
+        Some((|___t___|{
             #(#checks)*
         },
         #sql_crate::WhereClause{
             conditions: #conditions_parsed
-        })
+        }))
     };
 
-    //panic!("result: {}", result);
+    panic!("result: {}", result);
 
     result.into()
 }

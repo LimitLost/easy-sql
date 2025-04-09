@@ -1,3 +1,4 @@
+use anyhow::Context;
 use async_trait::async_trait;
 use easy_macros::macros::always_context;
 
@@ -8,6 +9,19 @@ use crate::{
 
 use super::{SqlInsert, SqlOutput, SqlUpdate, ToConvert};
 
+pub struct SqlTableTest<T> {
+    _marker: std::marker::PhantomData<T>,
+}
+
+#[always_context]
+impl<T> SqlTableTest<T> {
+    pub fn new(_n: impl Fn(T)) -> Self {
+        Self {
+            _marker: std::marker::PhantomData,
+        }
+    }
+}
+
 #[always_context]
 #[async_trait]
 pub trait SqlTable: Sized {
@@ -16,8 +30,12 @@ pub trait SqlTable: Sized {
     /// Use `sql!` or `sql_where!` macros to generate clauses (second argument to this function)
     async fn get<'a, Y: ToConvert + Send + Sync, T: SqlOutput<Self, Y>>(
         conn: &mut (impl EasyExecutor + Send + Sync),
-        (_, clauses): (fn(Self), impl CanBeSelectClause<'a> + Send + Sync),
+        clauses: Option<(fn(Self), impl CanBeSelectClause<'a> + Send + Sync)>,
     ) -> anyhow::Result<T> {
+        let clauses = match clauses {
+            Some((_, clauses)) => Some(clauses),
+            None => None,
+        };
         let sql = Sql::Select {
             table: Self::table_name(),
             joins: vec![],
@@ -37,9 +55,13 @@ pub trait SqlTable: Sized {
     /// ```
     async fn get_lazy<'a, T: SqlOutput<Self, Row>>(
         conn: &mut (impl EasyExecutor + Send + Sync),
-        (_, clauses): (fn(Self), impl CanBeSelectClause<'a> + Send + Sync),
+        clauses: Option<(fn(Self), impl CanBeSelectClause<'a> + Send + Sync)>,
         perform: impl FnMut(T) -> anyhow::Result<Option<Break>> + Send + Sync,
     ) -> anyhow::Result<()> {
+        let clauses = match clauses {
+            Some((_, clauses)) => Some(clauses),
+            None => None,
+        };
         let sql = Sql::Select {
             table: Self::table_name(),
             joins: vec![],
@@ -53,7 +75,7 @@ pub trait SqlTable: Sized {
     /// Use `sql!` or `sql_where!` macros to generate clauses (second argument to this function)
     async fn select<'a, Y: ToConvert + Send + Sync, T: SqlOutput<Self, Y>>(
         conn: &mut (impl EasyExecutor + Send + Sync),
-        clauses: (fn(Self), impl CanBeSelectClause<'a> + Send + Sync),
+        clauses: Option<(fn(Self), impl CanBeSelectClause<'a> + Send + Sync)>,
     ) -> anyhow::Result<T> {
         Self::get(conn, clauses).await
     }
@@ -70,7 +92,7 @@ pub trait SqlTable: Sized {
     /// ```
     async fn select_lazy<'a, T: SqlOutput<Self, Row>>(
         conn: &mut (impl EasyExecutor + Send + Sync),
-        clauses: (fn(Self), impl CanBeSelectClause<'a> + Send + Sync),
+        clauses: Option<(fn(Self), impl CanBeSelectClause<'a> + Send + Sync)>,
         perform: impl FnMut(T) -> anyhow::Result<Option<Break>> + Send + Sync,
     ) -> anyhow::Result<()> {
         Self::get_lazy(conn, clauses, perform).await
@@ -83,7 +105,7 @@ pub trait SqlTable: Sized {
         let sql = Sql::Insert {
             table: Self::table_name(),
             columns: I::insert_columns(),
-            values: to_insert.insert_values(),
+            values: to_insert.insert_values()?,
         };
 
         conn.query::<(), Self, ()>(&sql).await
@@ -100,7 +122,7 @@ pub trait SqlTable: Sized {
         let sql = Sql::Insert {
             table: Self::table_name(),
             columns: I::insert_columns(),
-            values: to_insert.insert_values(),
+            values: to_insert.insert_values()?,
         };
 
         conn.query(&sql).await
@@ -111,8 +133,12 @@ pub trait SqlTable: Sized {
     /// Use `sql_where!` macro to generate the where clause
     async fn delete<'a>(
         conn: &mut (impl EasyExecutor + Send + Sync),
-        where_: Option<WhereClause<'a>>,
+        where_: Option<(fn(Self), WhereClause<'a>)>,
     ) -> anyhow::Result<()> {
+        let where_ = match where_ {
+            Some((_, where_)) => Some(where_),
+            None => None,
+        };
         let sql = Sql::Delete {
             table: Self::table_name(),
             where_,
@@ -123,8 +149,12 @@ pub trait SqlTable: Sized {
     /// Use `sql_where!` macro to generate the where clause
     async fn delete_returning<'a, Y: ToConvert + Send + Sync, T: SqlOutput<Self, Y>>(
         conn: &mut (impl EasyExecutor + Send + Sync),
-        where_: Option<WhereClause<'a>>,
+        where_: Option<(fn(Self), WhereClause<'a>)>,
     ) -> anyhow::Result<T> {
+        let where_ = match where_ {
+            Some((_, where_)) => Some(where_),
+            None => None,
+        };
         let sql = Sql::Delete {
             table: Self::table_name(),
             where_,
@@ -135,12 +165,16 @@ pub trait SqlTable: Sized {
 
     //TODO delete returning lazy
 
-    /// Use `sql_where!` macro to generate the where clause
+    /// Use `sql_where!` macro to generate the `check` and `where` clause
     async fn update<'a>(
         conn: &mut (impl EasyExecutor + Send + Sync),
         update: impl SqlUpdate<Self> + Send + Sync,
-        where_: Option<WhereClause<'a>>,
+        where_: Option<(fn(Self), WhereClause<'a>)>,
     ) -> anyhow::Result<()> {
+        let where_ = match where_ {
+            Some((_, where_)) => Some(where_),
+            None => None,
+        };
         let sql = Sql::Update {
             table: Self::table_name(),
             set: update.updates(),
@@ -153,8 +187,12 @@ pub trait SqlTable: Sized {
     async fn update_returning<'a, Y: ToConvert + Send + Sync, T: SqlOutput<Self, Y>>(
         conn: &mut (impl EasyExecutor + Send + Sync),
         update: impl SqlUpdate<Self> + Send + Sync,
-        where_: Option<WhereClause<'a>>,
+        where_: Option<(fn(Self), WhereClause<'a>)>,
     ) -> anyhow::Result<T> {
+        let where_ = match where_ {
+            Some((_, where_)) => Some(where_),
+            None => None,
+        };
         let sql = Sql::Update {
             table: Self::table_name(),
             set: update.updates(),

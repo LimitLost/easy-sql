@@ -1,10 +1,16 @@
+use std::fmt::Debug;
+
+use anyhow::Context;
 use async_trait::async_trait;
 use easy_macros::macros::always_context;
 use sql_macros::{SqlInsert, SqlOutput, SqlUpdate, sql_where};
 
-use crate::{CreateTable, DatabaseSetup, EasyExecutor, SqlTable, SqlType, TableExists, TableField};
+use crate::{
+    CreateTable, DatabaseSetup, EasyExecutor, SqlTable, SqlTableTest, SqlType, TableExists,
+    TableField,
+};
 
-#[derive(SqlInsert)]
+#[derive(SqlInsert, Debug)]
 #[sql(table = EasySqlTables)]
 pub struct EasySqlTables {
     pub table_id: String,
@@ -12,13 +18,13 @@ pub struct EasySqlTables {
 }
 
 #[always_context]
+#[sql]
 impl EasySqlTables {
     pub async fn create(
         conn: &mut (impl EasyExecutor + Send + Sync),
         table_id: String,
         version: i64,
     ) -> anyhow::Result<()> {
-        #[no_context]
         EasySqlTables::insert(conn, &EasySqlTables { table_id, version }).await?;
 
         Ok(())
@@ -34,7 +40,15 @@ impl EasySqlTables {
             EasySqlTableVersion {
                 version: new_version,
             },
-            sql_where!(table_id = { table_id }),
+            Some(crate::WhereClause {
+                conditions: crate::WhereExpr::Eq(
+                    Box::new(crate::WhereExpr::Column("table_id".to_string())),
+                    Box::new(crate::WhereExpr::Value({ table_id }.into())),
+                ),
+            }), // sql_where!(table_id = { table_id }),
+            SqlTableTest::new(|___t___| {
+                let _ = ___t___.table_id;
+            }),
         )
         .await?;
 
@@ -46,12 +60,13 @@ impl EasySqlTables {
         table_id: &str,
     ) -> anyhow::Result<i64> {
         #[no_context]
-        let version = EasySqlTables::select(conn, sql_where!(table_id = { table_id })).await?;
-        Ok(version)
+        let version: EasySqlTableVersion =
+            EasySqlTables::select(conn, sql_where!(table_id = { table_id })).await?;
+        Ok(version.version)
     }
 }
 
-#[derive(SqlUpdate, SqlOutput)]
+#[derive(SqlUpdate, SqlOutput, Debug)]
 #[sql(table = EasySqlTables)]
 struct EasySqlTableVersion {
     pub version: i64,

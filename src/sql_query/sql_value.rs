@@ -116,6 +116,7 @@ pub enum SqlValueRef<'a> {
     ///Postgresql: text
     ///Sqlite: TEXT
     String(&'a String),
+    Str(&'a str),
     ///Aka Duration or TimeDelta
     ///Postgresql: interval
     ///Sqlite: BLOB
@@ -287,6 +288,7 @@ impl<'a> Encode<'a, crate::Db> for SqlValueRef<'a> {
             SqlValueRef::I32(v) => <i32 as Encode<'a, crate::Db>>::encode_by_ref(v, buf),
             SqlValueRef::I64(v) => <i64 as Encode<'a, crate::Db>>::encode_by_ref(v, buf),
             SqlValueRef::String(v) => <String as Encode<'a, crate::Db>>::encode_by_ref(v, buf),
+            SqlValueRef::Str(v) => <&str as Encode<'a, crate::Db>>::encode_by_ref(v, buf),
             SqlValueRef::Interval(v) => <Vec<u8> as Encode<'a, crate::Db>>::encode_by_ref(
                 &binary(PgIntervalSerde2::from(*v))?,
                 buf,
@@ -366,6 +368,7 @@ impl<'a> Encode<'a, crate::Db> for SqlValueRef<'a> {
             SqlValueRef::I32(_) => <i32 as sqlx::Type<crate::Db>>::type_info(),
             SqlValueRef::I64(_) => <i64 as sqlx::Type<crate::Db>>::type_info(),
             SqlValueRef::String(_) => <String as sqlx::Type<crate::Db>>::type_info(),
+            SqlValueRef::Str(_) => <&str as sqlx::Type<crate::Db>>::type_info(),
             SqlValueRef::Interval(_) => <Vec<u8> as sqlx::Type<crate::Db>>::type_info(),
             SqlValueRef::Bytes(_) => <Vec<u8> as sqlx::Type<crate::Db>>::type_info(),
             SqlValueRef::List(_) => <Vec<u8> as sqlx::Type<crate::Db>>::type_info(),
@@ -721,6 +724,12 @@ impl From<i64> for SqlValueMaybeRef<'_> {
     }
 }
 // String
+#[always_context]
+impl<'a> From<&'a str> for SqlValueMaybeRef<'a> {
+    fn from(value: &'a str) -> Self {
+        Self::Ref(SqlValueRef::Str(value))
+    }
+}
 #[always_context]
 impl<'a> From<&'a String> for SqlValueMaybeRef<'a> {
     fn from(value: &'a String) -> Self {

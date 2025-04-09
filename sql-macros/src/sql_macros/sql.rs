@@ -132,12 +132,12 @@ pub fn sql(item: proc_macro::TokenStream) -> proc_macro::TokenStream {
             .into_tokens_with_checks(&mut checks, &sql_crate);
 
         quote! {
-            (|___t___|{
+            Some((|___t___|{
                 #(#checks)*
             },
             easy_lib::easy_sql::WhereClause{
                 conditions: #where_
-            })
+            }))
         }
     } else {
         let where_ = input
@@ -193,7 +193,7 @@ pub fn sql(item: proc_macro::TokenStream) -> proc_macro::TokenStream {
         let distinct = input.distinct;
 
         quote! {
-            (|___t___|{
+            Some((|___t___|{
                 #(#checks)*
             },
             easy_lib::easy_sql::SelectClauses {
@@ -204,7 +204,7 @@ pub fn sql(item: proc_macro::TokenStream) -> proc_macro::TokenStream {
                 having: #having,
                 order_by: #order_by,
                 limit: #limit,
-            })
+            }))
         }
     }
     .into()

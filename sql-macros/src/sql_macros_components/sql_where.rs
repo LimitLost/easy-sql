@@ -168,42 +168,42 @@ impl WhereExpr {
                 let parsed = sql_value.into_tokens_with_checks(checks, sql_crate);
                 let parsed1 = sql_value1.into_tokens_with_checks(checks, sql_crate);
                 quote! {
-                    #sql_crate::WhereExpr::Equal(Box::new(#parsed), Box::new(#parsed1))
+                    #sql_crate::WhereExpr::Eq(Box::new(#parsed), Box::new(#parsed1))
                 }
             }
             WhereExpr::NotEqual(sql_value, sql_value1) => {
                 let parsed = sql_value.into_tokens_with_checks(checks, sql_crate);
                 let parsed1 = sql_value1.into_tokens_with_checks(checks, sql_crate);
                 quote! {
-                    #sql_crate::WhereExpr::NotEqual(Box::new(#parsed), Box::new(#parsed1))
+                    #sql_crate::WhereExpr::NotEq(Box::new(#parsed), Box::new(#parsed1))
                 }
             }
             WhereExpr::GreaterThan(sql_value, sql_value1) => {
                 let parsed = sql_value.into_tokens_with_checks(checks, sql_crate);
                 let parsed1 = sql_value1.into_tokens_with_checks(checks, sql_crate);
                 quote! {
-                    #sql_crate::WhereExpr::GreaterThan(Box::new(#parsed), Box::new(#parsed1))
+                    #sql_crate::WhereExpr::Gt(Box::new(#parsed), Box::new(#parsed1))
                 }
             }
             WhereExpr::GreaterThanOrEqual(sql_value, sql_value1) => {
                 let parsed = sql_value.into_tokens_with_checks(checks, sql_crate);
                 let parsed1 = sql_value1.into_tokens_with_checks(checks, sql_crate);
                 quote! {
-                    #sql_crate::WhereExpr::GreaterThanOrEqual(Box::new(#parsed), Box::new(#parsed1))
+                    #sql_crate::WhereExpr::GtEq(Box::new(#parsed), Box::new(#parsed1))
                 }
             }
             WhereExpr::LessThan(sql_value, sql_value1) => {
                 let parsed = sql_value.into_tokens_with_checks(checks, sql_crate);
                 let parsed1 = sql_value1.into_tokens_with_checks(checks, sql_crate);
                 quote! {
-                    #sql_crate::WhereExpr::LessThan(Box::new(#parsed), Box::new(#parsed1))
+                    #sql_crate::WhereExpr::Lt(Box::new(#parsed), Box::new(#parsed1))
                 }
             }
             WhereExpr::LessThanOrEqual(sql_value, sql_value1) => {
                 let parsed = sql_value.into_tokens_with_checks(checks, sql_crate);
                 let parsed1 = sql_value1.into_tokens_with_checks(checks, sql_crate);
                 quote! {
-                    #sql_crate::WhereExpr::LessThanOrEqual(Box::new(#parsed), Box::new(#parsed1))
+                    #sql_crate::WhereExpr::LtEq(Box::new(#parsed), Box::new(#parsed1))
                 }
             }
             WhereExpr::Like(sql_value, sql_value1) => {
