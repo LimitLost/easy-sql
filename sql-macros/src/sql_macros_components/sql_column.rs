@@ -12,21 +12,25 @@ pub enum SqlColumn {
 
 #[always_context]
 impl SqlColumn {
-    pub fn into_tokens_with_checks(self, checks: &mut Vec<TokenStream>) -> TokenStream {
+    pub fn into_tokens_with_checks(
+        self,
+        checks: &mut Vec<TokenStream>,
+        sql_crate: &TokenStream,
+    ) -> TokenStream {
         match self {
             SqlColumn::SpecificTableColumn(path, ident) => {
                 checks.push(quote_spanned! {path.span()=>
-                    fn has_table<T:easy_lib::easy_sql::HasTable<#path>>(test:&T){}
+                    fn has_table<T:#sql_crate::HasTable<#path>>(test:&T){}
                     has_table(&___t___);
                     //TODO "RealColumns" trait with type leading to the struct with actual database columns
-                    let mut table_instance = easy_lib::never::never_any::<#path>();
+                    let mut table_instance = #sql_crate::never::never_any::<#path>();
                     let _ = table_instance.#ident;
                 });
 
                 let ident_str = ident.to_string();
 
                 quote_spanned! {path.span()=>
-                    format!("{}.{}",<#path as SqlTable>::table_name(), #ident_str)
+                    format!("{}.{}",<#path as #sql_crate::SqlTable>::table_name(), #ident_str)
                 }
             }
             SqlColumn::Column(ident) => {

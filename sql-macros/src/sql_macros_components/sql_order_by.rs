@@ -37,15 +37,19 @@ pub struct OrderBy {
 
 #[always_context]
 impl OrderBy {
-    pub fn into_tokens_with_checks(self, checks: &mut Vec<TokenStream>) -> TokenStream {
-        let column_parsed = self.column.into_tokens_with_checks(checks);
+    pub fn into_tokens_with_checks(
+        self,
+        checks: &mut Vec<TokenStream>,
+        sql_crate: &TokenStream,
+    ) -> TokenStream {
+        let column_parsed = self.column.into_tokens_with_checks(checks, sql_crate);
         let order_parsed = match self.order {
             Order::Asc => quote! {false},
             Order::Desc => quote! {true},
         };
 
         quote! {
-            easy_lib::easy_sql::OrderBy{
+            #sql_crate::OrderBy{
                 descending: #order_parsed,
                 column: #column_parsed,
             }

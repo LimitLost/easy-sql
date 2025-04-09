@@ -8,7 +8,7 @@ use convert_case::{Case, Casing};
 pub use database_setup::*;
 use easy_macros::{
     anyhow::{self, Context},
-    helpers::context,
+    helpers::{context, find_crate_list},
     macros::always_context,
     proc_macro2::{self, TokenStream},
     quote::{self, ToTokens, quote},

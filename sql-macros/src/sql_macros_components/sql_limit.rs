@@ -31,15 +31,19 @@ impl Parse for SqlLimit {
 
 #[always_context]
 impl SqlLimit {
-    pub fn into_tokens_with_checks(self, _checks: &mut Vec<TokenStream>) -> TokenStream {
+    pub fn into_tokens_with_checks(
+        self,
+        _checks: &mut Vec<TokenStream>,
+        sql_crate: &TokenStream,
+    ) -> TokenStream {
         match self {
             SqlLimit::Literal(l) => {
-                quote! {easy_lib::easy_sql::LimitClause{
+                quote! {#sql_crate::LimitClause{
                     limit: #l,
                 }}
             }
             SqlLimit::Expr(expr) => {
-                quote_spanned! {expr.span()=>easy_lib::easy_sql::LimitClause{
+                quote_spanned! {expr.span()=>#sql_crate::LimitClause{
                     limit: {#expr},
                 } }
             }

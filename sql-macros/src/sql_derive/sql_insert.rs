@@ -7,6 +7,8 @@ use easy_macros::{
     syn::{self, parse::Parse, punctuated::Punctuated},
 };
 
+use crate::sql_crate;
+
 use super::ty_to_variant;
 
 struct DefaultAttr {
@@ -31,6 +33,8 @@ pub fn sql_insert_base(
     let field_names = fields.iter().map(|field| field.ident.as_ref().unwrap());
     let field_names_str = field_names.clone().map(|field| field.to_string());
 
+    let sql_crate = sql_crate();
+
     let mut insert_values = Vec::new();
 
     for field in fields.iter() {
@@ -38,17 +42,17 @@ pub fn sql_insert_base(
         insert_values.push(ty_to_variant(
             field_name.to_token_stream(),
             &field.ty,
-            &quote! {easy_lib::sql},
+            &sql_crate,
             true,
         )?);
     }
 
     Ok(quote! {
-        impl easy_lib::sql::SqlInsert<#table> for #item_name {
+        impl #sql_crate::SqlInsert<#table> for #item_name {
             fn insert_columns() -> Vec<String> {
-                easy_lib::sql::never::never_fn(|| {
+                #sql_crate::never::never_fn(|| {
                     //Check for validity
-                    let this_instance = easy_lib::sql::never::never_any::<Self>();
+                    let this_instance = #sql_crate::never::never_any::<Self>();
 
                     #table {
                         #(
@@ -66,10 +70,10 @@ pub fn sql_insert_base(
                 ]
             }
 
-            fn insert_values(&self) -> anyhow::Result<Vec<Vec<easy_lib::sql::SqlValueMaybeRef<'_>>>> {
-                vec![vec![
-                    #(#insert_values)*
-                ]]
+            fn insert_values(&self) -> anyhow::Result<Vec<Vec<#sql_crate::SqlValueMaybeRef<'_>>>> {
+                Ok(vec![vec![
+                    #(#insert_values),*
+                ]])
             }
         }
 
@@ -97,7 +101,6 @@ pub fn sql_insert(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::T
         }
         table = Some(attr);
     }
-    panic!("File: {} Line: {}", file!(), line!());
 
     #[no_context]
     let table = table.with_context(context!("Table attribute is required"))?;
@@ -112,5 +115,9 @@ pub fn sql_insert(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::T
         defaults.extend(parsed.fields.into_iter());
     }
 
-    sql_insert_base(&item_name, &fields, &table, defaults).map(|e| e.into())
+    sql_insert_base(&item_name, &fields, &table, defaults).map(|e| {
+        // panic!("{}", e);
+
+        e.into()
+    })
 }

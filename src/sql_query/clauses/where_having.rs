@@ -146,7 +146,7 @@ impl<'a> WhereExpr<'a> {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct WhereClause<'a> {
-    conditions: WhereExpr<'a>,
+    pub conditions: WhereExpr<'a>,
 }
 
 #[always_context]

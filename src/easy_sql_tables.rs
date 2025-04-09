@@ -1,7 +1,8 @@
+use async_trait::async_trait;
 use easy_macros::macros::always_context;
 use sql_macros::{SqlInsert, SqlOutput, SqlUpdate, sql_where};
 
-use crate::EasyExecutor;
+use crate::{CreateTable, DatabaseSetup, EasyExecutor, SqlTable, SqlType, TableExists, TableField};
 
 #[derive(SqlInsert)]
 #[sql(table = EasySqlTables)]
@@ -17,6 +18,7 @@ impl EasySqlTables {
         table_id: String,
         version: i64,
     ) -> anyhow::Result<()> {
+        #[no_context]
         EasySqlTables::insert(conn, &EasySqlTables { table_id, version }).await?;
 
         Ok(())
@@ -29,7 +31,9 @@ impl EasySqlTables {
     ) -> anyhow::Result<()> {
         EasySqlTables::update(
             conn,
-            EasySqlTableVersion { version },
+            EasySqlTableVersion {
+                version: new_version,
+            },
             sql_where!(table_id = { table_id }),
         )
         .await?;
@@ -41,6 +45,7 @@ impl EasySqlTables {
         conn: &mut (impl EasyExecutor + Send + Sync),
         table_id: &str,
     ) -> anyhow::Result<i64> {
+        #[no_context]
         let version = EasySqlTables::select(conn, sql_where!(table_id = { table_id })).await?;
         Ok(version)
     }
@@ -60,13 +65,14 @@ impl SqlTable for EasySqlTables {
 }
 
 #[always_context]
+#[async_trait]
 impl DatabaseSetup for EasySqlTables {
     async fn setup(
         conn: &mut (impl EasyExecutor + Send + Sync),
         used_table_names: &mut Vec<String>,
     ) -> anyhow::Result<()> {
         use crate::EasyExecutor;
-        use easy_lib::anyhow::Context;
+        use anyhow::Context;
 
         let table_exists = conn
             .query_setup(TableExists {
@@ -79,7 +85,7 @@ impl DatabaseSetup for EasySqlTables {
                 table_name: EasySqlTables::table_name(),
                 fields: vec![
                     TableField {
-                        name: "table_id",
+                        name: "table_id".to_string(),
                         data_type: SqlType::String,
                         is_primary_key: true,
                         foreign_key: None,
@@ -87,7 +93,7 @@ impl DatabaseSetup for EasySqlTables {
                         is_not_null: true,
                     },
                     TableField {
-                        name: "version",
+                        name: "version".to_string(),
                         data_type: SqlType::I64,
                         is_primary_key: false,
                         foreign_key: None,

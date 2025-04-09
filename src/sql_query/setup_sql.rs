@@ -5,6 +5,9 @@ use sqlx::Row;
 
 use crate::SetupSql;
 
+use super::table_field::TableField;
+
+#[derive(Debug)]
 pub struct TableExists {
     pub name: &'static str,
 }
@@ -31,76 +34,76 @@ impl SetupSql for TableExists {
         Ok(result)
     }
 }
-
-pub struct CreateTable{
+#[derive(Debug)]
+pub struct CreateTable {
     pub table_name: &'static str,
     pub fields: Vec<TableField>,
 }
 
 #[always_context]
-impl SetupSql for CreateTable{
+#[async_trait]
+impl SetupSql for CreateTable {
     type Output = ();
-    
+
     async fn query<'a>(
         self,
         exec: impl sqlx::Executor<'a, Database = crate::Db> + Send + Sync,
     ) -> anyhow::Result<Self::Output> {
+        let mut table_fields = String::new();
+        let mut table_constrains = String::new();
 
-        let mut table_fields=String::new();
-        let mut table_constrains=String::new();
-
-        for field in self.fields.into_iter(){
-            let TableField{
+        for field in self.fields.into_iter() {
+            let TableField {
                 name,
                 data_type,
                 is_primary_key,
                 foreign_key,
                 is_unique,
                 is_not_null,
-            }=field;
+            } = field;
 
-            let date_type_sqlite=data_type.sqlite();
+            let date_type_sqlite = data_type.sqlite();
 
-            let primary_key=if is_foreign_key{
-                "PRIMARY KET"
-            }else{
-                ""
-            };
-            let unique= if is_unique{
-                "UNIQUE"
-            }else{
-                ""
-            };
-            let not_null = if is_not_null {
-                "NOT NULL"
-            } else {
-                ""
-            };
+            let primary_key = if is_primary_key { "PRIMARY KET" } else { "" };
+            let unique = if is_unique { "UNIQUE" } else { "" };
+            let not_null = if is_not_null { "NOT NULL" } else { "" };
 
-            if let Some(foreign_key)=foreign_key{
-                table_constrains.push_str(&format!("FOREIGN KEY ({}) REFERENCES {}({}),", name, foreign_key.table_name, foreign_key.referenced_field));
+            if let Some(foreign_key) = foreign_key {
+                table_constrains.push_str(&format!(
+                    "FOREIGN KEY ({}) REFERENCES {}({}),",
+                    name, foreign_key.table_name, foreign_key.referenced_field
+                ));
             }
 
-            table_fields.push_str(&format!("{} {} {} {} {},", name, date_type_sqlite, primary_key, unique, not_null));
+            table_fields.push_str(&format!(
+                "{} {} {} {} {},",
+                name, date_type_sqlite, primary_key, unique, not_null
+            ));
         }
 
-        if table_constrains.is_empty() && !table_fields.is_empty(){
+        if table_constrains.is_empty() && !table_fields.is_empty() {
             //Removes last ,
             table_fields.pop();
         }
 
-        if !table_constrains.is_empty(){
+        if !table_constrains.is_empty() {
             //Removes last ,
             table_constrains.pop();
-
         }
 
-        let query=format!("CREATE TABLE {} (\r\n{}\r\n{})", self.table_name, table_fields, table_constrains);
-
-       sqlx::query(&query)
+        let query = format!(
+            "CREATE TABLE {} (\r\n{}\r\n{})",
+            self.table_name, table_fields, table_constrains
+        );
+        #[no_context]
+        sqlx::query(&query)
             .execute(exec)
             .await
-            .with_context(context!("table_name: {:?} | query: {:?}", self.name, query))?;
+            .with_context(context!(
+                "table_name: {:?} | query: {:?}",
+                self.table_name,
+                query
+            ))?;
 
         Ok(())
     }

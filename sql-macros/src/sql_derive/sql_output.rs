@@ -7,6 +7,8 @@ use easy_macros::{
     syn::{self, punctuated::Punctuated},
 };
 
+use crate::{easy_lib_crate, easy_macros_helpers_crate, sql_crate};
+
 pub fn sql_output_base(
     item_name: &syn::Ident,
     fields: &Punctuated<syn::Field, syn::Token![,]>,
@@ -16,6 +18,10 @@ pub fn sql_output_base(
     let field_names2 = field_names.clone();
     let field_names_str = field_names.clone().map(|field| field.to_string());
     let field_names_str2 = field_names_str.clone();
+
+    let sql_crate = sql_crate();
+    let easy_lib_crate = easy_lib_crate();
+    let easy_macros_helpers_crate = easy_macros_helpers_crate();
 
     let context_strs = fields.iter().map(|field| {
         format!(
@@ -27,11 +33,11 @@ pub fn sql_output_base(
     });
 
     quote! {
-        impl easy_lib::sql::SqlOutput<#table, easy_lib::sql::Row> for #item_name {
-            fn sql_to_query<'a>(sql: &'a easy_lib::sql::Sql<'a>) -> easy_lib::anyhow::Result<easy_lib::sql::QueryData<'a>> {
-                easy_lib::sql::never::never_fn(|| {
+        impl #sql_crate::SqlOutput<#table, #sql_crate::Row> for #item_name {
+            fn sql_to_query<'a>(sql: &'a #sql_crate::Sql<'a>) -> #easy_lib_crate::anyhow::Result<#sql_crate::QueryData<'a>> {
+                #sql_crate::never::never_fn(|| {
                     //Check for validity
-                    let table_instance = easy_lib::sql::never::never_any::<#table>();
+                    let table_instance = #sql_crate::never::never_any::<#table>();
 
                     Self {
                         #(#field_names: table_instance.#field_names),*
@@ -40,7 +46,7 @@ pub fn sql_output_base(
 
                 let requested_columns = vec![
                     #(
-                        easy_lib::sql::RequestedColumn {
+                        #sql_crate::RequestedColumn {
                             name: #field_names_str.to_owned(),
                             alias: None,
                         }
@@ -49,13 +55,13 @@ pub fn sql_output_base(
 
                 sql.query_output(requested_columns)
             }
-            fn convert<'r>(data: easy_lib::sql::Row) -> easy_lib::anyhow::Result<Self> {
-                use easy_lib::anyhow::Context;
-                use easy_macros::helpers::context;
+            fn convert<'r>(data: #sql_crate::Row) -> #easy_lib_crate::anyhow::Result<Self> {
+                use #easy_lib_crate::anyhow::Context;
+                use #easy_macros_helpers_crate::context;
 
                 Ok(Self {
                     #(
-                        #field_names2: <easy_lib::sql::Row as easy_lib::sql::SqlxRow>::try_get(&data, #field_names_str2).with_context(
+                        #field_names2: <#sql_crate::Row as #sql_crate::SqlxRow>::try_get(&data, #field_names_str2).with_context(
                             context!(#context_strs),
                         )?
                     ),*

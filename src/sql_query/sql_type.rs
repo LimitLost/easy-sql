@@ -1,3 +1,5 @@
+use easy_macros::macros::always_context;
+#[derive(Debug)]
 pub enum SqlRangeType {
     ///int4range
     I32,
@@ -12,7 +14,7 @@ pub enum SqlRangeType {
     ///numrange
     Decimal,
 }
-
+#[derive(Debug)]
 pub enum SqlType {
     ///Postgresql: inet
     ///Sqlite: BLOB
@@ -107,8 +109,8 @@ pub enum SqlType {
 }
 
 #[always_context]
-impl SqlType{
-    pub fn sqlite(self)->&'static str{
+impl SqlType {
+    pub fn sqlite(self) -> &'static str {
         match self {
             SqlType::IpAddr => "BLOB",
             SqlType::Bool => "BOOLEAN",

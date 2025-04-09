@@ -5,9 +5,47 @@ mod sql_derive;
 
 use easy_macros::{
     anyhow,
+    helpers::find_crate_list,
     macros::{always_context, macro_result},
+    proc_macro2,
+    quote::quote,
 };
 use proc_macro::TokenStream;
+
+fn sql_crate() -> proc_macro2::TokenStream {
+    if let Some(found) = find_crate_list(&[("easy-lib", quote! {::sql}), ("easy-sql", quote! {})]) {
+        found
+    } else {
+        quote! {self}
+    }
+}
+
+fn easy_lib_crate() -> proc_macro2::TokenStream {
+    if let Some(found) = find_crate_list(&[("easy-lib", quote! {})]) {
+        found
+    } else {
+        quote! {}
+    }
+}
+
+fn easy_macros_helpers_crate() -> proc_macro2::TokenStream {
+    if let Some(found) = find_crate_list(&[
+        ("easy-lib", quote! {::helpers}),
+        ("easy-macros", quote! {::helpers}),
+    ]) {
+        found
+    } else {
+        quote! {self}
+    }
+}
+
+fn async_trait_crate() -> proc_macro2::TokenStream {
+    if let Some(found) = find_crate_list(&[("easy-lib", quote! {}), ("async-trait", quote! {})]) {
+        found
+    } else {
+        quote! {self}
+    }
+}
 
 #[proc_macro]
 pub fn sql(item: TokenStream) -> TokenStream {

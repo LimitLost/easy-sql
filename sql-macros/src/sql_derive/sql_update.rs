@@ -7,6 +7,8 @@ use easy_macros::{
     syn::{self, punctuated::Punctuated},
 };
 
+use crate::sql_crate;
+
 use super::ty_to_variant;
 
 #[always_context]
@@ -18,6 +20,8 @@ pub fn sql_update_base(
     let field_names = fields.iter().map(|field| field.ident.as_ref().unwrap());
     let field_names_str = field_names.clone().map(|field| field.to_string());
 
+    let sql_crate = sql_crate();
+
     let mut update_values = Vec::new();
 
     for field in fields.iter() {
@@ -25,18 +29,18 @@ pub fn sql_update_base(
         update_values.push(ty_to_variant(
             field_name.to_token_stream(),
             &field.ty,
-            &quote! {easy_lib::sql},
+            &sql_crate,
             true,
         )?);
     }
 
     Ok(quote! {
-        impl easy_lib::sql::SqlUpdate<#table> for #item_name {
-            fn updates(&self) -> Vec<(String, easy_lib::sql::SqlValueMaybeRef<'_>)> {
-                easy_lib::sql::never::never_fn(|| {
+        impl #sql_crate::SqlUpdate<#table> for #item_name {
+            fn updates(&self) -> Vec<(String, #sql_crate::SqlValueMaybeRef<'_>)> {
+                #sql_crate::never::never_fn(|| {
                     //Check for validity
-                    let update_instance = easy_lib::sql::never::never_any::<Self>();
-                    let mut table_instance = easy_lib::sql::never::never_any::<#table>();
+                    let update_instance = #sql_crate::never::never_any::<Self>();
+                    let mut table_instance = #sql_crate::never::never_any::<#table>();
 
                     #(table_instance.#field_names = update_instance.#field_names;)*
                 });

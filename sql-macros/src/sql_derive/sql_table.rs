@@ -7,7 +7,10 @@ use easy_macros::{
     syn::{self, LitInt},
 };
 
-use crate::sql_derive::{sql_insert_base, sql_output_base, sql_update_base};
+use crate::{
+    easy_lib_crate, easy_macros_helpers_crate, sql_crate,
+    sql_derive::{sql_insert_base, sql_output_base, sql_update_base},
+};
 
 use super::ty_enum_value;
 
@@ -16,6 +19,10 @@ pub fn sql_table(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::To
     let item = parse_macro_input!(item as syn::ItemStruct);
     let item_name = &item.ident;
     let item_name_tokens = item.ident.to_token_stream();
+
+    let easy_macros_helpers_crate = easy_macros_helpers_crate();
+    let sql_crate = sql_crate();
+    let easy_lib_crate = easy_lib_crate();
 
     let fields = match item.fields {
         syn::Fields::Named(fields_named) => fields_named.named,
@@ -94,24 +101,24 @@ pub fn sql_table(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::To
         table_version.with_context(context!("sql(version = x) attribute is required"))?;
 
     Ok(quote! {
-        impl easy_lib::sql::DatabaseSetup for #item_name {
+        impl #sql_crate::DatabaseSetup for #item_name {
             async fn setup(
-                conn: &mut (impl crate::EasyExecutor + Send + Sync),
+                conn: &mut (impl #sql_crate::EasyExecutor + Send + Sync),
                 used_table_names: &mut Vec<String>,
-            ) -> easy_lib::anyhow::Result<()> {
-                use crate::EasyExecutor;
-                use easy_lib::anyhow::Context;
+            ) -> #easy_lib_crate::anyhow::Result<()> {
+                use #easy_lib_crate::anyhow::Context;
 
-                let table_exists = conn.query_setup(easy_lib::sql::TableExists{name: #table_name}).with_context(easy_sql::macros::context!("Checking if table exists: {:?}".#table_name)).await?;
+                let table_exists = conn.query_setup(#sql_crate::TableExists{name: #table_name}).with_context(#easy_macros_helpers_crate::context!("Checking if table exists: {:?}".#table_name)).await?;
 
                 if table_exists{
                     //TODO Get Table Version and migrate (alter table + update version) if neccessary
                 }else{
+                    use #sql_crate::EasyExecutor;
                     // Create table and create version in EasySqlTables
-                    conn.query_setup(CreateTable{table_name: EasySqlTables::table_name(), fields: vec![
-                        #(TableField{name: #field_names_str, data_type: easy_lib::sql::SqlType::#field_types, is_primary_key: #is_primary_key, foreign_key: None, is_unique: #is_unique, is_not_null: #is_not_null},)*
+                    conn.query_setup(#sql_crate::CreateTable{table_name: #sql_crate::EasySqlTables::table_name(), fields: vec![
+                        #(#sql_crate::TableField{name: #field_names_str, data_type: #sql_crate::SqlType::#field_types, is_primary_key: #is_primary_key, foreign_key: None, is_unique: #is_unique, is_not_null: #is_not_null},)*
                     ]}).await?;
-                    easy_lib::sql::EasySqlTables::create(conn, #table_name.to_string(), #table_version).await?;
+                    #sql_crate::EasySqlTables::create(conn, #table_name.to_string(), #table_version).await?;
 
 
                 }

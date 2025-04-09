@@ -3,6 +3,7 @@ mod column;
 mod sql_type;
 mod sql_value;
 mod table_field;
+pub use table_field::*;
 
 pub use clauses::*;
 pub use column::*;
@@ -13,6 +14,7 @@ pub use sql_value::*;
 mod sql;
 pub use sql::*;
 mod setup_sql;
+pub use setup_sql::*;
 
 use crate::Db;
 

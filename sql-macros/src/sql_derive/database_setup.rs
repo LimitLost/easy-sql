@@ -6,9 +6,16 @@ use easy_macros::{
     syn,
 };
 
+use crate::{async_trait_crate, easy_lib_crate, easy_macros_helpers_crate, sql_crate};
+
 #[always_context]
 pub fn database_setup(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::TokenStream> {
     let item = parse_macro_input!(item as syn::ItemStruct);
+
+    let sql_crate = sql_crate();
+    let easy_lib_crate = easy_lib_crate();
+    let async_trait_crate = async_trait_crate();
+    let easy_macros_helpers_crate = easy_macros_helpers_crate();
 
     let fields = match item.fields {
         syn::Fields::Named(fields_named) => fields_named.named,
@@ -29,19 +36,19 @@ pub fn database_setup(item: proc_macro::TokenStream) -> anyhow::Result<proc_macr
         let context=format!("Field `{}` with type `{}` of struct `{}` ",field_name, field_type_str, item.ident);
 
         quote! {
-            <#field_type as easy_lib::sql::DatabaseSetup>::setup(conn, used_table_names).await.with_context(easy_lib::helpers::context!(#context));
+            <#field_type as #sql_crate::DatabaseSetup>::setup(conn, used_table_names).await.with_context(#easy_macros_helpers_crate::context!(#context));
         }
     });
 
     let item_name = &item.ident;
 
     Ok(quote! {
-        #[easy_lib::async_trait]
-        impl easy_lib::sql::DatabaseSetup for #item_name {
+        #[#async_trait_crate::async_trait]
+        impl #sql_crate::DatabaseSetup for #item_name {
             async fn setup(
-                conn: &mut (impl easy_lib::sql::EasyExecutor + Send + Sync),
+                conn: &mut (impl #sql_crate::EasyExecutor + Send + Sync),
                 used_table_names: &mut Vec<String>,
-            ) -> easy_lib::anyhow::Result<()> {
+            ) -> #easy_lib_crate::anyhow::Result<()> {
                 #(
                     #fields_mapped
                 )*

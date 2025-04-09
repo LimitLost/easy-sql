@@ -4,9 +4,12 @@ use easy_macros::{
     syn::{self, parse::Parse},
 };
 
-use crate::sql_macros_components::{
-    sql_column::SqlColumn, sql_keyword, sql_limit::SqlLimit, sql_order_by::OrderBy,
-    sql_where::WhereExpr,
+use crate::{
+    sql_crate,
+    sql_macros_components::{
+        sql_column::SqlColumn, sql_keyword, sql_limit::SqlLimit, sql_order_by::OrderBy,
+        sql_where::WhereExpr,
+    },
 };
 
 struct Input {
@@ -120,8 +123,13 @@ pub fn sql(item: proc_macro::TokenStream) -> proc_macro::TokenStream {
 
     let mut checks = Vec::new();
 
+    let sql_crate = sql_crate();
+
     if input.only_where() {
-        let where_ = input.where_.unwrap().into_tokens_with_checks(&mut checks);
+        let where_ = input
+            .where_
+            .unwrap()
+            .into_tokens_with_checks(&mut checks, &sql_crate);
 
         quote! {
             (|___t___|{
@@ -135,7 +143,7 @@ pub fn sql(item: proc_macro::TokenStream) -> proc_macro::TokenStream {
         let where_ = input
             .where_
             .map(|w| {
-                let tokens = w.into_tokens_with_checks(&mut checks);
+                let tokens = w.into_tokens_with_checks(&mut checks, &sql_crate);
 
                 quote! {Some(easy_lib::easy_sql::WhereClause{
                     conditions:#tokens
@@ -148,7 +156,7 @@ pub fn sql(item: proc_macro::TokenStream) -> proc_macro::TokenStream {
             .map(|g| {
                 let tokens = g
                     .into_iter()
-                    .map(|el| el.into_tokens_with_checks(&mut checks));
+                    .map(|el| el.into_tokens_with_checks(&mut checks, &sql_crate));
 
                 quote! {Some(GroupByClause{columns: vec![#(#tokens),*]})}
             })
@@ -157,7 +165,7 @@ pub fn sql(item: proc_macro::TokenStream) -> proc_macro::TokenStream {
         let having = input
             .having
             .map(|h| {
-                let tokens = h.into_tokens_with_checks(&mut checks);
+                let tokens = h.into_tokens_with_checks(&mut checks, &sql_crate);
 
                 quote! {Some(easy_lib::easy_sql::HavingClause{conditions: #tokens})}
             })
@@ -168,7 +176,7 @@ pub fn sql(item: proc_macro::TokenStream) -> proc_macro::TokenStream {
             .map(|o| {
                 let tokens = o
                     .into_iter()
-                    .map(|el| el.into_tokens_with_checks(&mut checks));
+                    .map(|el| el.into_tokens_with_checks(&mut checks, &sql_crate));
 
                 quote! {Some(easy_lib::easy_sql::OrderByClause{conditions: vec![#(#tokens),*]})}
             })
@@ -176,7 +184,7 @@ pub fn sql(item: proc_macro::TokenStream) -> proc_macro::TokenStream {
         let limit = input
             .limit
             .map(|l| {
-                let tokens = l.into_tokens_with_checks(&mut checks);
+                let tokens = l.into_tokens_with_checks(&mut checks, &sql_crate);
 
                 quote! {Some(#tokens)}
             })

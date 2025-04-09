@@ -785,11 +785,11 @@ impl<'a, T: Into<SqlValueMaybeRef<'a>>> From<Vec<T>> for SqlValueMaybeRef<'a> {
 }
 
 #[always_context]
-impl<'a, T> From<&Vec<T>> for SqlValueMaybeRef<'a>
+impl<'a, T: 'a> From<&'a Vec<T>> for SqlValueMaybeRef<'a>
 where
     &'a T: Into<SqlValueMaybeRef<'a>>,
 {
-    fn from(value: Vec<T>) -> Self {
+    fn from(value: &'a Vec<T>) -> Self {
         let mut v = Vec::new();
         for i in value.iter() {
             v.push(i.into());

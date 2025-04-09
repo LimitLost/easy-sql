@@ -56,6 +56,7 @@ impl WhereExpr {
     pub fn into_tokens_with_checks(
         self,
         checks: &mut Vec<TokenStream>,
+        sql_crate: &TokenStream,
     ) -> easy_macros::proc_macro2::TokenStream {
         match self {
             WhereExpr::Value(sql_value) => match sql_value {
@@ -63,18 +64,18 @@ impl WhereExpr {
                     SqlColumn::SpecificTableColumn(path, ident) => {
                         checks.push(quote_spanned! {ident.span()=>
                             {
-                                fn has_table<T:easy_lib::easy_sql::HasTable<#path>>(test:&T){}
+                                fn has_table<T:#sql_crate::HasTable<#path>>(test:&T){}
                                 has_table(&___t___);
                                 //TODO "RealColumns" trait with type leading to the struct with actual database columns
-                                let mut table_instance = easy_lib::never::never_any::<#path>();
+                                let mut table_instance = #sql_crate::never::never_any::<#path>();
                                 let _ = bool::from(table_instance.#ident);
                             }
                         });
 
                         let ident_str = ident.to_string();
                         quote_spanned! {ident.span()=>
-                            easy_lib::easy_sql::WhereExpr::ColumnFromTable{
-                                table: <#path as easy_lib::easy_sql::SqlTable>::table_name(),
+                            #sql_crate::WhereExpr::ColumnFromTable{
+                                table: <#path as #sql_crate::SqlTable>::table_name(),
                                 column: #ident_str.to_string(),
                             }
                         }
@@ -88,16 +89,14 @@ impl WhereExpr {
                         let ident_str = ident.to_string();
 
                         quote_spanned! {ident.span()=>
-                            easy_lib::easy_sql::WhereExpr::Column{
-                                column: #ident_str.to_string(),
-                            }
+                            #sql_crate::WhereExpr::Column(#ident_str.to_string())
                         }
                     }
                 },
                 SqlValue::Lit(lit) => match lit {
                     syn::Lit::Bool(lit_bool) => {
                         quote_spanned! {lit_bool.span()=>
-                            easy_lib::easy_sql::WhereExpr::Value(#lit_bool.into())
+                            #sql_crate::WhereExpr::Value(#lit_bool.into())
                         }
                     }
                     l => {
@@ -109,7 +108,7 @@ impl WhereExpr {
                             }
                         });
                         quote! {
-                            easy_lib::easy_sql::WhereExpr::Value(true.into())
+                            #sql_crate::WhereExpr::Value(true.into())
                         }
                     }
                 },
@@ -120,102 +119,102 @@ impl WhereExpr {
                         }
                     });
                     quote_spanned! {expr.span()=>
-                        easy_lib::easy_sql::WhereExpr::Value({#expr}.into())
+                        #sql_crate::WhereExpr::Value({#expr}.into())
                     }
                 }
             },
             WhereExpr::Parenthesized(where_expr) => {
-                let inside_parsed = where_expr.into_tokens_with_checks(checks);
+                let inside_parsed = where_expr.into_tokens_with_checks(checks, sql_crate);
                 quote! {
-                    easy_lib::easy_sql::WhereExpr::Parenthesized(Box::new(#inside_parsed))
+                    #sql_crate::WhereExpr::Parenthesized(Box::new(#inside_parsed))
                 }
             }
             WhereExpr::AndOr(where_expr, items) => {
-                let first_parsed = where_expr.into_tokens_with_checks(checks);
+                let first_parsed = where_expr.into_tokens_with_checks(checks, sql_crate);
 
                 let mut items_parsed = Vec::new();
                 for (and_or, where_expr) in items {
-                    let inside_parsed = where_expr.into_tokens_with_checks(checks);
+                    let inside_parsed = where_expr.into_tokens_with_checks(checks, sql_crate);
                     let and_or_parsed = match and_or {
-                        AndOr::And => quote! {(easy_lib::easy_sql::AndOr::And, #inside_parsed)},
-                        AndOr::Or => quote! {(easy_lib::easy_sql::AndOr::Or, #inside_parsed)},
+                        AndOr::And => quote! {(#sql_crate::AndOr::And, #inside_parsed)},
+                        AndOr::Or => quote! {(#sql_crate::AndOr::Or, #inside_parsed)},
                     };
                     items_parsed.push(and_or_parsed);
                 }
 
                 quote! {
-                    easy_lib::easy_sql::WhereExpr::AndOr(Box::new(#first_parsed), vec![#(#items_parsed),*])
+                    #sql_crate::WhereExpr::AndOr(Box::new(#first_parsed), vec![#(#items_parsed),*])
                 }
             }
             WhereExpr::Not(where_expr) => {
-                let parsed = where_expr.into_tokens_with_checks(checks);
+                let parsed = where_expr.into_tokens_with_checks(checks, sql_crate);
                 quote! {
-                    easy_lib::easy_sql::WhereExpr::Not(Box::new(#parsed))
+                    #sql_crate::WhereExpr::Not(Box::new(#parsed))
                 }
             }
             WhereExpr::IsNull(sql_value) => {
-                let parsed = sql_value.into_tokens_with_checks(checks);
+                let parsed = sql_value.into_tokens_with_checks(checks, sql_crate);
                 quote! {
-                    easy_lib::easy_sql::WhereExpr::IsNull(Box::new(#parsed))
+                    #sql_crate::WhereExpr::IsNull(Box::new(#parsed))
                 }
             }
             WhereExpr::IsNotNull(sql_value) => {
-                let parsed = sql_value.into_tokens_with_checks(checks);
+                let parsed = sql_value.into_tokens_with_checks(checks, sql_crate);
                 quote! {
-                    easy_lib::easy_sql::WhereExpr::IsNotNull(Box::new(#parsed))
+                    #sql_crate::WhereExpr::IsNotNull(Box::new(#parsed))
                 }
             }
             WhereExpr::Equal(sql_value, sql_value1) => {
-                let parsed = sql_value.into_tokens_with_checks(checks);
-                let parsed1 = sql_value1.into_tokens_with_checks(checks);
+                let parsed = sql_value.into_tokens_with_checks(checks, sql_crate);
+                let parsed1 = sql_value1.into_tokens_with_checks(checks, sql_crate);
                 quote! {
-                    easy_lib::easy_sql::WhereExpr::Equal(Box::new(#parsed), Box::new(#parsed1))
+                    #sql_crate::WhereExpr::Equal(Box::new(#parsed), Box::new(#parsed1))
                 }
             }
             WhereExpr::NotEqual(sql_value, sql_value1) => {
-                let parsed = sql_value.into_tokens_with_checks(checks);
-                let parsed1 = sql_value1.into_tokens_with_checks(checks);
+                let parsed = sql_value.into_tokens_with_checks(checks, sql_crate);
+                let parsed1 = sql_value1.into_tokens_with_checks(checks, sql_crate);
                 quote! {
-                    easy_lib::easy_sql::WhereExpr::NotEqual(Box::new(#parsed), Box::new(#parsed1))
+                    #sql_crate::WhereExpr::NotEqual(Box::new(#parsed), Box::new(#parsed1))
                 }
             }
             WhereExpr::GreaterThan(sql_value, sql_value1) => {
-                let parsed = sql_value.into_tokens_with_checks(checks);
-                let parsed1 = sql_value1.into_tokens_with_checks(checks);
+                let parsed = sql_value.into_tokens_with_checks(checks, sql_crate);
+                let parsed1 = sql_value1.into_tokens_with_checks(checks, sql_crate);
                 quote! {
-                    easy_lib::easy_sql::WhereExpr::GreaterThan(Box::new(#parsed), Box::new(#parsed1))
+                    #sql_crate::WhereExpr::GreaterThan(Box::new(#parsed), Box::new(#parsed1))
                 }
             }
             WhereExpr::GreaterThanOrEqual(sql_value, sql_value1) => {
-                let parsed = sql_value.into_tokens_with_checks(checks);
-                let parsed1 = sql_value1.into_tokens_with_checks(checks);
+                let parsed = sql_value.into_tokens_with_checks(checks, sql_crate);
+                let parsed1 = sql_value1.into_tokens_with_checks(checks, sql_crate);
                 quote! {
-                    easy_lib::easy_sql::WhereExpr::GreaterThanOrEqual(Box::new(#parsed), Box::new(#parsed1))
+                    #sql_crate::WhereExpr::GreaterThanOrEqual(Box::new(#parsed), Box::new(#parsed1))
                 }
             }
             WhereExpr::LessThan(sql_value, sql_value1) => {
-                let parsed = sql_value.into_tokens_with_checks(checks);
-                let parsed1 = sql_value1.into_tokens_with_checks(checks);
+                let parsed = sql_value.into_tokens_with_checks(checks, sql_crate);
+                let parsed1 = sql_value1.into_tokens_with_checks(checks, sql_crate);
                 quote! {
-                    easy_lib::easy_sql::WhereExpr::LessThan(Box::new(#parsed), Box::new(#parsed1))
+                    #sql_crate::WhereExpr::LessThan(Box::new(#parsed), Box::new(#parsed1))
                 }
             }
             WhereExpr::LessThanOrEqual(sql_value, sql_value1) => {
-                let parsed = sql_value.into_tokens_with_checks(checks);
-                let parsed1 = sql_value1.into_tokens_with_checks(checks);
+                let parsed = sql_value.into_tokens_with_checks(checks, sql_crate);
+                let parsed1 = sql_value1.into_tokens_with_checks(checks, sql_crate);
                 quote! {
-                    easy_lib::easy_sql::WhereExpr::LessThanOrEqual(Box::new(#parsed), Box::new(#parsed1))
+                    #sql_crate::WhereExpr::LessThanOrEqual(Box::new(#parsed), Box::new(#parsed1))
                 }
             }
             WhereExpr::Like(sql_value, sql_value1) => {
-                let parsed = sql_value.into_tokens_with_checks(checks);
-                let parsed1 = sql_value1.into_tokens_with_checks(checks);
+                let parsed = sql_value.into_tokens_with_checks(checks, sql_crate);
+                let parsed1 = sql_value1.into_tokens_with_checks(checks, sql_crate);
                 quote! {
-                    easy_lib::easy_sql::WhereExpr::Like(Box::new(#parsed), Box::new(#parsed1))
+                    #sql_crate::WhereExpr::Like(Box::new(#parsed), Box::new(#parsed1))
                 }
             }
             WhereExpr::In(sql_value, sql_value_in) => {
-                let parsed = sql_value.into_tokens_with_checks(checks);
+                let parsed = sql_value.into_tokens_with_checks(checks, sql_crate);
 
                 match sql_value_in {
                     SqlValueIn::Single(sql_value) => {
@@ -224,7 +223,7 @@ impl WhereExpr {
                             SqlValue::OutsideVariable(expr) => {
                                 quote_spanned! {expr.span()=>
                                     {
-                                        fn ___collect_iterator<'a,Y:Into<easy_lib::easy_sql::SqlValueMaybeRef<'a>>,T:Iterator<Item=Y>>(i:T)->Vec<easy_lib::easy_sql::SqlValueMaybeRef<'a>>{
+                                        fn ___collect_iterator<'a,Y:Into<#sql_crate::SqlValueMaybeRef<'a>>,T:Iterator<Item=Y>>(i:T)->Vec<#sql_crate::SqlValueMaybeRef<'a>>{
                                             let collected=Vec::new();
                                             for item in i{
                                                 collected.push(item.into());
@@ -232,7 +231,7 @@ impl WhereExpr {
                                             collected
                                         }
 
-                                        easy_lib::easy_sql::WhereExpr::In(Box::new(#parsed),___collect_iterator({#expr}))
+                                        #sql_crate::WhereExpr::In(Box::new(#parsed),___collect_iterator({#expr}))
                                     }
                                 }
                             }
@@ -247,7 +246,7 @@ impl WhereExpr {
                                 });
 
                                 quote! {
-                                    easy_lib::easy_sql::WhereExpr::Error
+                                    #sql_crate::WhereExpr::Error
                                 }
                             }
                         }
@@ -255,21 +254,21 @@ impl WhereExpr {
                     SqlValueIn::Multiple(sql_values) => {
                         let mut parsed_values = Vec::new();
                         for sql_value in sql_values {
-                            let parsed_value = sql_value.into_tokens_with_checks(checks);
+                            let parsed_value = sql_value.into_tokens_with_checks(checks, sql_crate);
                             parsed_values.push(parsed_value);
                         }
                         quote! {
-                            easy_lib::easy_sql::WhereExpr::In(Box::new(#parsed), vec![#(#parsed_values),*])
+                            #sql_crate::WhereExpr::In(Box::new(#parsed), vec![#(#parsed_values),*])
                         }
                     }
                 }
             }
             WhereExpr::Between(sql_value, sql_value1, sql_value2) => {
-                let parsed = sql_value.into_tokens_with_checks(checks);
-                let parsed1 = sql_value1.into_tokens_with_checks(checks);
-                let parsed2 = sql_value2.into_tokens_with_checks(checks);
+                let parsed = sql_value.into_tokens_with_checks(checks, sql_crate);
+                let parsed1 = sql_value1.into_tokens_with_checks(checks, sql_crate);
+                let parsed2 = sql_value2.into_tokens_with_checks(checks, sql_crate);
                 quote! {
-                    easy_lib::easy_sql::WhereExpr::Between(Box::new(#parsed), Box::new(#parsed1), Box::new(#parsed2))
+                    #sql_crate::WhereExpr::Between(Box::new(#parsed), Box::new(#parsed1), Box::new(#parsed2))
                 }
             }
         }
@@ -298,6 +297,7 @@ impl SqlValue {
     fn into_tokens_with_checks(
         self,
         checks: &mut Vec<TokenStream>,
+        sql_crate: &TokenStream,
     ) -> easy_macros::proc_macro2::TokenStream {
         match self {
             SqlValue::Column(sql_column) => {
@@ -305,18 +305,18 @@ impl SqlValue {
                     SqlColumn::SpecificTableColumn(path, ident) => {
                         checks.push(quote_spanned! {ident.span()=>
                             {
-                                fn has_table<T:easy_lib::easy_sql::HasTable<#path>>(test:&T){}
+                                fn has_table<T:#sql_crate::HasTable<#path>>(test:&T){}
                                 has_table(&___t___);
                                 //TODO "RealColumns" trait with type leading to the struct with actual database columns
-                                let mut table_instance = easy_lib::never::never_any::<#path>();
+                                let mut table_instance = #sql_crate::never::never_any::<#path>();
                                 let _ = table_instance.#ident;
                             }
                         });
 
                         let ident_str = ident.to_string();
                         quote_spanned! {ident.span()=>
-                            easy_lib::easy_sql::WhereExpr::ColumnFromTable{
-                                table: <#path as easy_lib::easy_sql::SqlTable>::table_name(),
+                            #sql_crate::WhereExpr::ColumnFromTable{
+                                table: <#path as #sql_crate::SqlTable>::table_name(),
                                 column: #ident_str.to_string(),
                             }
                         }
@@ -330,21 +330,19 @@ impl SqlValue {
                         let ident_str = ident.to_string();
 
                         quote_spanned! {ident.span()=>
-                            easy_lib::easy_sql::WhereExpr::Column{
-                                column: #ident_str.to_string(),
-                            }
+                            #sql_crate::WhereExpr::Column(#ident_str.to_string())
                         }
                     }
                 }
             }
             SqlValue::Lit(lit) => {
                 quote_spanned! {lit.span()=>
-                    easy_lib::easy_sql::WhereExpr::Value(#lit.into())
+                    #sql_crate::WhereExpr::Value(#lit.into())
                 }
             }
             SqlValue::OutsideVariable(expr) => {
                 quote_spanned! {expr.span()=>
-                    easy_lib::easy_sql::WhereExpr::Value({#expr}.into())
+                    #sql_crate::WhereExpr::Value({#expr}.into())
                 }
             }
         }
