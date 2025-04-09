@@ -97,6 +97,7 @@ pub fn sql_insert(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::T
         }
         table = Some(attr);
     }
+    panic!("File: {} Line: {}", file!(), line!());
 
     #[no_context]
     let table = table.with_context(context!("Table attribute is required"))?;

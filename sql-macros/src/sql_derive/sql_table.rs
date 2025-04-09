@@ -1,13 +1,15 @@
 use convert_case::{Case, Casing};
 use easy_macros::{
     anyhow::{self, Context},
-    helpers::parse_macro_input,
-    macros::always_context,
+    helpers::{context, parse_macro_input},
+    macros::{always_context, get_attributes, has_attributes},
     quote::{ToTokens, quote},
-    syn,
+    syn::{self, LitInt},
 };
 
 use crate::sql_derive::{sql_insert_base, sql_output_base, sql_update_base};
+
+use super::ty_enum_value;
 
 #[always_context]
 pub fn sql_table(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::TokenStream> {
@@ -22,7 +24,9 @@ pub fn sql_table(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::To
         }
         syn::Fields::Unit => anyhow::bail!("Unit struct is not supported"),
     };
-    let field_names_str = fields.iter().map(|field| field.ident.as_ref().unwrap().to_string());
+    let field_names_str = fields
+        .iter()
+        .map(|field| field.ident.as_ref().unwrap().to_string());
 
     let table_name = item_name.to_string().to_case(Case::Snake);
 
@@ -35,40 +39,59 @@ pub fn sql_table(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::To
     let update_impl = sql_update_base(&item_name, &fields, &item_name_tokens)?;
     let output_impl = sql_output_base(&item_name, &fields, &item_name_tokens);
 
-    let mut is_primary_key=Vec::new();
-    let mut is_unique=Vec::new();
-    let mut primary_key_found=false;
+    let mut is_primary_key = Vec::new();
+    let mut is_unique = Vec::new();
+    let mut primary_key_found = false;
     let mut field_types = Vec::new();
-    let mut is_not_null=Vec::new();
+    let mut is_not_null = Vec::new();
 
-    for field in fields.iter(){
-        let (variant,is_field_not_null) = ty_enum_value(&field.ty)?;
+    for field in fields.iter() {
+        let (variant, is_field_not_null) = ty_enum_value(&field.ty)?;
         is_not_null.push(is_field_not_null);
-        if let Some(variant) = variant{
+        if let Some(variant) = variant {
             field_types.push(variant);
-        }else{
-            let current_is_primary_key=has_attribute!(field, #[sql(primary_key)]);
-            if current_is_primary_key{
+        } else {
+            let current_is_primary_key = has_attributes!(field, #[sql(primary_key)]);
+            if current_is_primary_key {
                 if !primary_key_found {
-                    primary_key_found=true;
+                    primary_key_found = true;
                     is_primary_key.push(true);
-                }else{
+                } else {
                     anyhow::bail!("Only one primary key is allowed per table!.");
                 }
-            }else{
+            } else {
                 is_primary_key.push(false);
             }
-            is_unique.push(has_attribute!(field, #[sql(unique)]));
-            
-            if has_attribute!(field, #[sql(bytes)]){
+            is_unique.push(has_attributes!(field, #[sql(unique)]));
+
+            if has_attributes!(field, #[sql(bytes)]) {
                 field_types.push(quote! {Bytes});
-            }else{
-                anyhow::bail!("Field type {:?} is not supported, use #[sql(bytes)] to convert it into bytes", field.ty);
+            } else {
+                anyhow::bail!(
+                    "Field type {:?} is not supported, use #[sql(bytes)] to convert it into bytes",
+                    field.ty
+                );
             }
         }
     }
 
-    let table_version=TODO;
+    let mut table_version = None;
+
+    for version in get_attributes!(item, #[sql(version = __unknown__)]) {
+        if table_version.is_some() {
+            anyhow::bail!("Only one version attribute is allowed");
+        }
+        let version: LitInt = syn::parse2(version.clone())
+            .context("Expected literal int in the sql(version) attribute")?;
+        let n: i64 = version
+            .base10_parse()
+            .context("Expected base10 literal int in the sql(version) attribute")?;
+        table_version = Some(n);
+    }
+
+    #[no_context]
+    let table_version =
+        table_version.with_context(context!("sql(version = x) attribute is required"))?;
 
     Ok(quote! {
         impl easy_lib::sql::DatabaseSetup for #item_name {
