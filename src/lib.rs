@@ -4,6 +4,7 @@ mod easy_executor;
 pub use easy_executor::*;
 pub mod never;
 mod sql_query;
+use easy_macros::macros::always_context;
 use serde::de::DeserializeOwned;
 pub use sql_query::*;
 mod traits;
@@ -25,6 +26,7 @@ mod tests;
 
 #[always_context]
 pub fn from_binary<T: DeserializeOwned>(slice: &[u8]) -> anyhow::Result<T> {
+    #[no_context]
     let (result, _) = bincode::serde::decode_from_slice(slice, bincode::config::standard())?;
 
     Ok(result)
@@ -32,6 +34,7 @@ pub fn from_binary<T: DeserializeOwned>(slice: &[u8]) -> anyhow::Result<T> {
 
 #[always_context]
 pub fn to_binary<T: serde::Serialize>(value: T) -> anyhow::Result<Vec<u8>> {
+    #[no_context]
     let result = bincode::serde::encode_to_vec(value, bincode::config::standard())?;
 
     Ok(result)

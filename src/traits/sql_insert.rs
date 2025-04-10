@@ -1,3 +1,4 @@
+use anyhow::Context;
 use easy_macros::macros::always_context;
 
 use crate::SqlValueMaybeRef;
@@ -15,7 +16,12 @@ impl<T: SqlInsert<Table>, Table> SqlInsert<Table> for Vec<T> {
     }
 
     fn insert_values(&self) -> anyhow::Result<Vec<Vec<SqlValueMaybeRef<'_>>>> {
-        Ok(self.iter().flat_map(|item| item.insert_values()).collect())
+        let mut result = Vec::new();
+        for item in self.iter() {
+            let values = item.insert_values()?;
+            result.extend(values);
+        }
+        Ok(result)
     }
 }
 
@@ -26,18 +32,7 @@ impl<T: SqlInsert<Table>, Table> SqlInsert<Table> for &T {
     }
 
     fn insert_values(&self) -> anyhow::Result<Vec<Vec<SqlValueMaybeRef<'_>>>> {
-        self.insert_values()
-    }
-}
-
-#[always_context]
-impl<T: SqlInsert<Table>, Table> SqlInsert<Table> for &Vec<T> {
-    fn insert_columns() -> Vec<String> {
-        T::insert_columns()
-    }
-
-    fn insert_values(&self) -> anyhow::Result<Vec<Vec<SqlValueMaybeRef<'_>>>> {
-        Ok(self.iter().flat_map(|item| item.insert_values()).collect())
+        (**self).insert_values()
     }
 }
 
@@ -48,6 +43,11 @@ impl<T: SqlInsert<Table>, Table> SqlInsert<Table> for [T] {
     }
 
     fn insert_values(&self) -> anyhow::Result<Vec<Vec<SqlValueMaybeRef<'_>>>> {
-        Ok(self.iter().flat_map(|item| item.insert_values()).collect())
+        let mut result = Vec::new();
+        for item in self.iter() {
+            let values = item.insert_values()?;
+            result.extend(values);
+        }
+        Ok(result)
     }
 }

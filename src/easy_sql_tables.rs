@@ -18,7 +18,7 @@ pub struct EasySqlTables {
 }
 
 #[always_context]
-//TODO Make this (#[sql]) a part of sql build function
+//TODO Make this (adding #[sql] where it's needed) a part of sql build function
 #[sql]
 impl EasySqlTables {
     pub async fn create(
@@ -26,7 +26,8 @@ impl EasySqlTables {
         table_id: String,
         version: i64,
     ) -> anyhow::Result<()> {
-        EasySqlTables::insert(conn, &EasySqlTables { table_id, version }).await?;
+        let inserted = EasySqlTables { table_id, version };
+        EasySqlTables::insert(conn, &inserted).await?;
 
         Ok(())
     }
@@ -41,15 +42,7 @@ impl EasySqlTables {
             EasySqlTableVersion {
                 version: new_version,
             },
-            Some(crate::WhereClause {
-                conditions: crate::WhereExpr::Eq(
-                    Box::new(crate::WhereExpr::Column("table_id".to_string())),
-                    Box::new(crate::WhereExpr::Value({ table_id }.into())),
-                ),
-            }), // sql_where!(table_id = { table_id }),
-            SqlTableTest::new(|___t___| {
-                let _ = ___t___.table_id;
-            }),
+            sql_where!(table_id = { table_id }),
         )
         .await?;
 
