@@ -1,3 +1,4 @@
+mod sql_convenience_attr;
 mod sql_macros;
 mod sql_macros_components;
 
@@ -82,4 +83,11 @@ pub fn sql_insert(item: TokenStream) -> anyhow::Result<TokenStream> {
 #[macro_result]
 pub fn sql_update(item: TokenStream) -> anyhow::Result<TokenStream> {
     sql_derive::sql_update(item)
+}
+
+#[always_context]
+#[proc_macro_attribute]
+#[macro_result]
+pub fn sql_convenience(attr: TokenStream, item: TokenStream) -> anyhow::Result<TokenStream> {
+    sql_convenience_attr::sql_convenience(attr, item)
 }

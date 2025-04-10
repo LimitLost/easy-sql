@@ -12,6 +12,8 @@ use crate::{
     },
 };
 
+use super::WrappedInput;
+
 struct Input {
     distinct: bool,
     where_: Option<WhereExpr>,
@@ -119,7 +121,9 @@ impl Parse for Input {
 }
 
 pub fn sql(item: proc_macro::TokenStream) -> proc_macro::TokenStream {
-    let input = syn::parse_macro_input!(item as Input);
+    let input = syn::parse_macro_input!(item as WrappedInput<Input>);
+    let table_ty = input.table;
+    let input = input.input;
 
     let mut checks = Vec::new();
 
@@ -193,7 +197,7 @@ pub fn sql(item: proc_macro::TokenStream) -> proc_macro::TokenStream {
         let distinct = input.distinct;
 
         quote! {
-            Some((|___t___|{
+            Some((|___t___:#table_ty|{
                 #(#checks)*
             },
             easy_lib::easy_sql::SelectClauses {

@@ -46,14 +46,14 @@ impl SqlInsert<ExampleTableStruct> for ExampleStruct {
         ]
     }
 
-    fn insert_values(&self) -> Vec<Vec<SqlValueMaybeRef<'_>>> {
-        vec![vec![
+    fn insert_values(&self) -> anyhow::Result<Vec<Vec<SqlValueMaybeRef<'_>>>> {
+        Ok(vec![vec![
             crate::SqlValueMaybeRef::Ref(crate::SqlValueRef::String(&self.field0)),
             crate::SqlValueMaybeRef::Ref(crate::SqlValueRef::String(&self.field1)),
             crate::SqlValueMaybeRef::Ref(crate::SqlValueRef::I32(&self.field2)),
             crate::SqlValueMaybeRef::Ref(crate::SqlValueRef::I64(&self.field3)),
             crate::SqlValueMaybeRef::Ref(crate::SqlValueRef::I16(&self.field4)),
-        ]]
+        ]])
     }
 }
 
