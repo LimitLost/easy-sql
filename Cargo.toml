@@ -34,13 +34,14 @@ futures = "0.3.31"
 pin-project = "1"
 
 sql-macros = { path = "./sql-macros" }
-sql-build = { path = "./sql-build" }
+sql-build = { path = "./sql-build", optional = true }
 
 [dev-dependencies]
 lazy_static = "*"
 
 [build-dependencies]
 easy-macros = { path = "../easy-macros", features = ["build"] }
+sql-build = { path = "./sql-build" }
 
 [features]
 backend = ["sqlx/postgres"]

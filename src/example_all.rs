@@ -68,6 +68,7 @@ struct ExampleUpdate {
     field2: Vec<i64>,
 }
 
+#[sql_convenience]
 #[always_context]
 async fn get_data_example() -> anyhow::Result<()> {
     let conn = DB.conn().await?;

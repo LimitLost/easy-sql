@@ -16,10 +16,7 @@ struct ExampleTable {
 #[always_context]
 #[async_trait]
 impl crate::DatabaseSetup for ExampleTable {
-    async fn setup(
-        conn: &mut (impl crate::EasyExecutor + Send + Sync),
-        used_table_names: &mut Vec<String>,
-    ) -> anyhow::Result<()> {
+    async fn setup(conn: &mut (impl crate::EasyExecutor + Send + Sync)) -> anyhow::Result<()> {
         use crate::EasyExecutor;
 
         //If table doesn't exist ( https://stackoverflow.com/questions/1601151/how-do-i-check-in-sqlite-whether-a-table-exists )

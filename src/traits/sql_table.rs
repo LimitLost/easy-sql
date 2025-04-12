@@ -9,19 +9,6 @@ use crate::{
 
 use super::{SqlInsert, SqlOutput, SqlUpdate, ToConvert};
 
-pub struct SqlTableTest<T> {
-    _marker: std::marker::PhantomData<T>,
-}
-
-#[always_context]
-impl<T> SqlTableTest<T> {
-    pub fn new(_n: impl Fn(T)) -> Self {
-        Self {
-            _marker: std::marker::PhantomData,
-        }
-    }
-}
-
 #[always_context]
 #[async_trait]
 pub trait SqlTable: Sized {
@@ -32,10 +19,7 @@ pub trait SqlTable: Sized {
         conn: &mut (impl EasyExecutor + Send + Sync),
         clauses: Option<(fn(Self), impl CanBeSelectClause<'a> + Send + Sync)>,
     ) -> anyhow::Result<T> {
-        let clauses = match clauses {
-            Some((_, clauses)) => Some(clauses),
-            None => None,
-        };
+        let clauses = clauses.map(|(_, clauses)| clauses);
         let sql = Sql::Select {
             table: Self::table_name(),
             joins: vec![],
@@ -58,10 +42,7 @@ pub trait SqlTable: Sized {
         clauses: Option<(fn(Self), impl CanBeSelectClause<'a> + Send + Sync)>,
         perform: impl FnMut(T) -> anyhow::Result<Option<Break>> + Send + Sync,
     ) -> anyhow::Result<()> {
-        let clauses = match clauses {
-            Some((_, clauses)) => Some(clauses),
-            None => None,
-        };
+        let clauses = clauses.map(|(_, clauses)| clauses);
         let sql = Sql::Select {
             table: Self::table_name(),
             joins: vec![],
@@ -135,10 +116,7 @@ pub trait SqlTable: Sized {
         conn: &mut (impl EasyExecutor + Send + Sync),
         where_: Option<(fn(Self), WhereClause<'a>)>,
     ) -> anyhow::Result<()> {
-        let where_ = match where_ {
-            Some((_, where_)) => Some(where_),
-            None => None,
-        };
+        let where_ = where_.map(|(_, where_)| where_);
         let sql = Sql::Delete {
             table: Self::table_name(),
             where_,
@@ -151,10 +129,7 @@ pub trait SqlTable: Sized {
         conn: &mut (impl EasyExecutor + Send + Sync),
         where_: Option<(fn(Self), WhereClause<'a>)>,
     ) -> anyhow::Result<T> {
-        let where_ = match where_ {
-            Some((_, where_)) => Some(where_),
-            None => None,
-        };
+        let where_ = where_.map(|(_, where_)| where_);
         let sql = Sql::Delete {
             table: Self::table_name(),
             where_,
@@ -171,10 +146,7 @@ pub trait SqlTable: Sized {
         update: impl SqlUpdate<Self> + Send + Sync,
         where_: Option<(fn(Self), WhereClause<'a>)>,
     ) -> anyhow::Result<()> {
-        let where_ = match where_ {
-            Some((_, where_)) => Some(where_),
-            None => None,
-        };
+        let where_ = where_.map(|(_, where_)| where_);
         let sql = Sql::Update {
             table: Self::table_name(),
             set: update.updates(),
@@ -189,10 +161,7 @@ pub trait SqlTable: Sized {
         update: impl SqlUpdate<Self> + Send + Sync,
         where_: Option<(fn(Self), WhereClause<'a>)>,
     ) -> anyhow::Result<T> {
-        let where_ = match where_ {
-            Some((_, where_)) => Some(where_),
-            None => None,
-        };
+        let where_ = where_.map(|(_, where_)| where_);
         let sql = Sql::Update {
             table: Self::table_name(),
             set: update.updates(),

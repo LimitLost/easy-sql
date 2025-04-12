@@ -43,6 +43,6 @@ pub trait SetupSql {
 
     async fn query<'a>(
         self,
-        exec: impl sqlx::Executor<'a, Database = crate::Db> + Send + Sync,
+        exec: impl sqlx::Executor<'a, Database = crate::Db> + Sync,
     ) -> anyhow::Result<Self::Output>;
 }

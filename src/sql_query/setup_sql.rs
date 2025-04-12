@@ -19,7 +19,7 @@ impl SetupSql for TableExists {
 
     async fn query<'a>(
         self,
-        exec: impl sqlx::Executor<'a, Database = crate::Db> + Send + Sync,
+        exec: impl sqlx::Executor<'a, Database = crate::Db> + Sync,
     ) -> anyhow::Result<Self::Output> {
         let query = format!(
             "SELECT EXISTS (SELECT * FROM sqlite_master WHERE type='table' AND name='{}')",
@@ -47,7 +47,7 @@ impl SetupSql for CreateTable {
 
     async fn query<'a>(
         self,
-        exec: impl sqlx::Executor<'a, Database = crate::Db> + Send + Sync,
+        exec: impl sqlx::Executor<'a, Database = crate::Db> + Sync,
     ) -> anyhow::Result<Self::Output> {
         let mut table_fields = String::new();
         let mut table_constrains = String::new();

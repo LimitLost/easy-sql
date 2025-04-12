@@ -10,9 +10,6 @@ pub use sql_query::*;
 mod traits;
 pub use traits::*;
 
-mod easy_sql_tables;
-pub use easy_sql_tables::*;
-
 type Db = sqlx::Sqlite;
 type ConnectionInternal = sqlx::pool::PoolConnection<Db>;
 pub type Row = sqlx::sqlite::SqliteRow;

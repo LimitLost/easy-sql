@@ -10,6 +10,7 @@ proc-macro = true
 easy-macros = { path = "../../easy-macros", features = ["for-macro"] }
 convert_case = "0.8.0"
 replace_with = "0.1.7"
+sql-compilation-data = { path = "../sql-compilation-data" }
 
 [build-dependencies]
 easy-macros = { path = "../../easy-macros", features = ["build"] }

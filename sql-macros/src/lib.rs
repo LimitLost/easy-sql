@@ -86,6 +86,13 @@ pub fn sql_update(item: TokenStream) -> anyhow::Result<TokenStream> {
 }
 
 #[always_context]
+#[proc_macro_derive(SqlTable, attributes(sql))]
+#[macro_result]
+pub fn sql_table(item: TokenStream) -> anyhow::Result<TokenStream> {
+    sql_derive::sql_table(item)
+}
+
+#[always_context]
 #[proc_macro_attribute]
 #[macro_result]
 pub fn sql_convenience(attr: TokenStream, item: TokenStream) -> anyhow::Result<TokenStream> {

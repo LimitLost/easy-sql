@@ -8,9 +8,9 @@ use convert_case::{Case, Casing};
 pub use database_setup::*;
 use easy_macros::{
     anyhow::{self, Context},
-    helpers::{context, find_crate_list},
+    helpers::context,
     macros::always_context,
-    proc_macro2::{self, TokenStream},
+    proc_macro2::TokenStream,
     quote::{self, ToTokens, quote},
     syn,
 };
@@ -130,7 +130,7 @@ fn ty_to_variant(
     bytes_allowed: bool,
 ) -> anyhow::Result<TokenStream> {
     match ty {
-        syn::Type::Array(type_array) => {
+        syn::Type::Array(_) => {
             //Convert into Vec
             anyhow::bail!("Arrays are not supported yet")
         }
@@ -164,7 +164,7 @@ fn ty_to_variant(
                         })
                         .flatten()
                 }
-                syn::PathArguments::Parenthesized(parenthesized_generic_arguments) => None,
+                syn::PathArguments::Parenthesized(_) => None,
             };
 
             let found = ty_name_into_data(&name.ident.to_string(), &generic_arg, bytes_allowed)?;
@@ -187,7 +187,7 @@ fn ty_to_variant(
                 }
             })
         }
-        syn::Type::Reference(type_reference) => {
+        syn::Type::Reference(_) => {
             //(&) into ref
             anyhow::bail!("References are not supported yet")
         }
@@ -280,7 +280,7 @@ fn ty_enum_value(ty: &syn::Type) -> anyhow::Result<(Option<TokenStream>, bool)> 
                             ),
                         }
                     }
-                    syn::PathArguments::Parenthesized(parenthesized_generic_arguments) => {
+                    syn::PathArguments::Parenthesized(_) => {
                         anyhow::bail!(
                             "Option with parenthesized generic arguments is not supported"
                         )
@@ -307,7 +307,7 @@ fn ty_enum_value(ty: &syn::Type) -> anyhow::Result<(Option<TokenStream>, bool)> 
                         })
                         .flatten()
                 }
-                syn::PathArguments::Parenthesized(parenthesized_generic_arguments) => None,
+                syn::PathArguments::Parenthesized(_) => None,
             };
 
             Ok((ty_str_enum_value(&name_str, &generic_arg)?, not_null))

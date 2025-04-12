@@ -6,7 +6,7 @@ use easy_macros::{
     macros::{all_syntax_cases, always_context},
     proc_macro2::LineColumn,
     quote::ToTokens,
-    syn::{self, ItemFn, Macro, Meta, spanned::Spanned},
+    syn::{self, ItemFn, ItemImpl, ItemTrait, Macro, Meta, spanned::Spanned},
 };
 #[derive(Debug, Default)]
 struct SearchData {
@@ -23,6 +23,10 @@ all_syntax_cases! {
     default_cases=>{
         #[after_system]
         fn item_fn_check(item: &mut ItemFn, context_info: &mut SearchData);
+        #[after_system]
+        fn trait_check(item: &mut ItemTrait, context_info: &mut SearchData);
+        #[after_system]
+        fn impl_check(item: &mut ItemImpl, context_info: &mut SearchData);
         fn macro_check(item: &mut Macro, context_info: &mut SearchData);
     }
     special_cases=>{}
@@ -35,6 +39,20 @@ fn macro_check(item: &mut Macro, context_info: &mut SearchData) {
             context_info.found = true;
         }
         _ => {}
+    }
+}
+
+fn trait_check(item: &mut ItemTrait, context_info: &mut SearchData) {
+    if context_info.found && !has_sql_convenience(&item.attrs) {
+        context_info.updates.push(item.span().start());
+        context_info.found = false;
+    }
+}
+
+fn impl_check(item: &mut ItemImpl, context_info: &mut SearchData) {
+    if context_info.found && !has_sql_convenience(&item.attrs) {
+        context_info.updates.push(item.span().start());
+        context_info.found = false;
     }
 }
 
@@ -118,14 +136,14 @@ fn handle_file(file_path: impl AsRef<Path>) -> anyhow::Result<()> {
         updates.sort_by(|a, b| a.line.cmp(&b.line));
         updates.reverse();
 
-        //Uses span position info to add #[always_context] to every item on the list
+        //Uses span position info to add #[sql_convenience] to every item on the list
         for start_pos in updates.into_iter() {
             //1 indexed
             let line = start_pos.line;
             //Find position based on line
             let line_bytes_end = line_pos(&contents, line - 1)?;
 
-            contents.insert_str(line_bytes_end, "#[always_context]\r\n");
+            contents.insert_str(line_bytes_end, "#[sql_convenience]\r\n");
         }
 
         let mut file = std::fs::File::create(file_path).unwrap();

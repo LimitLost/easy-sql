@@ -6,6 +6,7 @@ use easy_macros::{
     quote::{ToTokens, quote},
     syn::{self},
 };
+
 #[derive(Debug, Default)]
 struct SqlData {
     potential_table: Option<TokenStream>,
@@ -19,6 +20,7 @@ all_syntax_cases! {
     default_cases=>{
         fn macro_check(item: &mut syn::Macro, context_info: &mut SqlData);
         fn call_check(item: &mut syn::ExprCall, context_info: &mut SqlData);
+        #[after_system]
         fn after_call_check(item: &mut syn::ExprCall, context_info: &mut SqlData);
     }
     special_cases=>{}
@@ -48,6 +50,7 @@ fn table_function_check(fn_path: &syn::Path) -> Option<TokenStream> {
         | "delete_returning_lazy" => {
             let mut path = fn_path.clone();
             path.segments.pop();
+            path.segments.pop_punct();
             Some(path.to_token_stream())
         }
         _ => None,
@@ -77,7 +80,7 @@ fn macro_check(item: &mut syn::Macro, context_info: &mut SqlData) {
     match path.as_str() {
         "sql" | "sql_where" | "easy_lib::sql::sql" | "easy_lib::sql::sql_where" => {
             if let Some(table) = &context_info.potential_table {
-                if !table.to_string().starts_with("|") {
+                if !item.tokens.to_string().starts_with("|") {
                     replace_with::replace_with_or_abort(&mut item.tokens, |current_tokens| {
                         quote! {
                             | #table | #current_tokens
@@ -100,6 +103,8 @@ pub fn sql_convenience(
     let mut additional = Default::default();
 
     macro_search_item_handle(&mut item, &mut additional);
+
+    // panic!("{}", item.to_token_stream());
 
     Ok(item.into_token_stream().into())
 }

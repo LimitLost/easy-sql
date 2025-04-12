@@ -1720,11 +1720,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "sql-compilation-data"
+version = "0.1.0"
+dependencies = [
+ "easy-macros",
+]
+
+[[package]]
 name = "sql-macros"
 version = "0.1.0"
 dependencies = [
  "convert_case",
  "easy-macros",
+ "replace_with",
+ "sql-compilation-data",
 ]
 
 [[package]]
