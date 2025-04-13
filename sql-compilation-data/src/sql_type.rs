@@ -1,5 +1,5 @@
-use easy_macros::macros::always_context;
-#[derive(Debug)]
+use serde::{Deserialize, Serialize};
+#[derive(Debug, Serialize, Deserialize)]
 pub enum SqlRangeType {
     ///int4range
     I32,
@@ -14,7 +14,7 @@ pub enum SqlRangeType {
     ///numrange
     Decimal,
 }
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub enum SqlType {
     ///Postgresql: inet
     ///Sqlite: BLOB
@@ -108,7 +108,6 @@ pub enum SqlType {
     //Time
 }
 
-#[always_context]
 impl SqlType {
     pub fn sqlite(self) -> &'static str {
         match self {

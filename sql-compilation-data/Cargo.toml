@@ -4,4 +4,13 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-easy-macros = { path = "../../easy-macros", features = ["for-macro"] }
+easy-macros = { path = "../../easy-macros", features = [
+    "for-macro",
+], optional = true }
+
+ron = { version = "0.10.1", optional = true }
+serde = { version = "*", features = ["derive"] }
+
+[features]
+default = ["data"]
+data = ["ron", "easy-macros"]

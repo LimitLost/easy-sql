@@ -3,9 +3,10 @@ use std::fmt::Debug;
 use anyhow::Context;
 use async_trait::async_trait;
 use easy_macros::macros::always_context;
+use sql_compilation_data::SqlType;
 use sql_macros::{SqlInsert, SqlOutput, SqlUpdate, sql_convenience, sql_where};
 
-use crate::{CreateTable, DatabaseSetup, EasyExecutor, SqlTable, SqlType, TableExists, TableField};
+use crate::{CreateTable, DatabaseSetup, EasyExecutor, SqlTable, TableExists, TableField};
 
 #[derive(SqlInsert, Debug)]
 #[sql(table = EasySqlTables)]

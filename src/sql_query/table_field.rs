@@ -1,4 +1,4 @@
-use super::sql_type::SqlType;
+use sql_compilation_data::SqlType;
 
 #[derive(Debug)]
 pub struct TableField {

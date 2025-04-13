@@ -35,6 +35,7 @@ pin-project = "1"
 
 sql-macros = { path = "./sql-macros" }
 sql-build = { path = "./sql-build", optional = true }
+sql-compilation-data = { path = "./sql-compilation-data", default-features = false }
 
 [dev-dependencies]
 lazy_static = "*"

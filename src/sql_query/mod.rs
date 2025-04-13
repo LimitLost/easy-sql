@@ -1,6 +1,5 @@
 mod clauses;
 mod column;
-mod sql_type;
 mod sql_value;
 mod table_field;
 pub use table_field::*;
@@ -8,7 +7,6 @@ pub use table_field::*;
 pub use clauses::*;
 pub use column::*;
 use easy_macros::macros::always_context;
-pub use sql_type::*;
 pub use sql_value::*;
 
 mod sql;

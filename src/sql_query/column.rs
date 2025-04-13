@@ -1,6 +1,6 @@
 use easy_macros::macros::always_context;
 
-use super::sql_type::SqlType;
+use sql_compilation_data::SqlType;
 
 pub struct Column {
     pub name: String,
