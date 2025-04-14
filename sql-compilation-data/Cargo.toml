@@ -11,6 +11,9 @@ easy-macros = { path = "../../easy-macros", features = [
 ron = { version = "0.10.1", optional = true }
 serde = { version = "*", features = ["derive"] }
 
+uuid = {version = "1.16.0", features = ["v4" ]}
+
 [features]
 default = ["data"]
 data = ["ron", "easy-macros"]
+build=[]

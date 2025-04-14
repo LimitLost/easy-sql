@@ -6,4 +6,8 @@ edition = "2024"
 [dependencies]
 easy-macros = { path = "../../easy-macros", features = ["for-macro"] }
 proc-macro2 = { version = "*", features = ["span-locations"] }
+
 regex = "1.11.1"
+convert_case = "0.8.0"
+
+sql-compilation-data = { path = "../sql-compilation-data", features = ["build"]}

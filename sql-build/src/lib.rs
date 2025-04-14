@@ -1,18 +1,29 @@
-use std::{io::Write, path::Path};
+use std::{collections::hash_map::Entry, io::Write, path::Path};
 
 use easy_macros::{
     anyhow::{self, Context},
     helpers::context,
-    macros::{all_syntax_cases, always_context},
+    macros::{all_syntax_cases, always_context, get_attributes},
     proc_macro2::LineColumn,
     quote::ToTokens,
-    syn::{self, ItemFn, ItemImpl, ItemTrait, Macro, Meta, spanned::Spanned},
+    syn::{
+        self, ItemFn, ItemImpl, ItemTrait, LitInt, LitStr, Macro, Meta, punctuated::Punctuated,
+        spanned::Spanned,
+    },
 };
+use sql_compilation_data::{CompilationData, TableData, TableDataVersion, TableField};
 #[derive(Debug, Default)]
 struct SearchData {
     found: bool,
     ///Where to add `#[sql_convenience]`
     updates: Vec<LineColumn>,
+
+    //SqlTable handling
+    created_unique_ids: Vec<(String, LineColumn)>,
+    compilation_data: CompilationData,
+    found_existing_tables_ids: Vec<String>,
+    //Use also created_unique_ids to check if tables were updated
+    tables_updated: bool,
 }
 
 all_syntax_cases! {
@@ -21,6 +32,7 @@ all_syntax_cases! {
         additional_input_type:&mut SearchData
     }
     default_cases=>{
+        fn struct_table_handle(item: &mut syn::ItemStruct, context_info: &mut SearchData);
         #[after_system]
         fn item_fn_check(item: &mut ItemFn, context_info: &mut SearchData);
         #[after_system]
@@ -30,6 +42,167 @@ all_syntax_cases! {
         fn macro_check(item: &mut Macro, context_info: &mut SearchData);
     }
     special_cases=>{}
+}
+
+fn generate_table_data_from_struct(item: &syn::ItemStruct, table_name: String) -> TableDataVersion {
+    let fields = match item.fields {
+        syn::Fields::Named(fields_named) => fields_named.named,
+        _ => {
+            unreachable!(
+                "non named field type should be handled before `generate_table_data_from_struct` is called"
+            )
+        }
+    };
+
+    let fields_converted=Vec::new();
+
+    for field in fields.iter(){
+        let name=field.ident.as_ref().unwrap().to_string();
+
+        fields_converted.push(TableField{
+            name,
+            sql_type: ,
+            is_primary_key: todo!(),
+            has_default: todo!(),
+        });
+    }
+
+    TableDataVersion { table_name, fields: fields_converted }
+}
+
+///Table handling
+fn struct_table_handle(item: &mut syn::ItemStruct, context_info: &mut SearchData) {
+    if let Some(attr) = get_attributes!(item, #[derive(__unknown__)])
+        .into_iter()
+        .next()
+    {
+        let parsed = Punctuated::<syn::Path, syn::Token![,]>::parse_terminated(&attr).unwrap();
+        let mut is_sql_table = false;
+        for path in parsed.iter() {
+            let path_str = path
+                .to_token_stream()
+                .to_string()
+                .replace(|c: char| c.is_whitespace(), "");
+            match path_str.as_str() {
+                "SqlTable" | "easy_lib::sql::SqlTable" => {
+                    is_sql_table = true;
+                }
+                _ => {}
+            }
+        }
+        if !is_sql_table {
+            //No Sql Table derive
+            return;
+        }
+    } else {
+        //No Sql Table derive
+        return;
+    }
+    //Check is unique_id present
+    let mut unique_id = None;
+    for attr_data in get_attributes!(item, #[sql(unique_id = "__unknown__")]) {
+        if unique_id.is_some() {
+            //Ignore multiple unique_id attributes, error should be shown by derive macro
+            return;
+        }
+        let lit_str: LitStr = match syn::parse2(attr_data) {
+            Ok(lit_str) => lit_str,
+            Err(_) => {
+                //Ignore invalid attributes, error should be shown by derive macro
+                return;
+            }
+        };
+        unique_id = Some(lit_str.value());
+    }
+    //Unique Id
+    if let Some(unique_id) = unique_id {
+        //Table wasn't deleted
+        context_info.found_existing_tables_ids.push(unique_id);
+    } else {
+        //Create unique_id
+        let generated = context_info.compilation_data.generate_unique_id();
+        context_info
+            .created_unique_ids
+            .push((generated.clone(), item.span().start()));
+
+        unique_id = Some(generated);
+    }
+
+    let unique_id = unique_id.unwrap();
+
+    //Check if table version has changed
+    let mut version = None;
+    for attr_data in get_attributes!(item, #[sql(version = "__unknown__")]) {
+        let lit_int: LitInt = match syn::parse2(attr_data) {
+            Ok(lit_int) => lit_int,
+            Err(_) => {
+                //Ignore invalid attributes, error should be shown by derive macro
+                return;
+            }
+        };
+        version = match lit_int.base10_parse::<u64>() {
+            Ok(o) => Some(o),
+            Err(_) => {
+                //Ignore invalid attributes, error should be shown by derive macro
+                return;
+            }
+        };
+    }
+
+    //Version attribute should exist. if it doesn't error by derive macro should be shown
+    let version = match version {
+        Some(o) => o,
+        None => {
+            return;
+        }
+    };
+
+    match item.fields {
+        syn::Fields::Named(fields_named) => {}
+        _ => {
+            //Ignore unnamed and unit structs, error should be shown by derive macro
+            return;
+        }
+    }
+
+    let table_name = item.ident.to_string().to_case(Case::Snake);
+    //Check if table_name was set manually
+    for attr_data in get_attributes!(item, #[sql(table_name = "__unknown__")]) {
+        let lit_str: LitStr = match syn::parse2(attr_data) {
+            Ok(lit_str) => lit_str,
+            Err(_) => {
+                //Ignore invalid attributes, error should be shown by derive macro
+                return;
+            }
+        };
+        table_name = lit_str.value();
+        break;
+    }
+
+    match context_info.compilation_data.tables.entry(unique_id) {
+        Entry::Occupied(occupied_entry) => {
+            let table_data = occupied_entry.into_mut();
+            //Ignore when current version is smaller than the latest version (Error by derive macro)
+            if table_data.latest_version < version {
+                table_data
+                    .saved_versions
+                    .push(generate_table_data_from_struct(item, table_name));
+
+                table_data.latest_version = version;
+                context_info.tables_updated = true;
+            }
+        }
+        Entry::Vacant(vacant_entry) => {
+            let table_version = generate_table_data_from_struct(item, table_name);
+
+            let table_data = TableData {
+                latest_version: version,
+                saved_versions: vec![table_version],
+            };
+
+            vacant_entry.insert(table_data);
+        }
+    }
 }
 
 fn macro_check(item: &mut Macro, context_info: &mut SearchData) {

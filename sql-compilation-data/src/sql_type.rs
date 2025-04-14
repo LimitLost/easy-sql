@@ -1,3 +1,5 @@
+#[cfg(feature = "data")]
+use easy_macros::{anyhow, macros::always_context};
 use serde::{Deserialize, Serialize};
 #[derive(Debug, Serialize, Deserialize)]
 pub enum SqlRangeType {
@@ -133,4 +135,59 @@ impl SqlType {
             SqlType::Range(_) => "BLOB",
         }
     }
+}
+#[cfg(feature = "data")]
+#[always_context]
+fn ty_str_enum_value(
+    ty_str: &str,
+    generic_arg: &Option<String>,
+) -> anyhow::Result<Option<SqlType>> {
+    Ok(match ty_str {
+        "IpAddr" => Some(SqlType::IpAddr),
+        "bool" => Some(SqlType::Bool),
+        "f32" => Some(SqlType::F32),
+        "f64" => Some(SqlType::F64),
+        "i8" => Some(SqlType::I8),
+        "i16" => Some(SqlType::I16),
+        "i32" => Some(SqlType::I32),
+        "i64" => Some(SqlType::I64),
+        "String" => Some(SqlType::String),
+        "Interval" => Some(SqlType::Interval),
+        "Vec<u8>" => Some(SqlType::Bytes),
+        "NaiveDate" => Some(SqlType::NaiveDate),
+        "NaiveDateTime" => Some(SqlType::NaiveDateTime),
+        "NaiveTime" => Some(SqlType::NaiveTime),
+        "Uuid" => Some(SqlType::Uuid),
+        "Decimal" => Some(SqlType::Decimal),
+        "BigDecimal" => Some(SqlType::BigDecimal),
+        "Vec" => {
+            if let Some(arg) = generic_arg {
+                let subtype = ty_str_enum_value(&arg, &None::<String>)?;
+                if let Some(subtype) = subtype {
+                    Some(SqlType::List(Box::new(subtype)))
+                } else {
+                    None
+                }
+            } else {
+                anyhow::bail!("No Generic argument or Invalid/Not supported argument for Vec type")
+            }
+        }
+        "Range" | "PgRange" => {
+            if let Some(arg) = generic_arg {
+                match arg.as_str() {
+                    "i32" => Some(SqlType::Range(SqlRangeType::I32)),
+                    "i64" => Some(SqlType::Range(SqlRangeType::I64)),
+                    "NaiveDate" => Some(SqlType::Range(SqlRangeType::NaiveDate)),
+                    "NaiveDateTime" => Some(SqlType::Range(SqlRangeType::NaiveDateTime)),
+                    "BigDecimal" => Some(SqlType::Range(SqlRangeType::BigDecimal)),
+                    "Decimal" => Some(SqlType::Range(SqlRangeType::Decimal)),
+
+                    _ => None,
+                }
+            } else {
+                anyhow::bail!("No Generic argument or Invalid/Not supported argument for Vec type")
+            }
+        }
+        _ => None,
+    })
 }

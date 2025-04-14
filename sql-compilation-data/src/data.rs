@@ -51,7 +51,36 @@ impl CompilationData {
         Ok(data)
     }
 
-    //TODO Save function (only used by build script?)
+    #[cfg(feature = "build")]
+    pub fn save(&self) -> anyhow::Result<()> {
+        let current_dir = std::env::current_dir()?;
+
+        let data_path = current_dir.join("easy_sql.ron");
+
+        let data =
+            ron::ser::to_string_pretty(self, ron::ser::PrettyConfig::new().struct_names(true))?;
+
+        std::fs::write(&data_path, data).context("Failed to write easy_sql.ron file")?;
+
+        Ok(())
+    }
+
+    pub fn generate_unique_id(&self) -> String {
+        let mut generated = uuid::Uuid::new_v4().to_string();
+        let mut exists = true;
+
+        while exists {
+            exists = false;
+            for unique_id in self.tables.keys() {
+                if unique_id == &generated {
+                    exists = true;
+                    generated = uuid::Uuid::new_v4().to_string();
+                    break;
+                }
+            }
+        }
+        generated
+    }
 
     pub fn is_duplicate_table_name(
         &self,
@@ -81,6 +110,88 @@ impl CompilationData {
         }
 
         Ok(false)
+    }
+
+    // pub fn generate_migrations(
+    //     &self,
+}
+
+#[always_context]
+///Returns only type enum variant
+fn ty_enum_value(ty: &syn::Type) -> anyhow::Result<(Option<TokenStream>, bool)> {
+    match ty {
+        syn::Type::Path(type_path) => {
+            let mut last_segment = type_path
+                .path
+                .segments
+                .last()
+                .with_context(context!("Type path is empty | ty: {:?}", type_path))?;
+
+            let mut name_str = last_segment.ident.to_string();
+
+            let mut not_null = true;
+
+            if name_str == "Option" {
+                match &last_segment.arguments {
+                    syn::PathArguments::None => {
+                        anyhow::bail!("Option with no generic argument is not supported")
+                    }
+                    syn::PathArguments::AngleBracketed(angle_bracketed_generic_arguments) => {
+                        match angle_bracketed_generic_arguments.args.first()? {
+                            syn::GenericArgument::Type(ty) => match ty {
+                                syn::Type::Path(type_path) => {
+                                    last_segment = type_path.path.segments.last().with_context(
+                                        context!("Type path is empty | ty: {:?}", type_path),
+                                    )?;
+
+                                    name_str = last_segment.ident.to_string();
+
+                                    not_null = false;
+                                }
+                                _ => anyhow::bail!(
+                                    "Option with non- type path generic argument is not supported"
+                                ),
+                            },
+                            _ => anyhow::bail!(
+                                "Option with non-type generic argument is not supported"
+                            ),
+                        }
+                    }
+                    syn::PathArguments::Parenthesized(_) => {
+                        anyhow::bail!(
+                            "Option with parenthesized generic arguments is not supported"
+                        )
+                    }
+                }
+            }
+
+            let generic_arg = match &last_segment.arguments {
+                syn::PathArguments::None => None,
+                syn::PathArguments::AngleBracketed(angle_bracketed_generic_arguments) => {
+                    angle_bracketed_generic_arguments
+                        .args
+                        .first()
+                        .map(|el| match el {
+                            syn::GenericArgument::Type(ty) => match ty {
+                                syn::Type::Path(type_path) => type_path
+                                    .path
+                                    .segments
+                                    .last()
+                                    .map(|name| name.ident.to_string()),
+                                _ => None,
+                            },
+                            _ => None,
+                        })
+                        .flatten()
+                }
+                syn::PathArguments::Parenthesized(_) => None,
+            };
+
+            Ok((ty_str_enum_value(&name_str, &generic_arg)?, not_null))
+        }
+        _ => {
+            anyhow::bail!("Unsupported type: {}", ty.to_token_stream())
+        }
     }
 }
 
