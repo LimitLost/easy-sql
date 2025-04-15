@@ -3,8 +3,8 @@ use easy_macros::{
     anyhow::{self, Context},
     helpers::{context, parse_macro_input},
     macros::{always_context, get_attributes, has_attributes},
-    quote::{ToTokens, quote},
-    syn::{self, LitInt},
+    quote::{quote, ToTokens},
+    syn::{self, LitInt, LitStr},
 };
 
 use crate::{
@@ -35,7 +35,7 @@ pub fn sql_table(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::To
         .iter()
         .map(|field| field.ident.as_ref().unwrap().to_string());
 
-    let table_name = item_name.to_string().to_case(Case::Snake);
+    let mut table_name = item_name.to_string().to_case(Case::Snake);
 
     //Use name provided by the user if it exists
     for attr_data in get_attributes!(item, #[sql(table_name = "__unknown__")]) {

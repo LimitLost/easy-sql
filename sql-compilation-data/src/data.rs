@@ -2,9 +2,13 @@ use std::collections::HashMap;
 
 use easy_macros::{
     anyhow::{self, Context},
-    macros::always_context,
+    macros::{always_context, get_attributes, has_attributes},
+    quote::ToTokens,
+    syn,
 };
 use serde::{Deserialize, Serialize};
+
+use crate::SqlType;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct TableField {
@@ -21,6 +25,70 @@ pub struct TableDataVersion {
     pub table_name: String,
     pub fields: Vec<TableField>,
 }
+
+impl TableDataVersion {
+    pub fn from_struct(item: &syn::ItemStruct, table_name: String) -> anyhow::Result<Self> {
+        let fields = match &item.fields {
+            syn::Fields::Named(fields_named) => &fields_named.named,
+            _ => {
+                anyhow::bail!(
+                    "non named field type should be handled before `generate_table_data_from_struct` is called"
+                )
+            }
+        };
+
+        let mut fields_converted = Vec::new();
+
+        for field in fields.iter() {
+            let name = field.ident.as_ref().unwrap().to_string();
+
+            let (sql_type, is_not_null) = SqlType::from_syn_type(&field.ty)?;
+
+            let to_bytes = has_attributes!(field, #[sql(bytes)]);
+
+            let sql_type = if to_bytes {
+                SqlType::Bytes
+            } else {
+                match sql_type {
+                    Some(o) => o,
+                    None => {
+                        anyhow::bail!(
+                            "Field type `{}` is not supported, use #[sql(bytes)] to convert it into bytes",
+                            field.ty.to_token_stream()
+                        );
+                    }
+                }
+            };
+
+            let default = get_attributes!(field, #[sql(default = __unknown__)])
+                .into_iter()
+                .next()
+                .map(|e| e.to_string());
+
+            let foreign_key = get_attributes!(field, #[sql(foreign_key = __unknown__)])
+                .into_iter()
+                .next()
+                .map(|e| e.to_string());
+
+            let is_primary_key = has_attributes!(field, #[sql(primary_key)]);
+
+            fields_converted.push(TableField {
+                name,
+                sql_type: sql_type,
+                is_primary_key,
+                default,
+                is_not_null,
+                foreign_key,
+            });
+        }
+
+        Ok(TableDataVersion {
+            table_name,
+            fields: fields_converted,
+        })
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct TableData {
     pub saved_versions: HashMap<u64, TableDataVersion>,

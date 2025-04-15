@@ -1,9 +1,14 @@
-use std::{collections::hash_map::Entry, io::Write, path::Path};
+use std::{
+    collections::{HashMap, hash_map::Entry},
+    io::Write,
+    path::Path,
+};
 
+use convert_case::{Case, Casing};
 use easy_macros::{
     anyhow::{self, Context},
     helpers::context,
-    macros::{all_syntax_cases, always_context, get_attributes, has_attributes},
+    macros::{all_syntax_cases, always_context, get_attributes},
     proc_macro2::LineColumn,
     quote::ToTokens,
     syn::{
@@ -11,7 +16,7 @@ use easy_macros::{
         spanned::Spanned,
     },
 };
-use sql_compilation_data::{CompilationData, SqlType, TableData, TableDataVersion, TableField};
+use sql_compilation_data::{CompilationData, TableData, TableDataVersion};
 #[derive(Debug)]
 struct SearchData {
     found: bool,
@@ -24,6 +29,23 @@ struct SearchData {
     found_existing_tables_ids: Vec<String>,
     //Use also created_unique_ids to check if tables were updated
     tables_updated: bool,
+    ///Will be added to logs
+    /// Also add to logs when there were no errors
+    errors: Vec<anyhow::Error>,
+}
+
+impl SearchData {
+    fn new(compilation_data: CompilationData) -> Self {
+        SearchData {
+            found: false,
+            updates: Vec::new(),
+            created_unique_ids: Vec::new(),
+            compilation_data,
+            found_existing_tables_ids: Vec::new(),
+            tables_updated: false,
+            errors: Vec::new(),
+        }
+    }
 }
 
 all_syntax_cases! {
@@ -32,7 +54,7 @@ all_syntax_cases! {
         additional_input_type:&mut SearchData
     }
     default_cases=>{
-        fn struct_table_handle(item: &mut syn::ItemStruct, context_info: &mut SearchData);
+        fn struct_table_handle_wrapper(item: &mut syn::ItemStruct, context_info: &mut SearchData);
         #[after_system]
         fn item_fn_check(item: &mut ItemFn, context_info: &mut SearchData);
         #[after_system]
@@ -44,77 +66,33 @@ all_syntax_cases! {
     special_cases=>{}
 }
 
-fn generate_table_data_from_struct(
-    item: &syn::ItemStruct,
-    table_name: String,
-) -> anyhow::Result<TableDataVersion> {
-    let fields = match item.fields {
-        syn::Fields::Named(fields_named) => fields_named.named,
-        _ => {
-            anyhow::bail!(
-                "non named field type should be handled before `generate_table_data_from_struct` is called"
-            )
-        }
-    };
+struct DeriveInsides {
+    list: Punctuated<syn::Path, syn::Token![,]>,
+}
 
-    let mut fields_converted = Vec::new();
-
-    for field in fields.iter() {
-        let name = field.ident.as_ref().unwrap().to_string();
-
-        let (sql_type, is_not_null) = SqlType::from_syn_type(&field.ty)?;
-
-        let to_bytes = has_attributes!(field, #[sql(bytes)]);
-
-        let sql_type = if to_bytes {
-            SqlType::Bytes
-        } else {
-            match sql_type {
-                Some(o) => o,
-                None => {
-                    anyhow::bail!(
-                        "Field type `{}` is not supported, use #[sql(bytes)] to convert it into bytes",
-                        field.ty.to_token_stream()
-                    );
-                }
-            }
-        };
-
-        let default = get_attributes!(field, #[sql(default = __unknown__)])
-            .into_iter()
-            .next()
-            .map(|e| e.to_string());
-
-        let foreign_key = get_attributes!(field, #[sql(foreign_key = __unknown__)])
-            .into_iter()
-            .next()
-            .map(|e| e.to_string());
-
-        let is_primary_key = has_attributes!(field, #[sql(primary_key)]);
-
-        fields_converted.push(TableField {
-            name,
-            sql_type: sql_type,
-            is_primary_key,
-            default,
-            is_not_null,
-            foreign_key,
-        });
+impl syn::parse::Parse for DeriveInsides {
+    fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
+        let list = Punctuated::<syn::Path, syn::Token![,]>::parse_terminated(input)?;
+        Ok(DeriveInsides { list })
     }
-
-    Ok(TableDataVersion {
-        table_name,
-        fields: fields_converted,
-    })
 }
 
 ///Table handling
-fn struct_table_handle(item: &mut syn::ItemStruct, context_info: &mut SearchData) {
+fn struct_table_handle(
+    item: &mut syn::ItemStruct,
+    context_info: &mut SearchData,
+) -> anyhow::Result<()> {
     if let Some(attr) = get_attributes!(item, #[derive(__unknown__)])
         .into_iter()
         .next()
     {
-        let parsed = Punctuated::<syn::Path, syn::Token![,]>::parse_terminated(&attr).unwrap();
+        let parsed = match syn::parse2::<DeriveInsides>(attr) {
+            Ok(parsed) => parsed.list,
+            Err(_) => {
+                //Ignore invalid attributes, error should be shown by derive macro
+                return Ok(());
+            }
+        };
         let mut is_sql_table = false;
         for path in parsed.iter() {
             let path_str = path
@@ -130,32 +108,34 @@ fn struct_table_handle(item: &mut syn::ItemStruct, context_info: &mut SearchData
         }
         if !is_sql_table {
             //No Sql Table derive
-            return;
+            return Ok(());
         }
     } else {
         //No Sql Table derive
-        return;
+        return Ok(());
     }
     //Check is unique_id present
     let mut unique_id = None;
     for attr_data in get_attributes!(item, #[sql(unique_id = "__unknown__")]) {
         if unique_id.is_some() {
             //Ignore multiple unique_id attributes, error should be shown by derive macro
-            return;
+            return Ok(());
         }
         let lit_str: LitStr = match syn::parse2(attr_data) {
             Ok(lit_str) => lit_str,
             Err(_) => {
                 //Ignore invalid attributes, error should be shown by derive macro
-                return;
+                return Ok(());
             }
         };
         unique_id = Some(lit_str.value());
     }
     //Unique Id
-    if let Some(unique_id) = unique_id {
+    if let Some(unique_id) = &unique_id {
         //Table wasn't deleted
-        context_info.found_existing_tables_ids.push(unique_id);
+        context_info
+            .found_existing_tables_ids
+            .push(unique_id.clone());
     } else {
         //Create unique_id
         let generated = context_info.compilation_data.generate_unique_id();
@@ -175,44 +155,33 @@ fn struct_table_handle(item: &mut syn::ItemStruct, context_info: &mut SearchData
             Ok(lit_int) => lit_int,
             Err(_) => {
                 //Ignore invalid attributes, error should be shown by derive macro
-                return;
+                return Ok(());
             }
         };
         version = match lit_int.base10_parse::<u64>() {
             Ok(o) => Some(o),
             Err(_) => {
                 //Ignore invalid attributes, error should be shown by derive macro
-                return;
+                return Ok(());
             }
         };
     }
 
     //Version attribute should exist. if it doesn't error by derive macro should be shown
-    let version = match version {
-        Some(o) => o,
-        None => {
-            return;
-        }
-    };
+    let version = version.context("Version attribute should exist")?;
 
-    match item.fields {
-        syn::Fields::Named(fields_named) => {}
+    match &item.fields {
+        syn::Fields::Named(_) => {}
         _ => {
-            //Ignore unnamed and unit structs, error should be shown by derive macro
-            return;
+            //Ignore unnamed and unit structs, error should be shown by derive macro, leave debug info
+            anyhow::bail!("non named fields, struct: {}", item.to_token_stream());
         }
     }
 
-    let table_name = item.ident.to_string().to_case(Case::Snake);
+    let mut table_name = item.ident.to_string().to_case(Case::Snake);
     //Check if table_name was set manually
     for attr_data in get_attributes!(item, #[sql(table_name = "__unknown__")]) {
-        let lit_str: LitStr = match syn::parse2(attr_data) {
-            Ok(lit_str) => lit_str,
-            Err(_) => {
-                //Ignore invalid attributes, error should be shown by derive macro
-                return;
-            }
-        };
+        let lit_str: LitStr = syn::parse2(attr_data)?;
         table_name = lit_str.value();
         break;
     }
@@ -224,21 +193,33 @@ fn struct_table_handle(item: &mut syn::ItemStruct, context_info: &mut SearchData
             if table_data.latest_version < version {
                 table_data
                     .saved_versions
-                    .push(generate_table_data_from_struct(item, table_name));
+                    .insert(version, TableDataVersion::from_struct(item, table_name)?);
 
                 table_data.latest_version = version;
                 context_info.tables_updated = true;
             }
         }
         Entry::Vacant(vacant_entry) => {
-            let table_version = generate_table_data_from_struct(item, table_name);
+            let mut saved_versions = HashMap::new();
+            saved_versions.insert(version, TableDataVersion::from_struct(item, table_name)?);
 
             let table_data = TableData {
                 latest_version: version,
-                saved_versions: vec![table_version],
+                saved_versions,
             };
 
             vacant_entry.insert(table_data);
+        }
+    }
+
+    Ok(())
+}
+
+fn struct_table_handle_wrapper(item: &mut syn::ItemStruct, context_info: &mut SearchData) {
+    match struct_table_handle(item, context_info) {
+        Ok(_) => {}
+        Err(err) => {
+            context_info.errors.push(err);
         }
     }
 }
@@ -312,7 +293,7 @@ fn line_pos(haystack: &str, line: usize) -> anyhow::Result<usize> {
 }
 
 #[always_context]
-fn handle_file(file_path: impl AsRef<Path>) -> anyhow::Result<()> {
+fn handle_file(file_path: impl AsRef<Path>, search_data: &mut SearchData) -> anyhow::Result<()> {
     let file_path = file_path.as_ref();
     // Check if the file is a rust file
     match file_path.extension() {
@@ -323,7 +304,6 @@ fn handle_file(file_path: impl AsRef<Path>) -> anyhow::Result<()> {
     // Read the file
     let mut contents = std::fs::read_to_string(file_path)?;
     //Operate on syn::File
-    let mut search_data: SearchData = SearchData::default();
     let file = match syn::parse_file(&contents) {
         Ok(file) => file,
         Err(_) => {
@@ -336,7 +316,7 @@ fn handle_file(file_path: impl AsRef<Path>) -> anyhow::Result<()> {
         handle_item(
             #[context(tokens)]
             &mut item,
-            &mut search_data,
+            search_data,
         )?;
     }
 
