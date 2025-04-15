@@ -11,7 +11,10 @@ pub struct TableField {
     pub name: String,
     pub sql_type: super::sql_type::SqlType,
     pub is_primary_key: bool,
-    pub has_default: bool,
+    ///Tokens converted to_string()
+    pub default: Option<String>,
+    pub is_not_null: bool,
+    pub foreign_key: Option<String>,
 }
 #[derive(Debug, Serialize, Deserialize)]
 pub struct TableDataVersion {
@@ -60,7 +63,7 @@ impl CompilationData {
         let data =
             ron::ser::to_string_pretty(self, ron::ser::PrettyConfig::new().struct_names(true))?;
 
-        std::fs::write(&data_path, data).context("Failed to write easy_sql.ron file")?;
+        std::fs::write(&data_path, &data).context("Failed to write easy_sql.ron file")?;
 
         Ok(())
     }

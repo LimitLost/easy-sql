@@ -141,6 +141,91 @@ impl SqlType {
             SqlType::Range(_) => "BLOB",
         }
     }
+
+    #[cfg(feature = "data")]
+    #[always_context]
+    pub fn from_syn_type(ty: &syn::Type) -> anyhow::Result<(Option<SqlType>, bool)> {
+        use easy_macros::syn;
+
+        match ty {
+            syn::Type::Path(type_path) => {
+                let mut last_segment = type_path
+                    .path
+                    .segments
+                    .last()
+                    .with_context(context!("Type path is empty | ty: {:?}", type_path))?;
+
+                let mut name_str = last_segment.ident.to_string();
+
+                let mut not_null = true;
+
+                if name_str == "Option" {
+                    match &last_segment.arguments {
+                        syn::PathArguments::None => {
+                            anyhow::bail!("Option with no generic argument is not supported")
+                        }
+                        syn::PathArguments::AngleBracketed(angle_bracketed_generic_arguments) => {
+                            match angle_bracketed_generic_arguments.args.first()? {
+                                syn::GenericArgument::Type(ty) => match ty {
+                                    syn::Type::Path(type_path) => {
+                                        last_segment =
+                                            type_path.path.segments.last().with_context(
+                                                context!(
+                                                    "Type path is empty | ty: {:?}",
+                                                    type_path
+                                                ),
+                                            )?;
+
+                                        name_str = last_segment.ident.to_string();
+
+                                        not_null = false;
+                                    }
+                                    _ => anyhow::bail!(
+                                        "Option with non- type path generic argument is not supported"
+                                    ),
+                                },
+                                _ => anyhow::bail!(
+                                    "Option with non-type generic argument is not supported"
+                                ),
+                            }
+                        }
+                        syn::PathArguments::Parenthesized(_) => {
+                            anyhow::bail!(
+                                "Option with parenthesized generic arguments is not supported"
+                            )
+                        }
+                    }
+                }
+
+                let generic_arg = match &last_segment.arguments {
+                    syn::PathArguments::None => None,
+                    syn::PathArguments::AngleBracketed(angle_bracketed_generic_arguments) => {
+                        angle_bracketed_generic_arguments
+                            .args
+                            .first()
+                            .map(|el| match el {
+                                syn::GenericArgument::Type(ty) => match ty {
+                                    syn::Type::Path(type_path) => type_path
+                                        .path
+                                        .segments
+                                        .last()
+                                        .map(|name| name.ident.to_string()),
+                                    _ => None,
+                                },
+                                _ => None,
+                            })
+                            .flatten()
+                    }
+                    syn::PathArguments::Parenthesized(_) => None,
+                };
+
+                Ok((ty_str_enum_value(&name_str, &generic_arg)?, not_null))
+            }
+            _ => {
+                anyhow::bail!("Unsupported type: {}", ty.to_token_stream())
+            }
+        }
+    }
 }
 #[cfg(feature = "data")]
 #[always_context]
@@ -196,86 +281,4 @@ fn ty_str_enum_value(
         }
         _ => None,
     })
-}
-
-#[cfg(feature = "data")]
-#[always_context]
-///Returns only type enum variant
-fn ty_enum_value(ty: &syn::Type) -> anyhow::Result<(Option<SqlType>, bool)> {
-    use easy_macros::syn;
-
-    match ty {
-        syn::Type::Path(type_path) => {
-            let mut last_segment = type_path
-                .path
-                .segments
-                .last()
-                .with_context(context!("Type path is empty | ty: {:?}", type_path))?;
-
-            let mut name_str = last_segment.ident.to_string();
-
-            let mut not_null = true;
-
-            if name_str == "Option" {
-                match &last_segment.arguments {
-                    syn::PathArguments::None => {
-                        anyhow::bail!("Option with no generic argument is not supported")
-                    }
-                    syn::PathArguments::AngleBracketed(angle_bracketed_generic_arguments) => {
-                        match angle_bracketed_generic_arguments.args.first()? {
-                            syn::GenericArgument::Type(ty) => match ty {
-                                syn::Type::Path(type_path) => {
-                                    last_segment = type_path.path.segments.last().with_context(
-                                        context!("Type path is empty | ty: {:?}", type_path),
-                                    )?;
-
-                                    name_str = last_segment.ident.to_string();
-
-                                    not_null = false;
-                                }
-                                _ => anyhow::bail!(
-                                    "Option with non- type path generic argument is not supported"
-                                ),
-                            },
-                            _ => anyhow::bail!(
-                                "Option with non-type generic argument is not supported"
-                            ),
-                        }
-                    }
-                    syn::PathArguments::Parenthesized(_) => {
-                        anyhow::bail!(
-                            "Option with parenthesized generic arguments is not supported"
-                        )
-                    }
-                }
-            }
-
-            let generic_arg = match &last_segment.arguments {
-                syn::PathArguments::None => None,
-                syn::PathArguments::AngleBracketed(angle_bracketed_generic_arguments) => {
-                    angle_bracketed_generic_arguments
-                        .args
-                        .first()
-                        .map(|el| match el {
-                            syn::GenericArgument::Type(ty) => match ty {
-                                syn::Type::Path(type_path) => type_path
-                                    .path
-                                    .segments
-                                    .last()
-                                    .map(|name| name.ident.to_string()),
-                                _ => None,
-                            },
-                            _ => None,
-                        })
-                        .flatten()
-                }
-                syn::PathArguments::Parenthesized(_) => None,
-            };
-
-            Ok((ty_str_enum_value(&name_str, &generic_arg)?, not_null))
-        }
-        _ => {
-            anyhow::bail!("Unsupported type: {}", ty.to_token_stream())
-        }
-    }
 }

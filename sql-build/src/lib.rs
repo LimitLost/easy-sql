@@ -3,7 +3,7 @@ use std::{collections::hash_map::Entry, io::Write, path::Path};
 use easy_macros::{
     anyhow::{self, Context},
     helpers::context,
-    macros::{all_syntax_cases, always_context, get_attributes},
+    macros::{all_syntax_cases, always_context, get_attributes, has_attributes},
     proc_macro2::LineColumn,
     quote::ToTokens,
     syn::{
@@ -11,8 +11,8 @@ use easy_macros::{
         spanned::Spanned,
     },
 };
-use sql_compilation_data::{CompilationData, TableData, TableDataVersion, TableField};
-#[derive(Debug, Default)]
+use sql_compilation_data::{CompilationData, SqlType, TableData, TableDataVersion, TableField};
+#[derive(Debug)]
 struct SearchData {
     found: bool,
     ///Where to add `#[sql_convenience]`
@@ -44,30 +44,68 @@ all_syntax_cases! {
     special_cases=>{}
 }
 
-fn generate_table_data_from_struct(item: &syn::ItemStruct, table_name: String) -> TableDataVersion {
+fn generate_table_data_from_struct(
+    item: &syn::ItemStruct,
+    table_name: String,
+) -> anyhow::Result<TableDataVersion> {
     let fields = match item.fields {
         syn::Fields::Named(fields_named) => fields_named.named,
         _ => {
-            unreachable!(
+            anyhow::bail!(
                 "non named field type should be handled before `generate_table_data_from_struct` is called"
             )
         }
     };
 
-    let fields_converted=Vec::new();
+    let mut fields_converted = Vec::new();
 
-    for field in fields.iter(){
-        let name=field.ident.as_ref().unwrap().to_string();
+    for field in fields.iter() {
+        let name = field.ident.as_ref().unwrap().to_string();
 
-        fields_converted.push(TableField{
+        let (sql_type, is_not_null) = SqlType::from_syn_type(&field.ty)?;
+
+        let to_bytes = has_attributes!(field, #[sql(bytes)]);
+
+        let sql_type = if to_bytes {
+            SqlType::Bytes
+        } else {
+            match sql_type {
+                Some(o) => o,
+                None => {
+                    anyhow::bail!(
+                        "Field type `{}` is not supported, use #[sql(bytes)] to convert it into bytes",
+                        field.ty.to_token_stream()
+                    );
+                }
+            }
+        };
+
+        let default = get_attributes!(field, #[sql(default = __unknown__)])
+            .into_iter()
+            .next()
+            .map(|e| e.to_string());
+
+        let foreign_key = get_attributes!(field, #[sql(foreign_key = __unknown__)])
+            .into_iter()
+            .next()
+            .map(|e| e.to_string());
+
+        let is_primary_key = has_attributes!(field, #[sql(primary_key)]);
+
+        fields_converted.push(TableField {
             name,
-            sql_type: ,
-            is_primary_key: todo!(),
-            has_default: todo!(),
+            sql_type: sql_type,
+            is_primary_key,
+            default,
+            is_not_null,
+            foreign_key,
         });
     }
 
-    TableDataVersion { table_name, fields: fields_converted }
+    Ok(TableDataVersion {
+        table_name,
+        fields: fields_converted,
+    })
 }
 
 ///Table handling
