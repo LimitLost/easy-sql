@@ -31,7 +31,8 @@ struct SearchData {
     tables_updated: bool,
     ///Will be added to logs
     /// Also add to logs when there were no errors
-    errors: Vec<anyhow::Error>,
+    unsorted_errors: Vec<anyhow::Error>,
+    file_matched_errors: Vec<(String, Vec<anyhow::Error>)>,
 }
 
 impl SearchData {
@@ -43,7 +44,8 @@ impl SearchData {
             compilation_data,
             found_existing_tables_ids: Vec::new(),
             tables_updated: false,
-            errors: Vec::new(),
+            unsorted_errors: Vec::new(),
+            file_matched_errors: Vec::new(),
         }
     }
 }
@@ -131,12 +133,7 @@ fn struct_table_handle(
         unique_id = Some(lit_str.value());
     }
     //Unique Id
-    if let Some(unique_id) = &unique_id {
-        //Table wasn't deleted
-        context_info
-            .found_existing_tables_ids
-            .push(unique_id.clone());
-    } else {
+    if unique_id.is_none() {
         //Create unique_id
         let generated = context_info.compilation_data.generate_unique_id();
         context_info
@@ -147,6 +144,10 @@ fn struct_table_handle(
     }
 
     let unique_id = unique_id.unwrap();
+
+    context_info
+        .found_existing_tables_ids
+        .push(unique_id.clone());
 
     //Check if table version has changed
     let mut version = None;
@@ -219,7 +220,7 @@ fn struct_table_handle_wrapper(item: &mut syn::ItemStruct, context_info: &mut Se
     match struct_table_handle(item, context_info) {
         Ok(_) => {}
         Err(err) => {
-            context_info.errors.push(err);
+            context_info.unsorted_errors.push(err);
         }
     }
 }
@@ -320,12 +321,11 @@ fn handle_file(file_path: impl AsRef<Path>, search_data: &mut SearchData) -> any
         )?;
     }
 
-    // Update the file (if needed)
+    // Create #[sql_convenience] in the file (if needed)
     if !search_data.updates.is_empty() {
-        let mut updates = search_data.updates;
-        //Sort our lines and reverse them
-        updates.sort_by(|a, b| a.line.cmp(&b.line));
-        updates.reverse();
+        let mut updates = search_data.updates.drain(..).collect::<Vec<_>>();
+        //Sort our lines (reverse order)
+        updates.sort_by(|a, b| b.line.cmp(&a.line));
 
         //Uses span position info to add #[sql_convenience] to every item on the list
         for start_pos in updates.into_iter() {
@@ -341,6 +341,39 @@ fn handle_file(file_path: impl AsRef<Path>, search_data: &mut SearchData) -> any
         file.write_all(contents.as_bytes()).unwrap();
     }
 
+    //Create unique ids in the file (if needed)
+    if !search_data.created_unique_ids.is_empty() {
+        search_data.tables_updated = true;
+
+        let mut updates = search_data.created_unique_ids.drain(..).collect::<Vec<_>>();
+        //Sort our lines (reverse order)
+        updates.sort_by(|a, b| b.1.line.cmp(&a.1.line));
+
+        //Uses span position info to add #[sql(unique_id = ...)] to every item on the list
+        for (unique_id, start_pos) in updates.into_iter() {
+            //1 indexed
+            let line = start_pos.line;
+            //Find position based on line
+            let line_bytes_end = line_pos(&contents, line - 1)?;
+
+            contents.insert_str(
+                line_bytes_end,
+                &format!("#[sql(unique_id = \"{}\")]\r\n", unique_id),
+            );
+        }
+
+        let mut file = std::fs::File::create(file_path).unwrap();
+        file.write_all(contents.as_bytes()).unwrap();
+    }
+
+    //File match errors
+    if !search_data.unsorted_errors.is_empty() {
+        search_data.file_matched_errors.push((
+            file_path.display().to_string(),
+            search_data.unsorted_errors.drain(..).collect(),
+        ));
+    }
+
     Ok(())
 }
 
@@ -349,6 +382,7 @@ fn handle_dir(
     dir: impl AsRef<Path>,
     ignore_list: &[regex::Regex],
     base_path_len_bytes: usize,
+    search_data: &mut SearchData,
 ) -> anyhow::Result<()> {
     // Get all files in the src directory
     let files = std::fs::read_dir(dir.as_ref())?;
@@ -372,10 +406,10 @@ fn handle_dir(
 
         let file_type = entry.file_type()?;
         if file_type.is_file() {
-            handle_file(&entry_path)?;
+            handle_file(&entry_path, search_data)?;
         } else if file_type.is_dir() {
             // If the file is a directory, call this function recursively
-            handle_dir(&entry_path, ignore_list, base_path_len_bytes)?;
+            handle_dir(&entry_path, ignore_list, base_path_len_bytes, search_data)?;
         }
     }
 
@@ -398,7 +432,25 @@ fn build_result(ignore_list: &[regex::Regex]) -> anyhow::Result<()> {
     // Get the src directory
     let src_dir = current_dir.join("src");
 
-    handle_dir(&src_dir, ignore_list, base_path_len_bytes)?;
+    let mut search_data = SearchData::new(CompilationData::load()?);
+
+    handle_dir(&src_dir, ignore_list, base_path_len_bytes, &mut search_data)?;
+
+    //Remove deleted tables
+    if search_data.compilation_data.tables.len() != search_data.found_existing_tables_ids.len() {
+        search_data.tables_updated = true;
+
+        search_data.compilation_data.tables.retain(|key, _| {
+            if search_data.found_existing_tables_ids.contains(key) {
+                return true;
+            }
+            //Table was deleted
+            false
+        });
+    }
+
+    //Update compilation data (if needed)
+    search_data.compilation_data.save()?;
 
     Ok(())
 }

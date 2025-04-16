@@ -39,7 +39,7 @@ pub fn sql_table(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::To
 
     //Use name provided by the user if it exists
     for attr_data in get_attributes!(item, #[sql(table_name = "__unknown__")]) {
-        let lit_str: LitStr = syn::parse2(attr_data).context("Invalid table name provided, expected string with  quotes")?;
+        let lit_str: LitStr = syn::parse2(attr_data.clone()).context("Invalid table name provided, expected string with  quotes")?;
         table_name = lit_str.value();
         break;
     }
