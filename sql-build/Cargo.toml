@@ -9,5 +9,8 @@ proc-macro2 = { version = "*", features = ["span-locations"] }
 
 regex = "1.11.1"
 convert_case = "0.8.0"
+chrono = "0.4.40"
 
-sql-compilation-data = { path = "../sql-compilation-data", features = ["build"]}
+sql-compilation-data = { path = "../sql-compilation-data", features = [
+    "build",
+] }

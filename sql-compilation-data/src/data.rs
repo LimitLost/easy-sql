@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use easy_macros::{
     anyhow::{self, Context},
     macros::{always_context, get_attributes, has_attributes},
+    proc_macro2::TokenStream,
     quote::ToTokens,
     syn,
 };
@@ -183,8 +184,12 @@ impl CompilationData {
         Ok(false)
     }
 
-    // pub fn generate_migrations(
-    //     &self,
+    pub fn generate_migrations(
+        &self,
+        latest_version: &TableDataVersion,
+    ) -> anyhow::Result<TokenStream> {
+        todo!()
+    }
 }
 
 //TODO Check for table removal inside of build script
