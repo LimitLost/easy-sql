@@ -436,6 +436,41 @@ fn build_result(ignore_list: &[regex::Regex]) -> anyhow::Result<()> {
 
     handle_dir(&src_dir, ignore_list, base_path_len_bytes, &mut search_data)?;
 
+    //Write into log file (if needed)
+    if !search_data.file_matched_errors.is_empty() {
+        let log_folder = current_dir.join("easy_sql_logs");
+        if !log_folder.exists() {
+            std::fs::create_dir_all(&log_folder)?;
+        }
+        let current_date = chrono::Utc::now();
+        let log_file = log_folder.join(format!("{}.txt", current_date.format("%Y-%m-%d")));
+
+        let errors = search_data
+            .file_matched_errors
+            .iter()
+            .map(|(file_path, errors)| {
+                let mut error_str =
+                    format!("==========\r\nFile: {}\r\n==========\r\n\r\n", file_path);
+                for err in errors.iter() {
+                    error_str.push_str(&format!("{:?}\r\n\r\n", err));
+                }
+                error_str
+            })
+            .collect::<Vec<_>>()
+            .join("\n");
+
+        let log_header = format!(
+            "==================\r\n[[[{} - Build Log]]]\r\n==================\r\n\r\n{}\r\n\r\n",
+            current_date.format("%H:%M:%S"),
+            errors
+        );
+        let mut log_file = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&log_file)?;
+        log_file.write_all(log_header.as_bytes())?;
+    }
+
     //Remove deleted tables
     if search_data.compilation_data.tables.len() != search_data.found_existing_tables_ids.len() {
         search_data.tables_updated = true;
