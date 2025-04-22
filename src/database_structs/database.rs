@@ -39,6 +39,7 @@ pub struct Database {
     connection_pool: sqlx::Pool<Db>,
     internal: Arc<Mutex<DatabaseInternal>>,
 }
+
 #[always_context]
 impl Database {
     pub async fn setup<T: DatabaseSetup>(url: &str) -> anyhow::Result<Self> {

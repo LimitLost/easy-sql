@@ -3,6 +3,7 @@ use easy_macros::{
     anyhow::{self, Context},
     helpers::context,
     macros::always_context,
+    proc_macro2::TokenStream,
     quote::ToTokens,
     syn,
 };
@@ -223,6 +224,112 @@ impl SqlType {
             }
             _ => {
                 anyhow::bail!("Unsupported type: {}", ty.to_token_stream())
+            }
+        }
+    }
+
+    #[cfg(feature = "data")]
+    ///`sql_type_parent` - Example: `quote::quote! {easy_lib::sql}`
+    pub fn to_tokens(&self, sql_type_parent: &TokenStream) -> TokenStream {
+        use easy_macros::quote::quote;
+
+        match self {
+            SqlType::IpAddr => quote! {
+                #sql_type_parent::SqlType::IpAddr
+            },
+            SqlType::Bool => quote! {
+                #sql_type_parent::SqlType::Bool
+            },
+            SqlType::F32 => quote! {
+                #sql_type_parent::SqlType::F32
+            },
+            SqlType::F64 => quote! {
+                #sql_type_parent::SqlType::F64
+            },
+            SqlType::I8 => quote! {
+                #sql_type_parent::SqlType::I8
+            },
+            SqlType::I16 => quote! {
+                #sql_type_parent::SqlType::I16
+            },
+            SqlType::I32 => quote! {
+                #sql_type_parent::SqlType::I32
+            },
+            SqlType::I64 => quote! {
+                #sql_type_parent::SqlType::I64
+            },
+            SqlType::String => quote! {
+                #sql_type_parent::SqlType::String
+            },
+            SqlType::Interval => quote! {
+                #sql_type_parent::SqlType::Interval
+            },
+            SqlType::Bytes => quote! {
+                #sql_type_parent::SqlType::Bytes
+            },
+            SqlType::List(sql_type) => {
+                let sql_type = sql_type.to_tokens(sql_type_parent);
+                quote! {
+                    #sql_type_parent::SqlType::List(#sql_type)
+                }
+            }
+            SqlType::Array { data_type, size } => {
+                let data_type = data_type.to_tokens(sql_type_parent);
+                quote! {
+                    #sql_type_parent::SqlType::Array {
+                        data_type: #data_type,
+                        size: #size,
+                    }
+                }
+            }
+            SqlType::NaiveDate => {
+                quote! {
+                    #sql_type_parent::SqlType::NaiveDate
+                }
+            }
+            SqlType::NaiveDateTime => {
+                quote! {
+                    #sql_type_parent::SqlType::NaiveDateTime
+                }
+            }
+            SqlType::NaiveTime => {
+                quote! {
+                    #sql_type_parent::SqlType::NaiveTime
+                }
+            }
+            SqlType::Uuid => {
+                quote! {
+                    #sql_type_parent::SqlType::Uuid
+                }
+            }
+            SqlType::Decimal => {
+                quote! {
+                    #sql_type_parent::SqlType::Decimal
+                }
+            }
+            SqlType::BigDecimal => {
+                quote! {
+                    #sql_type_parent::SqlType::BigDecimal
+                }
+            }
+            SqlType::Range(sql_range_type) => {
+                let sql_range_type = match sql_range_type {
+                    SqlRangeType::I32 => quote! { #sql_type_parent::SqlRangeType::I32 },
+                    SqlRangeType::I64 => quote! { #sql_type_parent::SqlRangeType::I64 },
+                    SqlRangeType::NaiveDate => quote! { #sql_type_parent::SqlRangeType::NaiveDate },
+                    SqlRangeType::NaiveDateTime => {
+                        quote! { #sql_type_parent::SqlRangeType::NaiveDateTime }
+                    }
+                    SqlRangeType::BigDecimal => {
+                        quote! { #sql_type_parent::SqlRangeType::BigDecimal }
+                    }
+                    SqlRangeType::Decimal => {
+                        quote! { #sql_type_parent::SqlRangeType::Decimal }
+                    }
+                };
+                quote! {
+                    #sql_type_parent::SqlType::Range(#sql_range_type)
+                }
             }
         }
     }

@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use super::{QueryData, RequestedColumn, SelectClauses, SqlValueMaybeRef, TableJoin, WhereClause};
 
+
 fn single_value_str(columns_len: usize, current_value_n: &mut usize) -> String {
     let mut single_value_str = String::new();
     for _ in 0..columns_len {
@@ -44,6 +45,7 @@ pub enum Sql<'a> {
         //We don't allow for order by and limit since they are not in Postgres (only Sqlite)
     },
 }
+
 
 #[always_context]
 fn insert_query<'a>(
@@ -91,6 +93,7 @@ fn insert_query<'a>(
     })
 }
 
+
 #[always_context]
 fn update_query<'a>(
     table: &'static str,
@@ -136,6 +139,7 @@ fn update_query<'a>(
     })
 }
 
+
 #[always_context]
 fn delete_query<'a>(
     table: &'static str,
@@ -171,6 +175,7 @@ fn delete_query<'a>(
         bindings: bindings_list,
     })
 }
+
 
 #[always_context]
 impl Sql<'_> {

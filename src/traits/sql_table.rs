@@ -13,6 +13,7 @@ use super::{SqlInsert, SqlOutput, SqlUpdate, ToConvert};
 #[async_trait]
 pub trait SqlTable: Sized {
     fn table_name() -> &'static str;
+    fn primary_keys() -> Vec<&'static str>;
 
     /// Use `sql!` or `sql_where!` macros to generate clauses (second argument to this function)
     async fn get<'a, Y: ToConvert + Send + Sync, T: SqlOutput<Self, Y>>(

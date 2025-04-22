@@ -62,6 +62,9 @@ impl SqlTable for ExampleTableStruct {
     fn table_name() -> &'static str {
         "table"
     }
+    fn primary_keys() -> Vec<&'static str> {
+        vec!["id"]
+    }
 }
 
 #[always_context]

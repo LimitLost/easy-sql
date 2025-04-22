@@ -57,15 +57,14 @@ all_syntax_cases! {
     }
     default_cases=>{
         fn struct_table_handle_wrapper(item: &mut syn::ItemStruct, context_info: &mut SearchData);
-        #[after_system]
-        fn item_fn_check(item: &mut ItemFn, context_info: &mut SearchData);
-        #[after_system]
-        fn trait_check(item: &mut ItemTrait, context_info: &mut SearchData);
-        #[after_system]
-        fn impl_check(item: &mut ItemImpl, context_info: &mut SearchData);
+
         fn macro_check(item: &mut Macro, context_info: &mut SearchData);
     }
-    special_cases=>{}
+    special_cases=>{
+        fn item_fn_check(item: &mut ItemFn, context_info: &mut SearchData);
+        fn trait_check(item: &mut ItemTrait, context_info: &mut SearchData);
+        fn impl_check(item: &mut ItemImpl, context_info: &mut SearchData);
+    }
 }
 
 struct DeriveInsides {
@@ -236,6 +235,10 @@ fn macro_check(item: &mut Macro, context_info: &mut SearchData) {
 }
 
 fn trait_check(item: &mut ItemTrait, context_info: &mut SearchData) {
+    for item in item.items.iter_mut() {
+        macro_search_trait_item_handle(item, context_info);
+    }
+
     if context_info.found && !has_sql_convenience(&item.attrs) {
         context_info.updates.push(item.span().start());
         context_info.found = false;
@@ -243,6 +246,10 @@ fn trait_check(item: &mut ItemTrait, context_info: &mut SearchData) {
 }
 
 fn impl_check(item: &mut ItemImpl, context_info: &mut SearchData) {
+    for item in item.items.iter_mut() {
+        macro_search_impl_item_handle(item, context_info);
+    }
+
     if context_info.found && !has_sql_convenience(&item.attrs) {
         context_info.updates.push(item.span().start());
         context_info.found = false;
@@ -250,6 +257,8 @@ fn impl_check(item: &mut ItemImpl, context_info: &mut SearchData) {
 }
 
 fn item_fn_check(item: &mut ItemFn, context_info: &mut SearchData) {
+    macro_search_block_handle(&mut item.block, context_info);
+
     if context_info.found && !has_sql_convenience(&item.attrs) {
         context_info.updates.push(item.span().start());
         context_info.found = false;
@@ -314,6 +323,7 @@ fn handle_file(file_path: impl AsRef<Path>, search_data: &mut SearchData) -> any
     };
 
     for mut item in file.items.into_iter() {
+        search_data.found = false;
         handle_item(
             #[context(tokens)]
             &mut item,

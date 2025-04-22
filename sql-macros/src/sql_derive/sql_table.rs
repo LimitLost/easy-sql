@@ -54,9 +54,11 @@ pub fn sql_table(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::To
     let update_impl = sql_update_base(&item_name, &fields, &item_name_tokens)?;
     let output_impl = sql_output_base(&item_name, &fields, &item_name_tokens);
 
+    let mut primary_keys=Vec::new();
+    // let mut primary_key_types=Vec::new();
+
     let mut is_primary_key = Vec::new();
     let mut is_unique = Vec::new();
-    let mut primary_key_found = false;
     let mut field_types = Vec::new();
     let mut is_not_null = Vec::new();
 
@@ -68,12 +70,8 @@ pub fn sql_table(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::To
         } else {
             let current_is_primary_key = has_attributes!(field, #[sql(primary_key)]);
             if current_is_primary_key {
-                if !primary_key_found {
-                    primary_key_found = true;
+                    primary_keys.push(field.ident.as_ref()?.to_string());
                     is_primary_key.push(true);
-                } else {
-                    anyhow::bail!("Only one primary key is allowed per table!.");
-                }
             } else {
                 is_primary_key.push(false);
             }
@@ -90,6 +88,10 @@ pub fn sql_table(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::To
         }
     }
 
+    if primary_keys.is_empty(){
+        anyhow::bail!("No primary key found, please add #[sql(primary_key)] to one of the fields");
+    }
+
     let mut table_version = None;
 
     for version in get_attributes!(item, #[sql(version = __unknown__)]) {
@@ -104,30 +106,29 @@ pub fn sql_table(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::To
         table_version = Some(n);
     }
 
-    #[no_context]
+    #[no_context_inputs]
     let table_version =
-        table_version.with_context(context!("sql(version = x) attribute is required"))?;
+        table_version.with_context(context!("#[sql(version = x)] attribute is required"))?;
 
     Ok(quote! {
         impl #sql_crate::DatabaseSetup for #item_name {
+
             async fn setup(
                 conn: &mut (impl #sql_crate::EasyExecutor + Send + Sync),
             ) -> #easy_lib_crate::anyhow::Result<()> {
                 use #easy_lib_crate::anyhow::Context;
 
-                let table_exists = conn.query_setup(#sql_crate::TableExists{name: #table_name}).with_context(#easy_macros_helpers_crate::context!("Checking if table exists: {:?}".#table_name)).await?;
+                let table_exists = conn.query_setup(#sql_crate::TableExists{name: #table_name}).await.with_context(#easy_macros_helpers_crate::context!("Checking if table exists: {:?}",#table_name))?;
 
                 if table_exists{
                     //TODO Get Table Version and migrate (alter table + update version) if neccessary
                 }else{
                     use #sql_crate::EasyExecutor;
                     // Create table and create version in EasySqlTables
-                    conn.query_setup(#sql_crate::CreateTable{table_name: #sql_crate::EasySqlTables::table_name(), fields: vec![
+                    conn.query_setup(#sql_crate::CreateTable{table_name: #table_name, fields: vec![
                         #(#sql_crate::TableField{name: #field_names_str, data_type: #sql_crate::SqlType::#field_types, is_primary_key: #is_primary_key, foreign_key: None, is_unique: #is_unique, is_not_null: #is_not_null},)*
                     ]}).await?;
                     #sql_crate::EasySqlTables::create(conn, #table_name.to_string(), #table_version).await?;
-
-
                 }
 
                 //If table doesn't exist ( https://stackoverflow.com/questions/1601151/how-do-i-check-in-sqlite-whether-a-table-exists )
@@ -150,13 +151,19 @@ pub fn sql_table(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::To
             }
         }
 
-        impl easy_lib::sql::SqlTable for #item_name {
+        impl #sql_crate::SqlTable for #item_name {
             fn table_name() -> &'static str {
                 #table_name
             }
+
+            fn primary_keys() -> Vec<(&'static str,#sql_crate)>{
+                vec![#(#primary_keys),*]
+            }
         }
 
-        impl easy_lib::sql::HasTable<#item_name> for #item_name{}
+        
+
+        impl #sql_crate::HasTable<#item_name> for #item_name{}
 
         #insert_impl
         #update_impl

@@ -5,12 +5,17 @@ use sqlx::Row;
 
 use crate::SetupSql;
 
-use super::table_field::TableField;
+use crate::TableField;
 
 #[derive(Debug)]
 pub struct CreateTable {
     pub table_name: &'static str,
     pub fields: Vec<TableField>,
+
+    pub primary_keys: Vec<(&'static str, bool)>,
+    ///Can only be used when with single primary key
+    pub auto_increment: bool,
+    pub foreign_keys: Vec<(&'static str, &'static str, Vec<&'static str>)>,
 }
 
 #[always_context]
@@ -24,20 +29,19 @@ impl SetupSql for CreateTable {
     ) -> anyhow::Result<Self::Output> {
         let mut table_fields = String::new();
         let mut table_constrains = String::new();
+        let mut primary_keys = Vec::new();
 
         for field in self.fields.into_iter() {
             let TableField {
                 name,
                 data_type,
-                is_primary_key,
-                foreign_key,
                 is_unique,
                 is_not_null,
             } = field;
 
             let date_type_sqlite = data_type.sqlite();
 
-            let primary_key = if is_primary_key { "PRIMARY KET" } else { "" };
+            primary_keys.push(name.clone());
             let unique = if is_unique { "UNIQUE" } else { "" };
             let not_null = if is_not_null { "NOT NULL" } else { "" };
 
@@ -52,6 +56,14 @@ impl SetupSql for CreateTable {
                 "{} {} {} {} {},",
                 name, date_type_sqlite, primary_key, unique, not_null
             ));
+        }
+
+        //Primary key constraint
+        if auto_increment {
+            //TODO PRIMARY KEY (order_id AUTOINCREMENT)
+            //TODO Check for more than one primary key
+        } else {
+            table_constrains.push_str(&format!("PRIMARY KEY ({})", primary_keys.join(", ")));
         }
 
         if table_constrains.is_empty() && !table_fields.is_empty() {

@@ -30,6 +30,7 @@ enum ExampleEnum {
 }
 
 //Implements also SqlOutput, SqlInsert, SqlUpdate Traits
+#[sql(unique_id = "a489a304-5de0-4e91-b1aa-28f53b390c2f")]
 #[derive(SqlTable)]
 //Name can also be auto generated
 #[sql(table_name = example_table1)]

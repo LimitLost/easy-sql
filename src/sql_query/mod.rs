@@ -23,6 +23,7 @@ pub struct QueryData<'a> {
     bindings: Vec<&'a SqlValueMaybeRef<'a>>,
 }
 
+
 #[always_context]
 impl<'a> QueryData<'a> {
     pub fn sqlx(&'a self) -> QueryTy<'a> {

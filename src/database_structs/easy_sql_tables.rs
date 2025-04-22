@@ -63,7 +63,6 @@ struct EasySqlTableVersion {
     pub version: i64,
 }
 
-#[sql_convenience]
 #[always_context]
 impl SqlTable for EasySqlTables {
     fn table_name() -> &'static str {
@@ -71,7 +70,6 @@ impl SqlTable for EasySqlTables {
     }
 }
 
-#[sql_convenience]
 #[always_context]
 #[async_trait]
 impl DatabaseSetup for EasySqlTables {

@@ -31,6 +31,7 @@ struct PgIntervalSerde2 {
     microseconds: i64,
 }
 
+
 #[always_context]
 impl From<&PgInterval> for PgIntervalSerde2 {
     fn from(value: &PgInterval) -> Self {
@@ -41,6 +42,7 @@ impl From<&PgInterval> for PgIntervalSerde2 {
         }
     }
 }
+
 
 #[always_context]
 impl From<PgInterval> for PgIntervalSerde2 {

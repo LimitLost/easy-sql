@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use easy_macros::{
     anyhow::{self, Context},
+    helpers::MacroResult,
     macros::{always_context, get_attributes, has_attributes},
     proc_macro2::TokenStream,
     quote::ToTokens,
@@ -15,16 +16,18 @@ use crate::SqlType;
 pub struct TableField {
     pub name: String,
     pub sql_type: super::sql_type::SqlType,
-    pub is_primary_key: bool,
     ///Tokens converted to_string()
     pub default: Option<String>,
     pub is_not_null: bool,
-    pub foreign_key: Option<String>,
+    pub is_unique: bool,
 }
 #[derive(Debug, Serialize, Deserialize)]
 pub struct TableDataVersion {
     pub table_name: String,
     pub fields: Vec<TableField>,
+    pub primary_keys: Vec<String>,
+    ///0 - key, 1 - table (struct) name
+    pub foreign_keys: Vec<(String, String)>,
 }
 
 impl TableDataVersion {
@@ -39,6 +42,8 @@ impl TableDataVersion {
         };
 
         let mut fields_converted = Vec::new();
+        let mut primary_keys = Vec::new();
+        let mut foreign_keys = Vec::new();
 
         for field in fields.iter() {
             let name = field.ident.as_ref().unwrap().to_string();
@@ -66,26 +71,33 @@ impl TableDataVersion {
                 .next()
                 .map(|e| e.to_string());
 
-            let foreign_key = get_attributes!(field, #[sql(foreign_key = __unknown__)])
+            for foreign_key in get_attributes!(field, #[sql(foreign_key = __unknown__)])
                 .into_iter()
-                .next()
-                .map(|e| e.to_string());
+                .map(|e| e.to_string())
+            {
+                foreign_keys.push((name.clone(), foreign_key));
+            }
 
-            let is_primary_key = has_attributes!(field, #[sql(primary_key)]);
+            if has_attributes!(field, #[sql(primary_key)]) {
+                primary_keys.push(name.clone());
+            }
+
+            let is_unique = has_attributes!(field, #[sql(unique)]);
 
             fields_converted.push(TableField {
                 name,
                 sql_type: sql_type,
-                is_primary_key,
                 default,
                 is_not_null,
-                foreign_key,
+                is_unique,
             });
         }
 
         Ok(TableDataVersion {
             table_name,
             fields: fields_converted,
+            foreign_keys,
+            primary_keys,
         })
     }
 }
@@ -107,18 +119,35 @@ impl CompilationData {
 
         let data_path = current_dir.join("easy_sql.ron");
 
-        if !data_path.exists() {
-            anyhow::bail!(
-                "`easy_lib::sql::build` in build script is required (for automatic migrations and checks); easy_sql.ron file not found in the project directory: {:?}",
-                current_dir
-            );
-        }
+        let data: CompilationData = {
+            #[cfg(feature = "build")]
+            {
+                if !data_path.exists() {
+                    CompilationData {
+                        tables: HashMap::new(),
+                    }
+                } else {
+                    let data = std::fs::read_to_string(&data_path)
+                        .context("Failed to read easy_sql.ron file")?;
 
-        let data =
-            std::fs::read_to_string(&data_path).context("Failed to read easy_sql.ron file")?;
+                    ron::de::from_str(&data).context("Failed to parse easy_sql.ron file")?
+                }
+            }
+            #[cfg(not(feature = "build"))]
+            {
+                if !data_path.exists() {
+                    anyhow::bail!(
+                        "`easy_lib::sql::build` in build script is required (for automatic migrations and checks); easy_sql.ron file not found in the project directory: {:?}",
+                        current_dir
+                    );
+                }
 
-        let data: CompilationData =
-            ron::de::from_str(&data).context("Failed to parse easy_sql.ron file")?;
+                let data = std::fs::read_to_string(&data_path)
+                    .context("Failed to read easy_sql.ron file")?;
+
+                ron::de::from_str(&data).context("Failed to parse easy_sql.ron file")?
+            }
+        };
 
         Ok(data)
     }
@@ -186,8 +215,24 @@ impl CompilationData {
 
     pub fn generate_migrations(
         &self,
+        current_unique_id: &str,
         latest_version: &TableDataVersion,
+        latest_version_number: u64,
     ) -> anyhow::Result<TokenStream> {
+        let table_data = self
+            .tables
+            .get(current_unique_id)
+            .context("Table not found in Sql Compilation Data (easy_sql.ron)")?;
+
+        let mut result = MacroResult::default();
+
+        for (version_number, version_data) in table_data.saved_versions.iter() {
+            if version_number == &latest_version_number {
+                continue;
+            }
+            //version_data.fields
+        }
+
         todo!()
     }
 }

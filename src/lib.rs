@@ -16,6 +16,8 @@ pub type Row = sqlx::sqlite::SqliteRow;
 
 pub use sqlx::Row as SqlxRow;
 
+pub use sql_compilation_data::SqlType;
+
 pub use async_trait::async_trait;
 
 // #[cfg(test)]
