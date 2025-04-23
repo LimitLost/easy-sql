@@ -5,8 +5,6 @@ use sqlx::Row;
 
 use crate::SetupSql;
 
-use super::table_field::TableField;
-
 #[derive(Debug)]
 pub struct TableExists {
     pub name: &'static str,

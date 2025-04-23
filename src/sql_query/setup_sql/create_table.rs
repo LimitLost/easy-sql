@@ -1,7 +1,8 @@
+use std::collections::HashMap;
+
 use anyhow::Context;
 use async_trait::async_trait;
 use easy_macros::{helpers::context, macros::always_context};
-use sqlx::Row;
 
 use crate::SetupSql;
 
@@ -12,10 +13,12 @@ pub struct CreateTable {
     pub table_name: &'static str,
     pub fields: Vec<TableField>,
 
-    pub primary_keys: Vec<(&'static str, bool)>,
+    pub primary_keys: Vec<&'static str>,
     ///Can only be used when with single primary key
     pub auto_increment: bool,
-    pub foreign_keys: Vec<(&'static str, &'static str, Vec<&'static str>)>,
+    ///Key - table name
+    ///Value - field names, foreign field names
+    pub foreign_keys: HashMap<&'static str, (Vec<&'static str>, Vec<&'static str>)>,
 }
 
 #[always_context]
@@ -45,25 +48,34 @@ impl SetupSql for CreateTable {
             let unique = if is_unique { "UNIQUE" } else { "" };
             let not_null = if is_not_null { "NOT NULL" } else { "" };
 
-            if let Some(foreign_key) = foreign_key {
-                table_constrains.push_str(&format!(
-                    "FOREIGN KEY ({}) REFERENCES {}({}),",
-                    name, foreign_key.table_name, foreign_key.referenced_field
-                ));
-            }
-
             table_fields.push_str(&format!(
-                "{} {} {} {} {},",
-                name, date_type_sqlite, primary_key, unique, not_null
+                "{} {} {} {},",
+                name, date_type_sqlite, unique, not_null
             ));
         }
 
         //Primary key constraint
-        if auto_increment {
-            //TODO PRIMARY KEY (order_id AUTOINCREMENT)
-            //TODO Check for more than one primary key
+        if self.auto_increment {
+            match primary_keys.first() {
+                Some(primary_key) if primary_keys.len() == 1 => {
+                    table_constrains
+                        .push_str(&format!("PRIMARY KEY ({} AUTOINCREMENT)", primary_key));
+                }
+                _ => anyhow::bail!("Auto increment is only supported for single primary key"),
+            }
         } else {
             table_constrains.push_str(&format!("PRIMARY KEY ({})", primary_keys.join(", ")));
+        }
+
+        //Foreign key constraints
+
+        for (foreign_table, (referenced_fields, foreign_fields)) in self.foreign_keys {
+            let referenced_fields = referenced_fields.join(", ");
+            let foreign_fields = foreign_fields.join(", ");
+            table_constrains.push_str(&format!(
+                "FOREIGN KEY ({}) REFERENCES {}({}),",
+                referenced_fields, foreign_table, foreign_fields
+            ));
         }
 
         if table_constrains.is_empty() && !table_fields.is_empty() {

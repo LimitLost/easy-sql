@@ -26,8 +26,9 @@ pub struct TableDataVersion {
     pub table_name: String,
     pub fields: Vec<TableField>,
     pub primary_keys: Vec<String>,
-    ///0 - key, 1 - table (struct) name
-    pub foreign_keys: Vec<(String, String)>,
+    ///key - table (struct) name
+    ///value - current field name
+    pub foreign_keys: HashMap<String, Vec<String>>,
 }
 
 impl TableDataVersion {
@@ -43,7 +44,7 @@ impl TableDataVersion {
 
         let mut fields_converted = Vec::new();
         let mut primary_keys = Vec::new();
-        let mut foreign_keys = Vec::new();
+        let mut foreign_keys = HashMap::new();
 
         for field in fields.iter() {
             let name = field.ident.as_ref().unwrap().to_string();
@@ -75,7 +76,10 @@ impl TableDataVersion {
                 .into_iter()
                 .map(|e| e.to_string())
             {
-                foreign_keys.push((name.clone(), foreign_key));
+                let fields: &mut Vec<String> = foreign_keys
+                    .entry(foreign_key)
+                    .or_insert(Default::default());
+                fields.push(name.clone());
             }
 
             if has_attributes!(field, #[sql(primary_key)]) {

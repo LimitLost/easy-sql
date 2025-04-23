@@ -66,21 +66,26 @@ impl sql_crate::DatabaseSetup for ExampleTable {
             use sql_crate::EasyExecutor;
             // Create table and create version in EasySqlTables
             conn.query_setup(sql_crate::CreateTable {
-                table_name: sql_crate::EasySqlTables::table_name(),
+                table_name: "example_table",
                 fields: vec![sql_crate::TableField {
                     name: "id".to_string(),
                     data_type: sql_crate::SqlType::I64,
-                    is_primary_key: true,
-                    foreign_key: None,
                     is_unique: false,
                     is_not_null: true,
                 }],
+                auto_increment: true,
                 primary_keys: vec!["id"],
-                foreign_keys: vec![(
-                    "field3",
-                    <ExampleReferencedTable as sql_crate::SqlTable>::table_name(),
-                    <ExampleReferencedTable as sql_crate::SqlTable>::primary_keys(),
-                )],
+                foreign_keys: {
+                    vec![(
+                        <ExampleReferencedTable as sql_crate::SqlTable>::table_name(),
+                        (
+                            vec!["field3"],
+                            <ExampleReferencedTable as sql_crate::SqlTable>::primary_keys(),
+                        ),
+                    )]
+                    .into_iter()
+                    .collect()
+                },
             })
             .await?;
             sql_crate::EasySqlTables::create(conn, "table_name".to_string(), 5).await?;
