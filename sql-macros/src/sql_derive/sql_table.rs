@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use convert_case::{Case, Casing};
 use easy_macros::{
     anyhow::{self, Context},
@@ -13,6 +15,31 @@ use crate::{
 };
 
 use super::ty_enum_value;
+
+mod keywords{
+    use easy_macros::syn;
+    syn::custom_keyword!(cascade);
+}
+
+struct ForeignKeyParsed{
+    table_struct:syn::Path,
+    cascade:bool,
+}
+
+#[always_context]
+impl syn::parse::Parse for ForeignKeyParsed {
+    fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
+        let table_struct = input.parse()?;
+        let cascade = if input.is_empty() {
+            false
+        } else {
+            input.parse::<syn::Token![,]>()?;
+            input.parse::<keywords::cascade>()?;
+            true
+        };
+        Ok(ForeignKeyParsed { table_struct, cascade })
+    }
+}
 
 #[always_context]
 pub fn sql_table(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::TokenStream> {
@@ -55,6 +82,11 @@ pub fn sql_table(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::To
     let output_impl = sql_output_base(&item_name, &fields, &item_name_tokens);
 
     let mut primary_keys=Vec::new();
+    let mut foreign_keys=HashMap::new();
+
+    let mut auto_increment=false;
+
+    //TODO Primary key types check (compile time in the build script)
     // let mut primary_key_types=Vec::new();
 
     let mut is_primary_key = Vec::new();
@@ -63,6 +95,29 @@ pub fn sql_table(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::To
     let mut is_not_null = Vec::new();
 
     for field in fields.iter() {
+        //Auto Increment Check
+        if has_attributes!(field, #[sql(auto_increment)]) {
+            if auto_increment {
+                anyhow::bail!("Auto increment is only supported for single primary key");
+            }
+            auto_increment = true;
+        }
+        
+        //Foreign Key Check
+        for foreign_key in get_attributes!(field, #[sql(foreign_key = __unknown__)]) {
+
+            let foreign_key: ForeignKeyParsed = syn::parse2(foreign_key.clone())
+                .context("Expected foreign key to be a table name")?;
+
+            let fields: &mut (Vec<String>,bool) = foreign_keys
+                .entry(foreign_key.table_struct)
+                .or_insert((Default::default(),foreign_key.cascade));
+            fields.0.push(field.ident.as_ref()?.to_string());
+            if foreign_key.cascade {
+                fields.1=true;
+            }
+        }
+
         let (variant, is_field_not_null) = ty_enum_value(&field.ty)?;
         is_not_null.push(is_field_not_null);
         if let Some(variant) = variant {
@@ -89,7 +144,11 @@ pub fn sql_table(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::To
     }
 
     if primary_keys.is_empty(){
-        anyhow::bail!("No primary key found, please add #[sql(primary_key)] to one of the fields");
+        anyhow::bail!("No primary key found, please add #[sql(primary_key)] to one of the fields (Sqlite always has one)");
+    }
+
+    if primary_keys.len() !=1 && auto_increment{
+        anyhow::bail!("Auto increment is only supported for single primary key (Sqlite contrains this limitation)");
     }
 
     let mut table_version = None;
@@ -105,6 +164,24 @@ pub fn sql_table(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::To
             .context("Expected base10 literal int in the sql(version) attribute")?;
         table_version = Some(n);
     }
+
+    // Foreign keys converted
+    let foreign_keys={
+        let mut foreign_keys_converted=Vec::new();
+        for (foreign_table, (referenced_fields,cascade)) in foreign_keys {
+            foreign_keys_converted.push(quote! {
+                (
+                    <#foreign_table as #sql_crate::SqlTable>::table_name(),
+                    (
+                        vec![#(#referenced_fields),*],
+                        <#foreign_table as #sql_crate::SqlTable>::primary_keys(),
+                        #cascade
+                    ),
+                )
+            });
+        }
+        foreign_keys_converted
+    };
 
     #[no_context_inputs]
     let table_version =
@@ -125,9 +202,19 @@ pub fn sql_table(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::To
                 }else{
                     use #sql_crate::EasyExecutor;
                     // Create table and create version in EasySqlTables
-                    conn.query_setup(#sql_crate::CreateTable{table_name: #table_name, fields: vec![
-                        #(#sql_crate::TableField{name: #field_names_str, data_type: #sql_crate::SqlType::#field_types, is_primary_key: #is_primary_key, foreign_key: None, is_unique: #is_unique, is_not_null: #is_not_null},)*
-                    ]}).await?;
+                    conn.query_setup(#sql_crate::CreateTable{
+                        table_name: #table_name, 
+                        fields: vec![
+                            #(#sql_crate::TableField{name: #field_names_str, data_type: #sql_crate::SqlType::#field_types, is_primary_key: #is_primary_key, foreign_key: None, is_unique: #is_unique, is_not_null: #is_not_null},)*
+                        ],
+                        auto_increment: #auto_increment,
+                        primary_keys: vec![#(#primary_keys),*],
+                        foreign_keys: {
+                            vec![#(#foreign_keys),*]
+                            .into_iter()
+                            .collect()
+                        },
+                    }).await?;
                     #sql_crate::EasySqlTables::create(conn, #table_name.to_string(), #table_version).await?;
                 }
 

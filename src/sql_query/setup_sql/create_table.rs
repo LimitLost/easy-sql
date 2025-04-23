@@ -17,8 +17,8 @@ pub struct CreateTable {
     ///Can only be used when with single primary key
     pub auto_increment: bool,
     ///Key - table name
-    ///Value - field names, foreign field names
-    pub foreign_keys: HashMap<&'static str, (Vec<&'static str>, Vec<&'static str>)>,
+    ///Value - field names, foreign field names, on delete/update cascade
+    pub foreign_keys: HashMap<&'static str, (Vec<&'static str>, Vec<&'static str>, bool)>,
 }
 
 #[always_context]
@@ -68,13 +68,14 @@ impl SetupSql for CreateTable {
         }
 
         //Foreign key constraints
-
-        for (foreign_table, (referenced_fields, foreign_fields)) in self.foreign_keys {
+        for (foreign_table, (referenced_fields, foreign_fields, cascade)) in self.foreign_keys {
             let referenced_fields = referenced_fields.join(", ");
             let foreign_fields = foreign_fields.join(", ");
+            let on_delete = if cascade { "ON DELETE CASCADE" } else { "" };
+            let on_update = if cascade { "ON UPDATE CASCADE" } else { "" };
             table_constrains.push_str(&format!(
-                "FOREIGN KEY ({}) REFERENCES {}({}),",
-                referenced_fields, foreign_table, foreign_fields
+                "FOREIGN KEY ({}) REFERENCES {}({}) {} {},",
+                referenced_fields, foreign_table, foreign_fields, on_delete, on_update
             ));
         }
 

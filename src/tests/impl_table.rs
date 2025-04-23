@@ -81,6 +81,7 @@ impl sql_crate::DatabaseSetup for ExampleTable {
                         (
                             vec!["field3"],
                             <ExampleReferencedTable as sql_crate::SqlTable>::primary_keys(),
+                            false,
                         ),
                     )]
                     .into_iter()
