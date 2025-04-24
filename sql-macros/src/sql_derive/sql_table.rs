@@ -190,12 +190,12 @@ pub fn sql_table(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::To
 
     let compilation_data=CompilationData::load()?;
 
-    let unique_id=get_attributes!(item, #[sql(unique = __unknown__)]).into_iter().next().context("Sql build macro is required (reload VS Code or save if unique id is already generated)")?;
+    let unique_id=get_attributes!(item, #[sql(unique_id = __unknown__)]).into_iter().next().context("Sql build macro is required (reload VS Code or save if unique id is already generated)")?;
     let unique_id: LitStr = syn::parse2(unique_id.clone()).context("Unique id should be string")?;
 
-    let converted_to_version=TableDataVersion::from_struct(&item, table_name)?;
+    let converted_to_version=TableDataVersion::from_struct(&item, table_name.clone())?;
 
-        let migrations=compilation_data.generate_migrations(&unique_id.value(), &converted_to_version, table_version)?;
+    let migrations=compilation_data.generate_migrations(&unique_id.value(), &converted_to_version, table_version,&sql_crate)?;
 
     Ok(quote! {
         impl #sql_crate::DatabaseSetup for #item_name {
@@ -207,7 +207,7 @@ pub fn sql_table(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::To
 
                 let table_exists = conn.query_setup(#sql_crate::TableExists{name: #table_name}).await.with_context(#easy_macros_helpers_crate::context!("Checking if table exists: {:?}",#table_name))?;
 
-                if table_exists{
+                if let Some(current_version_number) = table_exists{
                     #migrations
                 }else{
                     use #sql_crate::EasyExecutor;

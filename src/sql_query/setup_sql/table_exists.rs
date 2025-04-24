@@ -1,9 +1,11 @@
+use std::ops::DerefMut;
+
 use anyhow::Context;
 use async_trait::async_trait;
 use easy_macros::{helpers::context, macros::always_context};
 use sqlx::Row;
 
-use crate::SetupSql;
+use crate::{RawConnection, SetupSql};
 
 #[derive(Debug)]
 pub struct TableExists {
@@ -17,7 +19,7 @@ impl SetupSql for TableExists {
 
     async fn query<'a>(
         self,
-        exec: impl sqlx::Executor<'a, Database = crate::Db> + Sync,
+        exec: &mut (impl DerefMut<Target = RawConnection> + Send + Sync),
     ) -> anyhow::Result<Self::Output> {
         let query = format!(
             "SELECT EXISTS (SELECT * FROM sqlite_master WHERE type='table' AND name='{}')",
@@ -25,7 +27,7 @@ impl SetupSql for TableExists {
         );
         #[no_context]
         let result: bool = sqlx::query(&query)
-            .fetch_one(exec)
+            .fetch_one(exec.deref_mut())
             .await
             .with_context(context!("table_name: {:?} | query: {:?}", self.name, query))?
             .get(0);

@@ -14,6 +14,8 @@ type Db = sqlx::Sqlite;
 type ConnectionInternal = sqlx::pool::PoolConnection<Db>;
 pub type Row = sqlx::sqlite::SqliteRow;
 
+pub(crate) type RawConnection = sqlx::SqliteConnection;
+
 pub use sqlx::Row as SqlxRow;
 
 pub use sql_compilation_data::SqlType;

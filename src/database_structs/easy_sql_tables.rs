@@ -68,6 +68,10 @@ impl SqlTable for EasySqlTables {
     fn table_name() -> &'static str {
         "easy_sql_tables"
     }
+
+    fn primary_keys() -> std::vec::Vec<&'static str> {
+        vec!["table_id"]
+    }
 }
 
 #[always_context]
@@ -89,20 +93,19 @@ impl DatabaseSetup for EasySqlTables {
                     TableField {
                         name: "table_id".to_string(),
                         data_type: SqlType::String,
-                        is_primary_key: true,
-                        foreign_key: None,
                         is_unique: false,
                         is_not_null: true,
                     },
                     TableField {
                         name: "version".to_string(),
                         data_type: SqlType::I64,
-                        is_primary_key: false,
-                        foreign_key: None,
                         is_unique: false,
                         is_not_null: true,
                     },
                 ],
+                primary_keys: vec!["table_id"],
+                auto_increment: false,
+                foreign_keys: Default::default(),
             })
             .await?;
         }

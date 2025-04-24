@@ -1,9 +1,9 @@
-use std::fmt::Debug;
+use std::{fmt::Debug, ops::DerefMut};
 
 use async_trait::async_trait;
 use easy_macros::macros::always_context;
 
-use crate::{Row, SqlOutput, ToConvert, sql_query::Sql};
+use crate::{RawConnection, Row, SqlOutput, ToConvert, sql_query::Sql};
 
 pub struct Break;
 
@@ -43,6 +43,6 @@ pub trait SetupSql {
 
     async fn query<'a>(
         self,
-        exec: impl sqlx::Executor<'a, Database = crate::Db> + Sync,
+        exec: &mut (impl DerefMut<Target = RawConnection> + Send + Sync),
     ) -> anyhow::Result<Self::Output>;
 }

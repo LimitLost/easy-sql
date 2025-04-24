@@ -1,9 +1,11 @@
 use std::collections::HashMap;
+use std::ops::DerefMut;
 
 use anyhow::Context;
 use async_trait::async_trait;
 use easy_macros::{helpers::context, macros::always_context};
 
+use crate::RawConnection;
 use crate::SetupSql;
 
 use crate::TableField;
@@ -28,30 +30,16 @@ impl SetupSql for CreateTable {
 
     async fn query<'a>(
         self,
-        exec: impl sqlx::Executor<'a, Database = crate::Db> + Sync,
+        exec: &mut (impl DerefMut<Target = RawConnection> + Send + Sync),
     ) -> anyhow::Result<Self::Output> {
         let mut table_fields = String::new();
         let mut table_constrains = String::new();
         let mut primary_keys = Vec::new();
 
         for field in self.fields.into_iter() {
-            let TableField {
-                name,
-                data_type,
-                is_unique,
-                is_not_null,
-            } = field;
+            primary_keys.push(field.name.clone());
 
-            let date_type_sqlite = data_type.sqlite();
-
-            primary_keys.push(name.clone());
-            let unique = if is_unique { "UNIQUE" } else { "" };
-            let not_null = if is_not_null { "NOT NULL" } else { "" };
-
-            table_fields.push_str(&format!(
-                "{} {} {} {},",
-                name, date_type_sqlite, unique, not_null
-            ));
+            table_fields.push_str(&field.definition());
         }
 
         //Primary key constraint
@@ -95,7 +83,7 @@ impl SetupSql for CreateTable {
         );
         #[no_context]
         sqlx::query(&query)
-            .execute(exec)
+            .execute(exec.deref_mut())
             .await
             .with_context(context!(
                 "table_name: {:?} | query: {:?}",

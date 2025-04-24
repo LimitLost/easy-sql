@@ -70,7 +70,7 @@ impl EasyExecutor for Connection {
         &mut self,
         sql: O,
     ) -> anyhow::Result<O::Output> {
-        sql.query(&mut *self.internal).await
+        sql.query(&mut self.internal).await
     }
 
     /* async fn fetch_all<T, O: SqlOutput<T, Row>>(&mut self, sql: &Sql) -> anyhow::Result<Vec<O>> {

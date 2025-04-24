@@ -8,7 +8,7 @@ use easy_macros::{
     syn,
 };
 use serde::{Deserialize, Serialize};
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub enum SqlRangeType {
     ///int4range
     I32,
@@ -23,7 +23,7 @@ pub enum SqlRangeType {
     ///numrange
     Decimal,
 }
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub enum SqlType {
     ///Postgresql: inet
     ///Sqlite: BLOB
