@@ -8,6 +8,7 @@ use easy_macros::{
     quote::{quote, ToTokens},
     syn::{self, LitInt, LitStr},
 };
+use sql_compilation_data::{CompilationData, TableDataVersion};
 
 use crate::{
     easy_lib_crate, easy_macros_helpers_crate, sql_crate,
@@ -51,8 +52,8 @@ pub fn sql_table(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::To
     let sql_crate = sql_crate();
     let easy_lib_crate = easy_lib_crate();
 
-    let fields = match item.fields {
-        syn::Fields::Named(fields_named) => fields_named.named,
+    let fields = match &item.fields {
+        syn::Fields::Named(fields_named) => fields_named.named.clone(),
         syn::Fields::Unnamed(_) => {
             anyhow::bail!("Unnamed struct fields are not supported")
         }
@@ -159,7 +160,7 @@ pub fn sql_table(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::To
         }
         let version: LitInt = syn::parse2(version.clone())
             .context("Expected literal int in the sql(version) attribute")?;
-        let n: i64 = version
+        let n: u64 = version
             .base10_parse()
             .context("Expected base10 literal int in the sql(version) attribute")?;
         table_version = Some(n);
@@ -187,6 +188,15 @@ pub fn sql_table(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::To
     let table_version =
         table_version.with_context(context!("#[sql(version = x)] attribute is required"))?;
 
+    let compilation_data=CompilationData::load()?;
+
+    let unique_id=get_attributes!(item, #[sql(unique = __unknown__)]).into_iter().next().context("Sql build macro is required (reload VS Code or save if unique id is already generated)")?;
+    let unique_id: LitStr = syn::parse2(unique_id.clone()).context("Unique id should be string")?;
+
+    let converted_to_version=TableDataVersion::from_struct(&item, table_name)?;
+
+        let migrations=compilation_data.generate_migrations(&unique_id.value(), &converted_to_version, table_version)?;
+
     Ok(quote! {
         impl #sql_crate::DatabaseSetup for #item_name {
 
@@ -198,7 +208,7 @@ pub fn sql_table(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::To
                 let table_exists = conn.query_setup(#sql_crate::TableExists{name: #table_name}).await.with_context(#easy_macros_helpers_crate::context!("Checking if table exists: {:?}",#table_name))?;
 
                 if table_exists{
-                    //TODO Get Table Version and migrate (alter table + update version) if neccessary
+                    #migrations
                 }else{
                     use #sql_crate::EasyExecutor;
                     // Create table and create version in EasySqlTables
