@@ -5,7 +5,7 @@ use easy_macros::{
     helpers::MacroResult,
     macros::{always_context, get_attributes, has_attributes},
     proc_macro2::TokenStream,
-    quote::ToTokens,
+    quote::{ToTokens, quote},
     syn,
 };
 use serde::{Deserialize, Serialize};
@@ -26,6 +26,7 @@ pub struct TableDataVersion {
     pub table_name: String,
     pub fields: Vec<TableField>,
     pub primary_keys: Vec<String>,
+    pub auto_increment: bool,
     ///key - table (struct) name
     ///value - current field name
     pub foreign_keys: HashMap<String, Vec<String>>,
@@ -46,8 +47,18 @@ impl TableDataVersion {
         let mut primary_keys = Vec::new();
         let mut foreign_keys = HashMap::new();
 
+        let mut auto_increment = false;
+
         for field in fields.iter() {
             let name = field.ident.as_ref().unwrap().to_string();
+
+            //Auto Increment Check
+            if has_attributes!(field, #[sql(auto_increment)]) {
+                if auto_increment {
+                    anyhow::bail!("Auto increment is only supported for single primary key");
+                }
+                auto_increment = true;
+            }
 
             let (sql_type, is_not_null) = SqlType::from_syn_type(&field.ty)?;
 
@@ -102,6 +113,7 @@ impl TableDataVersion {
             fields: fields_converted,
             foreign_keys,
             primary_keys,
+            auto_increment,
         })
     }
 }
@@ -222,6 +234,7 @@ impl CompilationData {
         current_unique_id: &str,
         latest_version: &TableDataVersion,
         latest_version_number: u64,
+        sql_crate: &TokenStream,
     ) -> anyhow::Result<TokenStream> {
         let table_data = self
             .tables
@@ -231,13 +244,151 @@ impl CompilationData {
         let mut result = MacroResult::default();
 
         for (version_number, version_data) in table_data.saved_versions.iter() {
+            let mut changes_needed = Vec::new();
+
             if version_number == &latest_version_number {
                 continue;
             }
-            //version_data.fields
+            //Primary Key Check (Must be equal)
+            if version_data.primary_keys != latest_version.primary_keys {
+                anyhow::bail!(
+                    "Primary key change is not supported (yet) -> Latest Version: {:?} ||| Version {}: {:?}",
+                    latest_version.primary_keys,
+                    version_number,
+                    version_data.primary_keys
+                );
+            }
+            //Foreign Key Check (Must be equal)
+            if version_data.foreign_keys != latest_version.foreign_keys {
+                anyhow::bail!(
+                    "Foreign key change is not supported (yet) -> Latest Version: {:?} ||| Version {}: {:?}",
+                    latest_version.foreign_keys,
+                    version_number,
+                    version_data.foreign_keys
+                );
+            }
+            //Auto increment check (Must be equal)
+            if version_data.auto_increment != latest_version.auto_increment {
+                anyhow::bail!(
+                    "Auto increment change is not supported (yet) -> Latest Version: {:?} ||| Version {}: {:?}",
+                    latest_version.auto_increment,
+                    version_number,
+                    version_data.auto_increment
+                );
+            }
+
+            // Table name change support
+            if version_data.table_name != latest_version.table_name {
+                let new_name = latest_version.table_name.as_str();
+
+                // Rename table
+                changes_needed.push(quote! {
+                    #sql_crate::AlterTableSingle::RenameTable{
+                        new_table_name: #new_name,
+                    }
+                });
+            }
+
+            // Check for old column change
+            for (old_field, new_field) in
+                version_data.fields.iter().zip(latest_version.fields.iter())
+            {
+                //We can only rename old columns
+                if old_field.name != new_field.name {
+                    let old_name = old_field.name.as_str();
+                    let new_name = new_field.name.as_str();
+
+                    // Rename field
+                    changes_needed.push(quote! {
+                        #sql_crate::AlterTableSingle::RenameColumn{
+                            old_column_name: #old_name,
+                            new_column_name: #new_name,
+                        }
+                    });
+                }
+                //Everything else on old column is not supported
+                if old_field.is_not_null != new_field.is_not_null {
+                    anyhow::bail!(
+                        "Field type change is not supported (yet) (only rename) -> Latest Version: {:?} ||| Version {}: {:?}",
+                        latest_version.fields,
+                        version_number,
+                        version_data.fields
+                    );
+                }
+                if old_field.sql_type != new_field.sql_type {
+                    anyhow::bail!(
+                        "Field type change is not supported (yet) (only rename) -> Latest Version: {:?} ||| Version {}: {:?}",
+                        latest_version.fields,
+                        version_number,
+                        version_data.fields
+                    );
+                }
+                if old_field.is_unique != new_field.is_unique {
+                    anyhow::bail!(
+                        "Field unique change is not supported (yet) (only rename) -> Latest Version: {:?} ||| Version {}: {:?}",
+                        latest_version.fields,
+                        version_number,
+                        version_data.fields
+                    );
+                }
+                if old_field.default != new_field.default {
+                    anyhow::bail!(
+                        "Field default value change is not supported (yet) (only rename) -> Latest Version: {:?} ||| Version {}: {:?}",
+                        latest_version.fields,
+                        version_number,
+                        version_data.fields
+                    );
+                }
+            }
+
+            //New Columns Check
+            for new_field in latest_version.fields.iter().skip(version_data.fields.len()) {
+                //New columns need default value
+                if new_field.default.is_none() && new_field.is_not_null {
+                    anyhow::bail!(
+                        "New (not null) column without default value is not supported -> Latest Version: {:?} ||| Version {}: {:?}",
+                        latest_version.fields,
+                        version_number,
+                        version_data.fields
+                    );
+                }
+
+                let field_name = new_field.name.as_str();
+                let data_type = new_field.sql_type.to_tokens(sql_crate);
+                let default_value = new_field.default.as_ref().map(|s| s.as_str());
+                let is_not_null = new_field.is_not_null;
+                let is_unique = new_field.is_unique;
+
+                //Create new field
+                changes_needed.push(quote! {
+                    #sql_crate::AlterTableSingle::AddColumn{
+                        column: #sql_crate::TableField {
+                            name: #field_name,
+                            data_type: #data_type,
+                            is_unique: #is_unique,
+                            is_not_null: #is_not_null,
+                            default: Some(#default_value.to_string()),
+                        }
+                    }
+                });
+            }
+
+            //Generate Migration (if needed)
+            if !changes_needed.is_empty() {
+                let version_number = *version_number;
+                let table_name = latest_version.table_name.as_str();
+
+                result.push(quote! {
+                    if
+                    #sql_crate::AlterTable{
+                        table_name: #table_name,
+                        changes: vec![#(#changes_needed),*],
+                    }
+                });
+            }
         }
 
-        todo!()
+        Ok(result.finalize())
     }
 }
 
