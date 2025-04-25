@@ -378,11 +378,14 @@ impl CompilationData {
                 let version_number = *version_number;
                 let table_name = latest_version.table_name.as_str();
 
-                result.push(quote! {
-                    if
-                    #sql_crate::AlterTable{
-                        table_name: #table_name,
-                        changes: vec![#(#changes_needed),*],
+                result.add(quote! {
+                    if current_version_number == #version_number{
+                        conn.query_setup(#sql_crate::AlterTable{
+                            table_name: #table_name,
+                            changes: vec![#(#changes_needed),*],
+                        }).await?;
+                        #sql_crate::EasySqlTables::update_version(conn, #table_name, #version_number).await?;
+                        return Ok(());
                     }
                 });
             }

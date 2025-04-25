@@ -10,7 +10,7 @@ use easy_macros::{
     helpers::context,
     macros::{all_syntax_cases, always_context, get_attributes},
     proc_macro2::LineColumn,
-    quote::ToTokens,
+    quote::{ToTokens, quote},
     syn::{
         self, ItemFn, ItemImpl, ItemTrait, LitInt, LitStr, Macro, Meta, punctuated::Punctuated,
         spanned::Spanned,
@@ -186,14 +186,23 @@ fn struct_table_handle(
         break;
     }
 
+    //Generate table version data
+    let version_data = TableDataVersion::from_struct(item, table_name)?;
+
+    //Migration check
+    context_info.compilation_data.generate_migrations(
+        &unique_id,
+        &version_data,
+        version,
+        &quote! {},
+    )?;
+
     match context_info.compilation_data.tables.entry(unique_id) {
         Entry::Occupied(occupied_entry) => {
             let table_data = occupied_entry.into_mut();
             //Ignore when current version is smaller than the latest version (Error by derive macro)
             if table_data.latest_version < version {
-                table_data
-                    .saved_versions
-                    .insert(version, TableDataVersion::from_struct(item, table_name)?);
+                table_data.saved_versions.insert(version, version_data);
 
                 table_data.latest_version = version;
                 context_info.tables_updated = true;
@@ -201,7 +210,7 @@ fn struct_table_handle(
         }
         Entry::Vacant(vacant_entry) => {
             let mut saved_versions = HashMap::new();
-            saved_versions.insert(version, TableDataVersion::from_struct(item, table_name)?);
+            saved_versions.insert(version, version_data);
 
             let table_data = TableData {
                 latest_version: version,

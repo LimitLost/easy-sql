@@ -72,6 +72,7 @@ impl sql_crate::DatabaseSetup for ExampleTable {
                     data_type: sql_crate::SqlType::I64,
                     is_unique: false,
                     is_not_null: true,
+                    default: None,
                 }],
                 auto_increment: true,
                 primary_keys: vec!["id"],

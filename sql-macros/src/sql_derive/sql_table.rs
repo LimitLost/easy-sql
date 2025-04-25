@@ -207,7 +207,9 @@ pub fn sql_table(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::To
 
                 let table_exists = conn.query_setup(#sql_crate::TableExists{name: #table_name}).await.with_context(#easy_macros_helpers_crate::context!("Checking if table exists: {:?}",#table_name))?;
 
-                if let Some(current_version_number) = table_exists{
+                if table_exists{
+                    use #sql_crate::EasyExecutor;
+                    let current_version_number = #sql_crate::EasySqlTables::get_version(conn,#unique_id).await?;
                     #migrations
                 }else{
                     use #sql_crate::EasyExecutor;
