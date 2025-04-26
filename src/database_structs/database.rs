@@ -2,7 +2,9 @@ use std::sync::Arc;
 
 use anyhow::Context;
 use easy_macros::macros::always_context;
-use sqlx::Executor;
+use sqlx::{Executor, sqlite::SqliteConnectOptions};
+
+use std::path::Path;
 use tokio::sync::Mutex;
 
 use super::{Connection, Transaction};
@@ -42,8 +44,9 @@ pub struct Database {
 
 #[always_context]
 impl Database {
-    pub async fn setup<T: DatabaseSetup>(url: &str) -> anyhow::Result<Self> {
-        let connection_pool = sqlx::Pool::<Db>::connect(url).await?;
+    pub async fn setup<T: DatabaseSetup>(path: impl AsRef<Path>) -> anyhow::Result<Self> {
+        let connection_pool =
+            sqlx::Pool::<Db>::connect_with(SqliteConnectOptions::default().filename(&path)).await?;
         Ok(Database {
             connection_pool,
             internal: Default::default(),
