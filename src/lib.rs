@@ -1,3 +1,5 @@
+#![doc = include_str!("../README.md")]
+
 mod database_structs;
 pub use database_structs::*;
 mod easy_executor;
@@ -22,7 +24,9 @@ pub use sql_compilation_data::SqlType;
 
 pub use async_trait::async_trait;
 
-// #[cfg(test)]
+pub use sql_macros::*;
+
+#[cfg(test)]
 mod tests;
 
 #[always_context]
