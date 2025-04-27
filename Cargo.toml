@@ -1,48 +1,48 @@
 [package]
-name = "easy-sql"
-version = "0.1.0"
-edition = "2024"
+edition = "2024" 
+name = "easy-sql" 
+version = "0.9.0" # Table Join and Exists is required for 1.0.0
 
 [dependencies]
-sqlx = { version = "0.8", features = [
-    "runtime-tokio",
-    "uuid",
-    "sqlite",
-    "postgres",
-    "bigdecimal",
-    "rust_decimal",
-    "chrono",
-] }
-uuid = { version = "*", features = ["serde"] }
+sqlx = {version = "0.8", features = [
+  "runtime-tokio",
+  "uuid",
+  "sqlite",
+  "postgres",
+  "bigdecimal",
+  "rust_decimal",
+  "chrono",
+]}
+uuid = {version = "*", features = ["serde"]}
 # Add serde impl to bigdecimal
-bigdecimal = { version = "*", features = ["serde-json"] }
+bigdecimal = {version = "*", features = ["serde-json"]}
 # Add serde impl to decimal
-rust_decimal = { version = "1.37.1", features = ["serde-str"] }
+rust_decimal = {version = "1.37.1", features = ["serde-str"]}
 
-easy-macros = { path = "../easy-macros", features = ["general"] }
+easy-macros = {path = "../easy-macros", features = ["general"]}
 
 anyhow = "1"
-chrono = { version = "*", features = ["serde"] }
+chrono = {version = "*", features = ["serde"]}
 
-serde = { version = "1", features = ["derive"] }
-bincode = { version = "2", features = ["serde"] }
+bincode = {version = "2", features = ["serde"]}
+serde = {version = "1", features = ["derive"]}
 
-tokio = { version = "1", features = ["sync"] }
 async-trait = "0.1.88"
-futures-core = "0.3.31"
 futures = "0.3.31"
+futures-core = "0.3.31"
 pin-project = "1"
+tokio = {version = "1", features = ["sync"]}
 
-sql-macros = { path = "./sql-macros" }
-sql-build = { path = "./sql-build", optional = true }
-sql-compilation-data = { path = "./sql-compilation-data", default-features = false }
+sql-build = {path = "./sql-build", optional = true}
+sql-compilation-data = {path = "./sql-compilation-data", default-features = false}
+sql-macros = {path = "./sql-macros"}
 
 [dev-dependencies]
 lazy_static = "*"
 
 [build-dependencies]
-easy-macros = { path = "../easy-macros", features = ["build"] }
-sql-build = { path = "./sql-build" }
+easy-macros = {path = "../easy-macros", features = ["build"]}
+sql-build = {path = "./sql-build"}
 
 [features]
 backend = ["sqlx/postgres"]
