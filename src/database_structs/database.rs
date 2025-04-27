@@ -44,9 +44,10 @@ pub struct Database {
 
 #[always_context]
 impl Database {
-    pub async fn setup<T: DatabaseSetup>(path: impl AsRef<Path>) -> anyhow::Result<Self> {
+    pub async fn setup<T: DatabaseSetup>(db_file_path: impl AsRef<Path>) -> anyhow::Result<Self> {
         let connection_pool =
-            sqlx::Pool::<Db>::connect_with(SqliteConnectOptions::default().filename(&path)).await?;
+            sqlx::Pool::<Db>::connect_with(SqliteConnectOptions::default().filename(&db_file_path))
+                .await?;
         Ok(Database {
             connection_pool,
             internal: Default::default(),
