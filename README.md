@@ -4,6 +4,7 @@ Currently this library only supports SQLite.
 
 - Table join support
 - EXISTS query support
+- Allow for multiple `#[sql(table = ...)]` attributes on single struct
 - Support for Postgres
 - Support for syncing data to remote database provided by you
 - Renaming columns in table (with attribute, overwriting name set by the field name)
@@ -75,14 +76,58 @@ async fn main() -> anyhow::Result<()> {
 
 ## Advanced table creation
 
-- TODO show auto increment
+- Primary Key Auto Increment
 
-- TODO show multiple primary keys
+```rust
+#[derive(SqlTable)]
+#[sql(version = 1)]
+struct ExampleTableIncrement {
+    // Column name: `id`
+    #[sql(primary_key)]
+    #[sql(auto_increment)]
+    id: i32,
+    // Column name: `field`
+    field: i64,
+}
+```
 
-- TODO show foreign keys
+- TODO Multiple Primary Keys
 
-- TODO show table renaming
+- TODO show Foreign Keys
+
+- TODO show Table Renaming
 
 ## Table manipulation
 
+- Creating table manipulation structs with `SqlInsert`, `SqlUpdate` and `SqlOutput` derive macros
+
+```rust
+
+//Field validity is automatically checked and errors will be shown on compile time if they are not
+#[derive(SqlInsert,SqlUpdate,SqlOutput)]
+#[sql(table = ExampleTableIncrement)]
+struct ExampleInsert{
+    field: i64,
+}
+
+```
+
 - TODO Create example using all table manipulation functions
+
+```rust
+use easy_lib::sql::{SqlTable};
+
+#[tokio::main]
+async fn main() -> anyhow::Result<()> {
+    let db = Database::setup::<ExampleDatabase>("example.db").await?;
+
+    // You can also use `db.conn()` if you don't want to start a transaction
+    let mut conn=db.transaction().await?;
+`
+    // TODO Your code for table manipulation will go here
+
+    // You can also use `conn.rollback().await?` if you want to rollback the transaction
+    conn.commit().await?;
+    Ok(())
+}
+```
