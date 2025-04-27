@@ -2,10 +2,23 @@ Currently this library only supports SQLite.
 
 # Future Features
 
-- Support for Postgres (connection made by external handler provided by you)
+- Table join support
+- EXISTS query support
+- Support for Postgres
+- Support for syncing data to remote database provided by you
 - Renaming columns in table (with attribute, overwriting name set by the field name)
+- (Table editing) Support for changing more than just renaming table, columns and adding new columns
+- Check if foreign key column type is correct
 
 # Examples (they reference each other)
+
+- `.gitignore` setup (ignore build logs)
+
+```gitignore
+/easy_sql_logs
+```
+
+WARNING: Never gitignore `easy_sql.ron` file, it is used for generating migrations (and for checking foreign keys in the future)
 
 ## Creating database and tables
 
@@ -15,6 +28,9 @@ Currently this library only supports SQLite.
 use easy_lib::sql::{DatabaseSetup, SqlTable};
 
 #[derive(SqlTable)]
+// Needed because of automatic migration generation
+// Update this after you're done with making changes (NOT before)
+#[sql(version = 1)]
 struct ExampleTable {
     // Column name: `id`
     // Multiple primary keys supported
@@ -59,4 +75,14 @@ async fn main() -> anyhow::Result<()> {
 
 ## Advanced table creation
 
+- TODO show auto increment
+
+- TODO show multiple primary keys
+
+- TODO show foreign keys
+
+- TODO show table renaming
+
 ## Table manipulation
+
+- TODO Create example using all table manipulation functions
