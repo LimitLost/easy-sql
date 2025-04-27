@@ -53,6 +53,15 @@ impl Database {
         })
     }
 
+    pub async fn setup_in_memory<T: DatabaseSetup>() -> anyhow::Result<Self> {
+        let connection_pool =
+            sqlx::Pool::<Db>::connect_with(SqliteConnectOptions::default().in_memory(true)).await?;
+        Ok(Database {
+            connection_pool,
+            internal: Default::default(),
+        })
+    }
+
     pub async fn maybe_exit(&self) -> anyhow::Result<()> {
         let mut internal = self.internal.lock().await;
         internal.maybe_exit().await?;
