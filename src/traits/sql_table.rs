@@ -111,6 +111,23 @@ pub trait SqlTable: Sized {
     }
 
     //TODO insert returning lazy
+    async fn insert_returning_lazy<
+        Y: ToConvert + Send + Sync,
+        T: SqlOutput<Self, Y>,
+        I: SqlInsert<Self> + Send + Sync,
+    >(
+        conn: &mut (impl EasyExecutor + Send + Sync),
+        to_insert: &I,
+        perform: impl FnMut(T) -> anyhow::Result<Option<Break>> + Send + Sync,
+    ) -> anyhow::Result<()> {
+        let sql = Sql::Insert {
+            table: Self::table_name(),
+            columns: I::insert_columns(),
+            values: to_insert.insert_values(),
+        };
+
+        conn.fetch_lazy(&sql, perform).await
+    }
 
     /// Use `sql_where!` macro to generate the where clause
     async fn delete<'a>(
@@ -140,6 +157,17 @@ pub trait SqlTable: Sized {
     }
 
     //TODO delete returning lazy
+    async fn delete_returning_lazy<'a, Y: ToConvert + Send + Sync, T: SqlOutput<Self, Y>>(
+        conn: &mut (impl EasyExecutor + Send + Sync),
+        where_: Option<WhereClause<'a>>,
+        mut perform: impl FnMut(T) -> anyhow::Result<Option<Break>> + Send + Sync,
+    ) -> anyhow::Result<()> {
+        let sql = Sql::Delete {
+            table: Self::table_name(),
+            where_,
+        };
+        conn.fetch_lazy(&sql, perform).await
+    }
 
     /// Use `sql_where!` macro to generate the `check` and `where` clause
     async fn update<'a>(
@@ -173,4 +201,22 @@ pub trait SqlTable: Sized {
     }
 
     //TODO update returning lazy
+    async fn update_returning_lazy<
+        'a,
+        Y: ToConvert + Send + Sync,
+        T: SqlOutput<Self, Y>,
+        U: SqlUpdate<Self> + Send + Sync,
+    >(
+        conn: &mut (impl EasyExecutor + Send + Sync),
+        update: U,
+        where_: Option<WhereClause<'a>>,
+        mut perform: impl FnMut(T) -> anyhow::Result<Option<Break>> + Send + Sync,
+    ) -> anyhow::Result<()> {
+        let sql = Sql::Update {
+            table: Self::table_name(),
+            set: update.updates(),
+            where_,
+        };
+        conn.fetch_lazy(&sql, perform).await
+    }
 }
