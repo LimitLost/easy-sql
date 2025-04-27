@@ -110,10 +110,9 @@ pub trait SqlTable: Sized {
         conn.query(&sql).await
     }
 
-    //TODO insert returning lazy
     async fn insert_returning_lazy<
         Y: ToConvert + Send + Sync,
-        T: SqlOutput<Self, Y>,
+        T: SqlOutput<Self, Row>,
         I: SqlInsert<Self> + Send + Sync,
     >(
         conn: &mut (impl EasyExecutor + Send + Sync),
@@ -123,7 +122,7 @@ pub trait SqlTable: Sized {
         let sql = Sql::Insert {
             table: Self::table_name(),
             columns: I::insert_columns(),
-            values: to_insert.insert_values(),
+            values: to_insert.insert_values()?,
         };
 
         conn.fetch_lazy(&sql, perform).await
@@ -156,8 +155,7 @@ pub trait SqlTable: Sized {
         conn.query(&sql).await
     }
 
-    //TODO delete returning lazy
-    async fn delete_returning_lazy<'a, Y: ToConvert + Send + Sync, T: SqlOutput<Self, Y>>(
+    async fn delete_returning_lazy<'a, Y: ToConvert + Send + Sync, T: SqlOutput<Self, Row>>(
         conn: &mut (impl EasyExecutor + Send + Sync),
         where_: Option<WhereClause<'a>>,
         mut perform: impl FnMut(T) -> anyhow::Result<Option<Break>> + Send + Sync,
@@ -200,11 +198,10 @@ pub trait SqlTable: Sized {
         conn.query(&sql).await
     }
 
-    //TODO update returning lazy
     async fn update_returning_lazy<
         'a,
         Y: ToConvert + Send + Sync,
-        T: SqlOutput<Self, Y>,
+        T: SqlOutput<Self, Row>,
         U: SqlUpdate<Self> + Send + Sync,
     >(
         conn: &mut (impl EasyExecutor + Send + Sync),
