@@ -80,6 +80,21 @@ pub trait SqlTable: Sized {
         Self::get_lazy(conn, clauses, perform).await
     }
 
+    /// Use `sql!` or `sql_where!` macros to generate clauses (second argument to this function)
+    async fn exists<'a>(
+        conn: &mut (impl EasyExecutor + Send + Sync),
+        clauses: Option<(fn(Self), impl CanBeSelectClause<'a> + Send + Sync)>,
+    ) -> anyhow::Result<bool> {
+        let clauses = clauses.map(|(_, clauses)| clauses);
+
+        let sql = Sql::Exists {
+            table: Self::table_name(),
+            joins: vec![],
+            clauses: clauses.into_select_clauses(),
+        };
+        conn.query::<Row, Self, bool>(&sql).await
+    }
+
     async fn insert<I: SqlInsert<Self> + Send + Sync>(
         conn: &mut (impl EasyExecutor + Send + Sync),
         to_insert: &I,

@@ -1,7 +1,7 @@
 use anyhow::Context;
 use async_trait::async_trait;
 use easy_macros::{helpers::context, macros::always_context};
-use sqlx::Executor;
+use sqlx::{Executor, Row as SqlxRow};
 
 use crate::{Db, QueryData, Row, Sql};
 
@@ -101,5 +101,15 @@ impl<Table> SqlOutput<Table, ()> for () {
     }
     fn convert(_data: ()) -> anyhow::Result<Self> {
         Ok(())
+    }
+}
+
+#[always_context]
+impl<Table> SqlOutput<Table, Row> for bool {
+    fn sql_to_query<'a>(sql: &'a Sql<'a>) -> anyhow::Result<QueryData<'a>> {
+        sql.query()
+    }
+    fn convert(data: Row) -> anyhow::Result<Self> {
+        Ok(data.get(0))
     }
 }

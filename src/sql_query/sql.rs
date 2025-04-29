@@ -1,9 +1,10 @@
+use std::fmt::Display;
+
 use anyhow::Context;
 use easy_macros::macros::always_context;
 use serde::{Deserialize, Serialize};
 
 use super::{QueryData, RequestedColumn, SelectClauses, SqlValueMaybeRef, TableJoin, WhereClause};
-
 
 fn single_value_str(columns_len: usize, current_value_n: &mut usize) -> String {
     let mut single_value_str = String::new();
@@ -28,6 +29,11 @@ pub enum Sql<'a> {
         joins: Vec<TableJoin>,
         clauses: SelectClauses<'a>,
     },
+    Exists {
+        table: &'static str,
+        joins: Vec<TableJoin>,
+        clauses: SelectClauses<'a>,
+    },
     Insert {
         table: &'static str,
         columns: Vec<String>,
@@ -45,7 +51,6 @@ pub enum Sql<'a> {
         //We don't allow for order by and limit since they are not in Postgres (only Sqlite)
     },
 }
-
 
 #[always_context]
 fn insert_query<'a>(
@@ -93,7 +98,6 @@ fn insert_query<'a>(
     })
 }
 
-
 #[always_context]
 fn update_query<'a>(
     table: &'static str,
@@ -139,7 +143,6 @@ fn update_query<'a>(
     })
 }
 
-
 #[always_context]
 fn delete_query<'a>(
     table: &'static str,
@@ -176,6 +179,32 @@ fn delete_query<'a>(
     })
 }
 
+fn select_base<'a>(
+    joins: &[TableJoin],
+    table: &'static str,
+    clauses: &'a SelectClauses,
+    bindings_list: &mut Vec<&'a SqlValueMaybeRef<'a>>,
+    requested_str: impl Display,
+) -> String {
+    let distinct = if clauses.distinct { " DISTINCT" } else { "" };
+
+    let joins_str = {
+        let mut joins_str = String::new();
+        for join in joins.iter() {
+            joins_str.push_str(&join.to_query_data());
+            joins_str.push(' ');
+        }
+        joins_str
+    };
+
+    let mut current_binding_n = 1;
+
+    let clauses_str = clauses.to_query_data(&mut current_binding_n, bindings_list);
+
+    let query_str =
+        format!("SELECT{distinct} {requested_str} FROM `{table}` {joins_str} {clauses_str}",);
+    query_str
+}
 
 #[always_context]
 impl Sql<'_> {
@@ -183,6 +212,21 @@ impl Sql<'_> {
         Ok(match self {
             Sql::Select { .. } => {
                 anyhow::bail!("Select query, but no output expected | self: {:?}", self)
+            }
+            Sql::Exists {
+                table,
+                joins,
+                clauses,
+            } => {
+                let mut bindings_list = Vec::new();
+                let query_str = format!(
+                    "EXISTS ({})",
+                    select_base(joins, table, clauses, &mut bindings_list, "1")
+                );
+                QueryData {
+                    query: query_str,
+                    bindings: bindings_list,
+                }
             }
             Sql::Insert {
                 table,
@@ -208,8 +252,6 @@ impl Sql<'_> {
                 joins,
                 clauses,
             } => {
-                let distinct = if clauses.distinct { " DISTINCT" } else { "" };
-
                 let requested_str = {
                     let mut requested_str = String::new();
                     for column in requested_columns.iter() {
@@ -221,28 +263,25 @@ impl Sql<'_> {
                     requested_str
                 };
 
-                let joins_str = {
-                    let mut joins_str = String::new();
-                    for join in joins.iter() {
-                        joins_str.push_str(&join.to_query_data());
-                        joins_str.push(' ');
-                    }
-                    joins_str
-                };
-
-                let mut current_binding_n = 1;
                 let mut bindings_list = Vec::new();
 
-                let clauses_str = clauses.to_query_data(&mut current_binding_n, &mut bindings_list);
-
-                let query_str = format!(
-                    "SELECT{distinct} {requested_str} FROM `{table}` {joins_str} {clauses_str}",
-                );
+                let query_str =
+                    select_base(joins, table, clauses, &mut bindings_list, requested_str);
 
                 QueryData {
                     query: query_str,
                     bindings: bindings_list,
                 }
+            }
+            Sql::Exists {
+                table: _,
+                joins: _,
+                clauses: _,
+            } => {
+                anyhow::bail!(
+                    "Exists query, but no output request expected | self: {:?}",
+                    self
+                )
             }
             Sql::Insert {
                 table,
