@@ -3,7 +3,6 @@ Currently this library only supports SQLite.
 # Future Features
 
 - Table join support
-- EXISTS query support
 - Allow for multiple `#[sql(table = ...)]` attributes on single struct
 - Support for Postgres
 - Support for syncing data to remote database provided by you
