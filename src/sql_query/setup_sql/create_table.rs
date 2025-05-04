@@ -39,7 +39,7 @@ impl SetupSql for CreateTable {
         let mut bindings_list = Vec::new();
 
         for field in self.fields.into_iter() {
-            primary_keys.push(field.name.clone());
+            primary_keys.push(field.name);
 
             table_fields.push_str(&field.definition(&mut bindings_list));
         }
