@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, path::PathBuf, str::FromStr};
 
 use easy_macros::{
     anyhow::{self, Context},
@@ -12,16 +12,18 @@ use serde::{Deserialize, Serialize};
 
 use crate::SqlType;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct TableField {
     pub name: String,
+    #[serde(default)]
+    pub ty_to_bytes: bool,
     pub sql_type: super::sql_type::SqlType,
     ///Tokens converted to_string()
     pub default: Option<String>,
     pub is_not_null: bool,
     pub is_unique: bool,
 }
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Eq, PartialEq)]
 pub struct TableDataVersion {
     pub table_name: String,
     pub fields: Vec<TableField>,
@@ -85,7 +87,7 @@ impl TableDataVersion {
 
             for foreign_key in get_attributes!(field, #[sql(foreign_key = __unknown__)])
                 .into_iter()
-                .map(|e| e.to_string())
+                .map(|e| e.to_string().replace(|c: char| c.is_whitespace(), ""))
             {
                 let fields: &mut Vec<String> = foreign_keys
                     .entry(foreign_key)
@@ -99,12 +101,15 @@ impl TableDataVersion {
 
             let is_unique = has_attributes!(field, #[sql(unique)]);
 
+            let ty_to_bytes = has_attributes!(field, #[sql(bytes)]);
+
             fields_converted.push(TableField {
                 name,
                 sql_type: sql_type,
                 default,
                 is_not_null,
                 is_unique,
+                ty_to_bytes,
             });
         }
 
@@ -130,10 +135,15 @@ pub struct CompilationData {
 }
 #[always_context]
 impl CompilationData {
-    pub fn load() -> anyhow::Result<CompilationData> {
-        let current_dir = std::env::current_dir()?;
+    pub fn data_location() -> anyhow::Result<PathBuf> {
+        let manifest_dir_str = std::env::var("CARGO_MANIFEST_DIR")?;
+        let current_dir = PathBuf::from_str(&manifest_dir_str)?;
 
-        let data_path = current_dir.join("easy_sql.ron");
+        Ok(current_dir.join("easy_sql.ron"))
+    }
+
+    pub fn load() -> anyhow::Result<CompilationData> {
+        let data_path = Self::data_location()?;
 
         let data: CompilationData = {
             #[cfg(feature = "build")]
@@ -170,9 +180,7 @@ impl CompilationData {
 
     #[cfg(feature = "build")]
     pub fn save(&self) -> anyhow::Result<()> {
-        let current_dir = std::env::current_dir()?;
-
-        let data_path = current_dir.join("easy_sql.ron");
+        let data_path = Self::data_location()?;
 
         let data =
             ron::ser::to_string_pretty(self, ron::ser::PrettyConfig::new().struct_names(true))?;
@@ -355,9 +363,52 @@ impl CompilationData {
 
                 let field_name = new_field.name.as_str();
                 let data_type = new_field.sql_type.to_tokens(sql_crate);
-                let default_value = new_field.default.as_ref().map(|s| s.as_str());
+                let default_value = new_field.default.as_ref().map(|s| s.as_str()).unwrap();
                 let is_not_null = new_field.is_not_null;
                 let is_unique = new_field.is_unique;
+
+                let default_expr: syn::Expr = syn::parse_str(default_value)?;
+
+                let default_value = if new_field.ty_to_bytes {
+                    let error_context = format!(
+                        "Converting default value `{}` to bytes for field `{}`, table_unique_id: `{}` migrating from version: `{}` to version: `{}`",
+                        default_value,
+                        field_name,
+                        current_unique_id,
+                        version_number,
+                        latest_version_number,
+                    );
+                    //For compatibility sake
+                    let default_value = default_expr;
+
+                    //Convert provided default value to bytes
+                    quote! {
+                        {
+                            //Test if default value to_bytes will be successful
+                            //Even in release mode, just in case, it's low cost anyway
+                            #sql_crate::to_bytes(#default_value).context(#error_context)?;
+
+                            #sql_crate::lazy_static!{
+                                static ref DEFAULT_VALUE: #sql_crate::SqlValueMaybeRef<'static> = #sql_crate::to_bytes(#default_value).unwrap().into();
+                            }
+
+                            Some(&*DEFAULT_VALUE)
+                        }
+                    }
+                } else {
+                    //For compatibility sake
+                    let default_value = default_expr;
+
+                    quote! {
+                        {
+                            #sql_crate::lazy_static!{
+                                static ref DEFAULT_VALUE: #sql_crate::SqlValueMaybeRef<'static> = (#default_value).into();
+                            }
+
+                            Some(&*DEFAULT_VALUE)
+                        }
+                    }
+                };
 
                 //Create new field
                 changes_needed.push(quote! {
@@ -367,7 +418,7 @@ impl CompilationData {
                             data_type: #data_type,
                             is_unique: #is_unique,
                             is_not_null: #is_not_null,
-                            default: Some(#default_value.to_string()),
+                            default: #default_value,
                         }
                     }
                 });

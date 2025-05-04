@@ -76,7 +76,7 @@ impl sql_crate::DatabaseSetup for ExampleTable {
             conn.query_setup(sql_crate::CreateTable {
                 table_name: "example_table",
                 fields: vec![sql_crate::TableField {
-                    name: "id".to_string(),
+                    name: "id",
                     data_type: sql_crate::SqlType::I64,
                     is_unique: false,
                     is_not_null: true,

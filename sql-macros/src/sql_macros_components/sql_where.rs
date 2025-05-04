@@ -64,10 +64,10 @@ impl WhereExpr {
                     SqlColumn::SpecificTableColumn(path, ident) => {
                         checks.push(quote_spanned! {ident.span()=>
                             {
-                                fn has_table<T:#sql_crate::HasTable<#path>>(test:&T){}
+                                fn has_table<T:#sql_crate::HasTable<#path>>(_test:&T){}
                                 has_table(&___t___);
                                 //TODO "RealColumns" trait with type leading to the struct with actual database columns
-                                let mut table_instance = #sql_crate::never::never_any::<#path>();
+                                let table_instance = #sql_crate::never::never_any::<#path>();
                                 let _ = bool::from(table_instance.#ident);
                             }
                         });
@@ -75,7 +75,7 @@ impl WhereExpr {
                         let ident_str = ident.to_string();
                         quote_spanned! {ident.span()=>
                             #sql_crate::WhereExpr::ColumnFromTable{
-                                table: <#path as #sql_crate::SqlTable>::table_name(),
+                                table: <#path as #sql_crate::SqlTable>::table_name().to_owned(),
                                 column: #ident_str.to_string(),
                             }
                         }
@@ -305,10 +305,10 @@ impl SqlValue {
                     SqlColumn::SpecificTableColumn(path, ident) => {
                         checks.push(quote_spanned! {ident.span()=>
                             {
-                                fn has_table<T:#sql_crate::HasTable<#path>>(test:&T){}
+                                fn has_table<T:#sql_crate::HasTable<#path>>(_test:&T){}
                                 has_table(&___t___);
                                 //TODO "RealColumns" trait with type leading to the struct with actual database columns
-                                let mut table_instance = #sql_crate::never::never_any::<#path>();
+                                let table_instance = #sql_crate::never::never_any::<#path>();
                                 let _ = table_instance.#ident;
                             }
                         });
@@ -316,7 +316,7 @@ impl SqlValue {
                         let ident_str = ident.to_string();
                         quote_spanned! {ident.span()=>
                             #sql_crate::WhereExpr::ColumnFromTable{
-                                table: <#path as #sql_crate::SqlTable>::table_name(),
+                                table: <#path as #sql_crate::SqlTable>::table_name().to_owned(),
                                 column: #ident_str.to_string(),
                             }
                         }

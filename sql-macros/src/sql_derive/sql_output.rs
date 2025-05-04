@@ -38,26 +38,22 @@ pub fn sql_output_base(
         let table_field = &joined_field.table_field;
 
         //Check if the field type is an option
-        let (is_option, actual_ty) = match field_type {
+        let is_option = match field_type {
             syn::Type::Path(path_ty) => {
                 if let Some(last_segment) = path_ty.path.segments.last() {
                     //Check if the type is an option
                     if last_segment.ident == "Option" {
                         //Get the inner type
                         if let syn::PathArguments::AngleBracketed(args) = &last_segment.arguments {
-                            if let Some(syn::GenericArgument::Type(inner_ty)) = args.args.first() {
-                                (true, inner_ty)
-                            } else {
-                                (false, field_type)
-                            }
+                            args.args.first().is_some()
                         } else {
-                            (false, field_type)
+                            false
                         }
                     } else {
-                        (false, field_type)
+                        false
                     }
                 } else {
-                    (false, field_type)
+                    false
                 }
             }
             ty => {

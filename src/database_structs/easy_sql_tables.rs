@@ -97,14 +97,14 @@ impl DatabaseSetup for EasySqlTables {
                 table_name: EasySqlTables::table_name(),
                 fields: vec![
                     TableField {
-                        name: "table_id".to_string(),
+                        name: "table_id",
                         data_type: SqlType::String,
                         is_unique: false,
                         is_not_null: true,
                         default: None,
                     },
                     TableField {
-                        name: "version".to_string(),
+                        name: "version",
                         data_type: SqlType::I64,
                         is_unique: false,
                         is_not_null: true,

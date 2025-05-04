@@ -19,6 +19,8 @@ use easy_macros::{
 use sql_compilation_data::{CompilationData, TableData, TableDataVersion};
 #[derive(Debug)]
 struct SearchData {
+    ///When parsing rust files
+    errors_found: bool,
     found: bool,
     ///Where to add `#[sql_convenience]`
     updates: Vec<LineColumn>,
@@ -38,6 +40,7 @@ struct SearchData {
 impl SearchData {
     fn new(compilation_data: CompilationData) -> Self {
         SearchData {
+            errors_found: false,
             found: false,
             updates: Vec::new(),
             created_unique_ids: Vec::new(),
@@ -79,6 +82,7 @@ impl syn::parse::Parse for DeriveInsides {
 }
 
 ///Table handling
+#[always_context]
 fn struct_table_handle(
     item: &mut syn::ItemStruct,
     context_info: &mut SearchData,
@@ -117,30 +121,27 @@ fn struct_table_handle(
     }
     //Check is unique_id present
     let mut unique_id = None;
-    for attr_data in get_attributes!(item, #[sql(unique_id = "__unknown__")]) {
+    for attr_data in get_attributes!(item, #[sql(unique_id = __unknown__)]) {
         if unique_id.is_some() {
             //Ignore multiple unique_id attributes, error should be shown by derive macro
             return Ok(());
         }
-        let lit_str: LitStr = match syn::parse2(attr_data) {
-            Ok(lit_str) => lit_str,
-            Err(_) => {
-                //Ignore invalid attributes, error should be shown by derive macro
-                return Ok(());
-            }
-        };
+        let lit_str: LitStr = syn::parse2(attr_data.clone())?;
         unique_id = Some(lit_str.value());
     }
     //Unique Id
-    if unique_id.is_none() {
+    let newly_created = if unique_id.is_none() {
         //Create unique_id
         let generated = context_info.compilation_data.generate_unique_id();
         context_info
             .created_unique_ids
-            .push((generated.clone(), item.span().start()));
+            .push((generated.clone(), item.struct_token.span().start()));
 
         unique_id = Some(generated);
-    }
+        true
+    } else {
+        false
+    };
 
     let unique_id = unique_id.unwrap();
 
@@ -150,7 +151,7 @@ fn struct_table_handle(
 
     //Check if table version has changed
     let mut version = None;
-    for attr_data in get_attributes!(item, #[sql(version = "__unknown__")]) {
+    for attr_data in get_attributes!(item, #[sql(version = __unknown__)]) {
         let lit_int: LitInt = match syn::parse2(attr_data) {
             Ok(lit_int) => lit_int,
             Err(_) => {
@@ -168,6 +169,7 @@ fn struct_table_handle(
     }
 
     //Version attribute should exist. if it doesn't error by derive macro should be shown
+    #[no_context]
     let version = version.context("Version attribute should exist")?;
 
     match &item.fields {
@@ -181,21 +183,21 @@ fn struct_table_handle(
     let mut table_name = item.ident.to_string().to_case(Case::Snake);
     //Check if table_name was set manually
     for attr_data in get_attributes!(item, #[sql(table_name = "__unknown__")]) {
-        let lit_str: LitStr = syn::parse2(attr_data)?;
+        let lit_str: LitStr = syn::parse2(attr_data.clone())?;
         table_name = lit_str.value();
         break;
     }
 
     //Generate table version data
-    let version_data = TableDataVersion::from_struct(item, table_name)?;
+    let version_data = TableDataVersion::from_struct(item, table_name.clone())?;
 
-    //Migration check
-    context_info.compilation_data.generate_migrations(
-        &unique_id,
-        &version_data,
-        version,
-        &quote! {},
-    )?;
+    //Migration check if data exists before
+    if !newly_created {
+        context_info
+            .compilation_data
+            .generate_migrations(&unique_id, &version_data, version, &quote! {})
+            .with_context(|| format!("Compilation data: {:?}", context_info.compilation_data))?;
+    }
 
     match context_info.compilation_data.tables.entry(unique_id) {
         Entry::Occupied(occupied_entry) => {
@@ -326,6 +328,8 @@ fn handle_file(file_path: impl AsRef<Path>, search_data: &mut SearchData) -> any
     let file = match syn::parse_file(&contents) {
         Ok(file) => file,
         Err(_) => {
+            //Don't delete tables if at least one file has errors
+            search_data.errors_found = true;
             //Ignore files with errors
             return Ok(());
         }
@@ -491,7 +495,10 @@ fn build_result(ignore_list: &[regex::Regex]) -> anyhow::Result<()> {
     }
 
     //Remove deleted tables
-    if search_data.compilation_data.tables.len() != search_data.found_existing_tables_ids.len() {
+    // If no errors when parsing rust files were found
+    if !search_data.errors_found
+        && search_data.compilation_data.tables.len() != search_data.found_existing_tables_ids.len()
+    {
         search_data.tables_updated = true;
 
         search_data.compilation_data.tables.retain(|key, _| {

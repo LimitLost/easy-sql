@@ -5,7 +5,7 @@ use super::SqlValueMaybeRef;
 
 #[derive(Debug)]
 pub struct TableField {
-    pub name: String,
+    pub name: &'static str,
     pub data_type: SqlType,
     pub is_unique: bool,
     pub is_not_null: bool,
