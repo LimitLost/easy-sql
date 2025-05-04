@@ -71,7 +71,7 @@ pub fn sql_table(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::To
     let mut table_name = item_name.to_string().to_case(Case::Snake);
 
     //Use name provided by the user if it exists
-    for attr_data in get_attributes!(item, #[sql(table_name = "__unknown__")]) {
+    for attr_data in get_attributes!(item, #[sql(table_name = __unknown__)]) {
         let lit_str: LitStr = syn::parse2(attr_data.clone())
             .context("Invalid table name provided, expected string with  quotes")?;
         table_name = lit_str.value();
@@ -123,7 +123,7 @@ pub fn sql_table(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::To
             }
         }
         //Get `Type Enum Variant` and `Is Not Null`
-        let (variant, is_field_not_null) = ty_enum_value(&field.ty)?;
+        let (variant, is_field_not_null) = ty_enum_value(&field.ty, &sql_crate)?;
         is_not_null.push(is_field_not_null);
 
         //Primary Key Check
@@ -154,6 +154,8 @@ pub fn sql_table(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::To
         //Default Value Check
         let mut default_value_found = false;
         for default_value in get_attributes!(field, #[sql(default = __unknown__)]) {
+            let field_name = field.ident.as_ref()?;
+
             if default_value_found {
                 anyhow::bail!("Only one default value is allowed");
             }
@@ -164,7 +166,7 @@ pub fn sql_table(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::To
                 let error_context = format!(
                     "Converting default value `{}` to bytes for field `{}`, struct name: `{}`, table name: `{}`",
                     default_value.to_token_stream(),
-                    field.ident.as_ref().unwrap(),
+                    field_name,
                     item_name,
                     table_name
                 );
@@ -180,6 +182,12 @@ pub fn sql_table(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::To
                                 static ref DEFAULT_VALUE: #sql_crate::SqlValueMaybeRef<'static> = #sql_crate::to_bytes(#default_value).unwrap().into();
                             }
 
+                            //Check if default value has valid type for the current column
+                            #sql_crate::never::never_fn(||{
+                                let mut table_instance = #sql_crate::never::never_any::<#item_name>();
+                                table_instance.#field_name = #default_value;
+                            });
+
                             Some(&*DEFAULT_VALUE)
                         }
                     });
@@ -189,6 +197,12 @@ pub fn sql_table(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::To
                             #sql_crate::lazy_static!{
                                 static ref DEFAULT_VALUE: #sql_crate::SqlValueMaybeRef<'static> = (#default_value).into();
                             }
+
+                            //Check if default value has valid type for the current column
+                            #sql_crate::never::never_fn(||{
+                                let mut table_instance = #sql_crate::never::never_any::<#item_name>();
+                                table_instance.#field_name = #default_value;
+                            });
 
                             Some(&*DEFAULT_VALUE)
                         }
@@ -269,13 +283,14 @@ pub fn sql_table(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::To
             &converted_to_version,
             table_version,
             &sql_crate,
+            &item_name.to_token_stream(),
         )?;
 
         if let Some(this_version) = table_data.saved_versions.get(&table_version) {
             if this_version != &converted_to_version {
                 return Err(anyhow::anyhow!(
                     "When you're done with making changes to the table, don't forget to update the version number in the #[sql(version = x)] attribute!"
-                )); //.with_context(context!("table in easy_sql.ron: {:?}\r\n\r\nnew table structure: {:?}",this_version,converted_to_version));
+                )).with_context(context!("table in easy_sql.ron: {:?}\r\n\r\nnew table structure: {:?}",this_version,converted_to_version));
             }
         }
 

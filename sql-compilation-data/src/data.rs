@@ -2,7 +2,7 @@ use std::{collections::HashMap, path::PathBuf, str::FromStr};
 
 use easy_macros::{
     anyhow::{self, Context},
-    helpers::MacroResult,
+    helpers::{MacroResult, token_stream_to_consistent_string},
     macros::{always_context, get_attributes, has_attributes},
     proc_macro2::TokenStream,
     quote::{ToTokens, quote},
@@ -83,11 +83,11 @@ impl TableDataVersion {
             let default = get_attributes!(field, #[sql(default = __unknown__)])
                 .into_iter()
                 .next()
-                .map(|e| e.to_string());
+                .map(|e| token_stream_to_consistent_string(e));
 
             for foreign_key in get_attributes!(field, #[sql(foreign_key = __unknown__)])
                 .into_iter()
-                .map(|e| e.to_string().replace(|c: char| c.is_whitespace(), ""))
+                .map(|e| token_stream_to_consistent_string(e))
             {
                 let fields: &mut Vec<String> = foreign_keys
                     .entry(foreign_key)
@@ -243,6 +243,7 @@ impl CompilationData {
         latest_version: &TableDataVersion,
         latest_version_number: u64,
         sql_crate: &TokenStream,
+        item_name: &TokenStream,
     ) -> anyhow::Result<TokenStream> {
         let table_data = self
             .tables
@@ -392,6 +393,12 @@ impl CompilationData {
                                 static ref DEFAULT_VALUE: #sql_crate::SqlValueMaybeRef<'static> = #sql_crate::to_bytes(#default_value).unwrap().into();
                             }
 
+                            //Check if default value has valid type for the current column
+                            #sql_crate::never::never_fn(||{
+                                let mut table_instance = #sql_crate::never::never_any::<#item_name>();
+                                table_instance.#field_name = #default_value;
+                            });
+
                             Some(&*DEFAULT_VALUE)
                         }
                     }
@@ -404,6 +411,12 @@ impl CompilationData {
                             #sql_crate::lazy_static!{
                                 static ref DEFAULT_VALUE: #sql_crate::SqlValueMaybeRef<'static> = (#default_value).into();
                             }
+
+                            //Check if default value has valid type for the current column
+                            #sql_crate::never::never_fn(||{
+                                let mut table_instance = #sql_crate::never::never_any::<#item_name>();
+                                table_instance.#field_name = #default_value;
+                            });
 
                             Some(&*DEFAULT_VALUE)
                         }

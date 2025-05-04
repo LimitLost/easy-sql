@@ -129,7 +129,7 @@ pub fn sql(item: proc_macro::TokenStream) -> proc_macro::TokenStream {
 
     let sql_crate = sql_crate();
 
-    if input.only_where() {
+    let result = if input.only_where() {
         let where_ = input
             .where_
             .unwrap()
@@ -139,7 +139,7 @@ pub fn sql(item: proc_macro::TokenStream) -> proc_macro::TokenStream {
             Some((|___t___|{
                 #(#checks)*
             },
-            easy_lib::easy_sql::WhereClause{
+            #sql_crate::WhereClause{
                 conditions: #where_
             }))
         }
@@ -149,7 +149,7 @@ pub fn sql(item: proc_macro::TokenStream) -> proc_macro::TokenStream {
             .map(|w| {
                 let tokens = w.into_tokens_with_checks(&mut checks, &sql_crate);
 
-                quote! {Some(easy_lib::easy_sql::WhereClause{
+                quote! {Some(#sql_crate::WhereClause{
                     conditions:#tokens
                 })}
             })
@@ -162,7 +162,7 @@ pub fn sql(item: proc_macro::TokenStream) -> proc_macro::TokenStream {
                     .into_iter()
                     .map(|el| el.into_tokens_with_checks(&mut checks, &sql_crate));
 
-                quote! {Some(GroupByClause{columns: vec![#(#tokens),*]})}
+                quote! {Some(#sql_crate::GroupByClause{order_by: vec![#(#tokens),*]})}
             })
             .unwrap_or_else(|| quote! {None});
 
@@ -171,7 +171,7 @@ pub fn sql(item: proc_macro::TokenStream) -> proc_macro::TokenStream {
             .map(|h| {
                 let tokens = h.into_tokens_with_checks(&mut checks, &sql_crate);
 
-                quote! {Some(easy_lib::easy_sql::HavingClause{conditions: #tokens})}
+                quote! {Some(#sql_crate::HavingClause{conditions: #tokens})}
             })
             .unwrap_or_else(|| quote! {None});
 
@@ -182,7 +182,7 @@ pub fn sql(item: proc_macro::TokenStream) -> proc_macro::TokenStream {
                     .into_iter()
                     .map(|el| el.into_tokens_with_checks(&mut checks, &sql_crate));
 
-                quote! {Some(easy_lib::easy_sql::OrderByClause{conditions: vec![#(#tokens),*]})}
+                quote! {Some(#sql_crate::OrderByClause{order_by: vec![#(#tokens),*]})}
             })
             .unwrap_or_else(|| quote! {None});
         let limit = input
@@ -200,7 +200,7 @@ pub fn sql(item: proc_macro::TokenStream) -> proc_macro::TokenStream {
             Some((|___t___:#table_ty|{
                 #(#checks)*
             },
-            easy_lib::easy_sql::SelectClauses {
+            #sql_crate::SelectClauses {
                 distinct: #distinct,
 
                 where_: #where_,
@@ -210,6 +210,9 @@ pub fn sql(item: proc_macro::TokenStream) -> proc_macro::TokenStream {
                 limit: #limit,
             }))
         }
-    }
-    .into()
+    };
+
+    // panic!("{}", result);
+
+    result.into()
 }

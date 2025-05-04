@@ -182,7 +182,7 @@ fn struct_table_handle(
 
     let mut table_name = item.ident.to_string().to_case(Case::Snake);
     //Check if table_name was set manually
-    for attr_data in get_attributes!(item, #[sql(table_name = "__unknown__")]) {
+    for attr_data in get_attributes!(item, #[sql(table_name = __unknown__)]) {
         let lit_str: LitStr = syn::parse2(attr_data.clone())?;
         table_name = lit_str.value();
         break;
@@ -195,7 +195,7 @@ fn struct_table_handle(
     if !newly_created {
         context_info
             .compilation_data
-            .generate_migrations(&unique_id, &version_data, version, &quote! {})
+            .generate_migrations(&unique_id, &version_data, version, &quote! {}, &quote! {})
             .with_context(|| format!("Compilation data: {:?}", context_info.compilation_data))?;
     }
 
