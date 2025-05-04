@@ -26,7 +26,10 @@ pub use async_trait::async_trait;
 
 pub use sql_macros::*;
 
-#[cfg(test)]
+//Used by SqlTable derive macro (default attribute)
+pub use lazy_static::lazy_static;
+
+// #[cfg(test)]
 mod tests;
 
 #[always_context]

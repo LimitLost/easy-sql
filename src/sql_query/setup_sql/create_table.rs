@@ -36,10 +36,12 @@ impl SetupSql for CreateTable {
         let mut table_constrains = String::new();
         let mut primary_keys = Vec::new();
 
+        let mut bindings_list = Vec::new();
+
         for field in self.fields.into_iter() {
             primary_keys.push(field.name.clone());
 
-            table_fields.push_str(&field.definition());
+            table_fields.push_str(&field.definition(&mut bindings_list));
         }
 
         //Primary key constraint
@@ -81,8 +83,14 @@ impl SetupSql for CreateTable {
             "CREATE TABLE {} (\r\n{}\r\n{})",
             self.table_name, table_fields, table_constrains
         );
+
+        let mut sqlx_query = sqlx::query(&query);
+        for binding in bindings_list {
+            sqlx_query = sqlx_query.bind(binding);
+        }
+
         #[no_context]
-        sqlx::query(&query)
+        sqlx_query
             .execute(exec.deref_mut())
             .await
             .with_context(context!(

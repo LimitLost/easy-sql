@@ -57,14 +57,21 @@ impl SetupSql for AlterTable {
                     queries_done.push(query);
                 }
                 AlterTableSingle::AddColumn { column } => {
+                    let mut bindings_list = Vec::new();
+
                     let query = format!(
                         "ALTER TABLE {} ADD COLUMN {}",
                         self.table_name,
-                        column.definition()
+                        column.definition(&mut bindings_list)
                     );
 
+                    let mut sqlx_query = sqlx::query(&query);
+                    for binding in bindings_list {
+                        sqlx_query = sqlx_query.bind(binding);
+                    }
+
                     #[no_context]
-                    sqlx::query(&query)
+                    sqlx_query
                         .execute(exec.deref_mut())
                         .await
                         .with_context(context!(

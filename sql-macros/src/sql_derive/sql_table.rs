@@ -141,11 +141,58 @@ pub fn sql_table(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::To
                     field.ty
                 );
             }
+        };
+
+        //Default Value Check
+        let mut default_value_found = false;
+        for default_value in get_attributes!(field, #[sql(default = __unknown__)]) {
+            if default_value_found {
+                anyhow::bail!("Only one default value is allowed");
+            }
+            let default_value: syn::Expr = syn::parse2(default_value.clone())
+                .context("Expected default value to be an expression")?;
+
+            if binary_field {
+                let error_context = format!(
+                    "Converting default value `{}` to bytes for field `{}`, struct name: `{}`, table name: `{}`",
+                    default_value.to_token_stream(),
+                    field.ident.as_ref().unwrap(),
+                    item_name,
+                    table_name
+                );
+
+                //Convert provided default value to bytes
+                default_values.push(quote! {
+                        {
+                            //Test if default value to_bytes will be successful
+                            //Even in release mode, just in case, it's low cost anyway
+                            #sql_crate::to_bytes(#default_value).context(#error_context)?;
+
+                            #sql_crate::lazy_static!{
+                                static ref DEFAULT_VALUE: #sql_crate::SqlValueMaybeRef<'static> = #sql_crate::to_bytes(#default_value).unwrap().into();
+                            }
+
+                            Some(&*DEFAULT_VALUE)
+                        }
+                    });
+            } else {
+                default_values.push(quote! {
+                        {
+                            #sql_crate::lazy_static!{
+                                static ref DEFAULT_VALUE: #sql_crate::SqlValueMaybeRef<'static> = (#default_value).into();
+                            }
+
+                            Some(&*DEFAULT_VALUE)
+                        }
+                    });
+            }
+
+            default_value_found = true;
+        }
+        if !default_value_found {
+            default_values.push(quote! {None});
         }
     }
-
-    if primary_keys.is_empty(){
-        anyhow::bail!("No primary key found, please add #[sql(primary_key)] to one of the fields (Sqlite always has one)");
     }
 
     if primary_keys.len() !=1 && auto_increment{
@@ -217,7 +264,15 @@ pub fn sql_table(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::To
                     conn.query_setup(#sql_crate::CreateTable{
                         table_name: #table_name, 
                         fields: vec![
-                            #(#sql_crate::TableField{name: #field_names_str, data_type: #sql_crate::SqlType::#field_types, is_primary_key: #is_primary_key, foreign_key: None, is_unique: #is_unique, is_not_null: #is_not_null},)*
+                            #(
+                            #sql_crate::TableField{
+                                name: #field_names_str,
+                                data_type: #sql_crate::SqlType::#field_types,
+                                is_unique: #is_unique,
+                                is_not_null: #is_not_null,
+                                default: #default_values,
+                            },
+                            )*
                         ],
                         auto_increment: #auto_increment,
                         primary_keys: vec![#(#primary_keys),*],

@@ -1,18 +1,20 @@
 use easy_macros::macros::always_context;
 use sql_compilation_data::SqlType;
 
+use super::SqlValueMaybeRef;
+
 #[derive(Debug)]
 pub struct TableField {
     pub name: String,
     pub data_type: SqlType,
     pub is_unique: bool,
     pub is_not_null: bool,
-    pub default: Option<String>,
+    pub default: Option<&'static SqlValueMaybeRef<'static>>,
 }
 
 #[always_context]
 impl TableField {
-    pub fn definition(self) -> String {
+    pub fn definition<'a>(self, bindings_list: &mut Vec<&'a SqlValueMaybeRef<'a>>) -> String {
         let TableField {
             name,
             data_type,
@@ -26,9 +28,10 @@ impl TableField {
         let unique = if is_unique { "UNIQUE" } else { "" };
         let not_null = if is_not_null { "NOT NULL" } else { "" };
         let default = if let Some(default) = default {
-            format!("DEFAULT {}", default)
+            bindings_list.push(default);
+            "DEFAULT ?"
         } else {
-            "".to_string()
+            ""
         };
 
         format!(
