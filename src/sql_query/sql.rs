@@ -26,12 +26,12 @@ pub enum Sql<'a> {
     Select {
         // We don't provide output columns here, they are provided inside of SqlOutput trait
         table: &'static str,
-        joins: Vec<TableJoin>,
+        joins: Vec<TableJoin<'a>>,
         clauses: SelectClauses<'a>,
     },
     Exists {
         table: &'static str,
-        joins: Vec<TableJoin>,
+        joins: Vec<TableJoin<'a>>,
         clauses: SelectClauses<'a>,
     },
     Insert {
@@ -180,7 +180,7 @@ fn delete_query<'a>(
 }
 
 fn select_base<'a>(
-    joins: &[TableJoin],
+    joins: &'a [TableJoin],
     table: &'static str,
     clauses: &'a SelectClauses,
     bindings_list: &mut Vec<&'a SqlValueMaybeRef<'a>>,
@@ -188,16 +188,16 @@ fn select_base<'a>(
 ) -> String {
     let distinct = if clauses.distinct { " DISTINCT" } else { "" };
 
+    let mut current_binding_n = 1;
+
     let joins_str = {
         let mut joins_str = String::new();
         for join in joins.iter() {
-            joins_str.push_str(&join.to_query_data());
+            joins_str.push_str(&join.to_query_data(&mut current_binding_n, bindings_list));
             joins_str.push(' ');
         }
         joins_str
     };
-
-    let mut current_binding_n = 1;
 
     let clauses_str = clauses.to_query_data(&mut current_binding_n, bindings_list);
 

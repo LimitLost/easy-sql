@@ -3,15 +3,19 @@ use easy_macros::{
     helpers::{context, parse_macro_input},
     macros::{always_context, get_attributes},
     proc_macro2::TokenStream,
-    quote::{ToTokens, quote},
-    syn::{self, punctuated::Punctuated},
+    quote::{quote, ToTokens},
+    syn::{self, parse::Parse, punctuated::Punctuated},
 };
 
-use crate::{easy_lib_crate, easy_macros_helpers_crate, sql_crate};
+use crate::{
+    easy_lib_crate, easy_macros_helpers_crate, sql_crate,
+    sql_macros_components::joined_field::JoinedField,
+};
 
 pub fn sql_output_base(
     item_name: &syn::Ident,
     fields: &Punctuated<syn::Field, syn::Token![,]>,
+    joined_fields: Vec<JoinedField>,
     table: &TokenStream,
 ) -> TokenStream {
     let field_names = fields.iter().map(|field| field.ident.as_ref().unwrap());
@@ -19,9 +23,106 @@ pub fn sql_output_base(
     let field_names_str = field_names.clone().map(|field| field.to_string());
     let field_names_str2 = field_names_str.clone();
 
+    let joined_field_aliases=(0..joined_fields.len()).into_iter().map(|i|{
+        format!("j___easy_sql_dont_use_this_name__joined_field_{}",i)
+    }).collect::<Vec<_>>();
+
     let sql_crate = sql_crate();
     let easy_lib_crate = easy_lib_crate();
     let easy_macros_helpers_crate = easy_macros_helpers_crate();
+
+    let joined_checks = joined_fields.iter().map(|joined_field| {
+        let field_name = joined_field.field.ident.as_ref().unwrap();
+        let field_type = &joined_field.field.ty;
+        let ref_table = &joined_field.table;
+        let table_field = &joined_field.table_field;
+
+        //Check if the field type is an option
+        let (is_option, actual_ty) = match field_type {
+            syn::Type::Path(path_ty) => {
+                if let Some(last_segment) = path_ty.path.segments.last() {
+                    //Check if the type is an option
+                    if last_segment.ident == "Option" {
+                        //Get the inner type
+                        if let syn::PathArguments::AngleBracketed(args) = &last_segment.arguments {
+                            if let Some(syn::GenericArgument::Type(inner_ty)) = args.args.first() {
+                                (true, inner_ty)
+                            } else {
+                                (false, field_type)
+                            }
+                        } else {
+                            (false, field_type)
+                        }
+                    } else {
+                        (false, field_type)
+                    }
+                } else {
+                    (false, field_type)
+                }
+            }
+            ty => {
+                let compile_error =
+                    format!("Non path type is not supported `{}`", ty.to_token_stream());
+                return quote! {
+                    let #field_name={
+                        compile_error!(#compile_error);
+                        panic!()
+                    };
+                };
+            }
+        };
+
+        //Create _Flatten trait if needed
+        let (flatten, flatten_use) = if is_option {
+            (
+                quote! {
+                    trait _Flatten{
+                        fn _flatten(self)->#field_type;
+                    }
+
+                    impl _Flatten for #field_type{
+                        fn _flatten(self)->#field_type{
+                            self
+                        }
+                    }
+                    impl _Flatten for Option<#field_type>{
+                        fn _flatten(self)->#field_type{
+                            self.unwrap()
+                        }
+                    }
+                },
+                quote! {
+                    ._flatten()
+                },
+            )
+        } else {
+            (quote! {}, quote! {})
+        };
+
+        quote! {
+            let #field_name = {
+                //Get field from reference table
+                let mut table_instance = #sql_crate::never::never_any::<#ref_table>();
+
+                #flatten
+                    
+                <#table as #sql_crate::HasTableJoined<#ref_table>>::into_maybe_option(table_instance.#table_field)#flatten_use
+            };
+        }
+    }).collect::<Vec<_>>();
+
+    let joined_checks_field_names=joined_fields.iter().map(|joined_field|{
+        let field_name = joined_field.field.ident.as_ref().unwrap();
+        field_name
+    }).collect::<Vec<_>>();
+
+    let joined_checks_table_names=joined_fields.iter().map(|joined_field|{
+        joined_field.table.clone()
+    }).collect::<Vec<_>>();
+
+    let joined_checks_column_name_format=joined_fields.iter().map(|joined_field|{
+        format!("{{}}.{}",joined_field.table_field) 
+    });
 
     let context_strs = fields.iter().map(|field| {
         format!(
@@ -32,6 +133,16 @@ pub fn sql_output_base(
         )
     });
 
+    let context_strs2 = joined_fields.iter().map(|joined_field| {
+        format!(
+            "Getting joined field `{}` with type {} for struct `{}` from table `{}`",
+            joined_field.field.ident.as_ref().unwrap(),
+            joined_field.field.ty.to_token_stream(),
+            item_name,
+            joined_field.table.to_token_stream()
+        )
+    });
+
     quote! {
         impl #sql_crate::SqlOutput<#table, #sql_crate::Row> for #item_name {
             fn sql_to_query<'a>(sql: &'a #sql_crate::Sql<'a>) -> #easy_lib_crate::anyhow::Result<#sql_crate::QueryData<'a>> {
@@ -39,8 +150,13 @@ pub fn sql_output_base(
                     //Check for validity
                     let table_instance = #sql_crate::never::never_any::<#table>();
 
+                    //Joined fields check for validity
+                    #(#joined_checks)*
+
                     Self {
-                        #(#field_names: table_instance.#field_names),*
+                        #(#field_names: table_instance.#field_names,)*
+                        //Joined fields
+                        #(#joined_checks_field_names,)*
                     }
                 });
 
@@ -49,8 +165,14 @@ pub fn sql_output_base(
                         #sql_crate::RequestedColumn {
                             name: #field_names_str.to_owned(),
                             alias: None,
-                        }
-                    ),*
+                        },
+                    )*
+                    #(
+                        #sql_crate::RequestedColumn {
+                            name: format!(#joined_checks_column_name_format,<#joined_checks_table_names as #sql_crate::SqlTable>::table_name()),
+                            alias: Some(#joined_field_aliases.to_owned()),
+                        },
+                    )*
                 ];
 
                 sql.query_output(requested_columns)
@@ -63,14 +185,35 @@ pub fn sql_output_base(
                     #(
                         #field_names2: <#sql_crate::Row as #sql_crate::SqlxRow>::try_get(&data, #field_names_str2).with_context(
                             context!(#context_strs),
-                        )?
-                    ),*
+                        )?,
+                    )*
+                    #(
+                        #joined_checks_field_names: <#sql_crate::Row as #sql_crate::SqlxRow>::try_get(&data, #joined_field_aliases).with_context(
+                            context!(#context_strs2),
+                        )?,
+                    )*
                 })
             }
         }
 
     }
 }
+
+struct FieldAttribute{
+    table:syn::Path,
+    table_field:syn::Ident,
+}
+
+#[always_context]
+impl Parse for FieldAttribute {
+    fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
+        let table = input.parse::<syn::Path>()?;
+        input.parse::<syn::Token![.]>()?;
+        let table_field = input.parse::<syn::Ident>()?;
+        Ok(FieldAttribute { table, table_field })
+    }
+}
+
 
 #[always_context]
 pub fn sql_output(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::TokenStream> {
@@ -85,6 +228,31 @@ pub fn sql_output(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::T
         syn::Fields::Unit => anyhow::bail!("Unit struct is not supported"),
     };
 
+    // Get joined fields (fields with #[sql(field = table.field)])
+    let mut joined_fields=Vec::new();
+    let mut fields2: Punctuated<syn::Field, syn::token::Comma> =Punctuated::new();
+    for field in fields.into_iter() {
+        //Get attribute #[sql(field = __unknown__)]
+        let mut attr=None;
+        for a in get_attributes!(field, #[sql(field = __unknown__)]) {
+            if attr.is_some() {
+                anyhow::bail!("Only one #[sql(field = ...)] attribute is allowed per field!");
+            }
+            attr = Some(a);
+        }
+        if let Some(attr) = attr{
+            //Parse the attribute
+            let attr :FieldAttribute = syn::parse2(attr.clone())?;
+
+            joined_fields.push(JoinedField{ field, table: attr.table, table_field: attr.table_field });
+        }else{
+            fields2.push(field);
+        }
+        
+    }
+
+    let fields=fields2;
+
     let mut table = None;
 
     for attr in get_attributes!(item, #[sql(table = __unknown__)]) {
@@ -97,5 +265,9 @@ pub fn sql_output(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::T
     #[no_context]
     let table = table.with_context(context!("Table attribute is required"))?;
 
-    Ok(sql_output_base(&item_name, &fields, &table).into())
+    let result=sql_output_base(&item_name, &fields, joined_fields, &table);
+
+    // panic!("{}", result);
+
+    Ok(result.into())
 }

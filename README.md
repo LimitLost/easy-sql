@@ -90,9 +90,27 @@ struct ExampleTableIncrement {
 }
 ```
 
-- TODO Multiple Primary Keys
+- with Foreign Key
 
-- TODO show Foreign Keys
+```rust
+
+#[derive(SqlTable)]
+#[sql(version = 1)]
+struct ExampleTableWithForeignKey {
+    #[sql(primary_key)]
+    id: i32,
+    /// Without cascade on update/delete
+    #[sql(foreign_key = ExampleTableIncrement)]
+    example_increment_id: i32,
+    /// With cascade on update/delete
+    #[sql(foreign_key = ExampleTable, cascade)]
+    example_table_id: i32,
+    value: String,
+}
+
+```
+
+- TODO Multi column foreign key
 
 - TODO show Table Renaming
 
@@ -128,5 +146,32 @@ async fn main() -> anyhow::Result<()> {
     // You can also use `conn.rollback().await?` if you want to rollback the transaction
     conn.commit().await?;
     Ok(())
+}
+```
+
+## Table Joining
+
+- Creating joined table struct
+
+```rust
+use easy_lib::sql::table_join;
+
+// First Argument - Struct Name Representing the Joined Tables
+// `|` - Separator
+table_join!(JoinedExampleTables | ExampleTable LEFT JOIN ExampleTableWithForeignKey ON ExampleTable.id = ExampleTableWithForeignKey.example_table_id);
+
+```
+
+- Creating joined table data output
+
+```rust
+#[derive(SqlOutput)]
+#[sql(table = JoinedExampleTables)]
+struct JoinedExampleTableOutput {
+    //You need to specify referenced table column
+    #[sql(field = ExampleTable.id)]
+    id: i32,
+    #[sql(field = ExampleTableWithForeignKey.value)]
+    value: String,
 }
 ```

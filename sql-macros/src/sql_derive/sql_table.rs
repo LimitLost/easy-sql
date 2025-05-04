@@ -255,12 +255,14 @@ pub fn sql_table(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::To
                 #table_name
             }
 
-            fn primary_keys() -> Vec<(&'static str,#sql_crate)>{
+            fn primary_keys() -> Vec<&'static str>{
                 vec![#(#primary_keys),*]
             }
-        }
 
-        
+            fn table_joins() -> Vec<TableJoin> {
+                vec![]
+            }
+        }
 
         impl #sql_crate::HasTable<#item_name> for #item_name{}
 

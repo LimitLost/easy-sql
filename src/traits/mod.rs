@@ -10,7 +10,7 @@ pub use sql_update::*;
 
 mod sql_table;
 pub use sql_table::*;
-mod has_table;
-pub use has_table::*;
+mod has_table_traits;
+pub use has_table_traits::*;
 
 //TODO when joining tables create trait "HasTable"

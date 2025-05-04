@@ -6,7 +6,9 @@ use easy_macros::macros::always_context;
 use sql_compilation_data::SqlType;
 use sql_macros::{SqlInsert, SqlOutput, SqlUpdate, sql_convenience, sql_where};
 
-use crate::{CreateTable, DatabaseSetup, EasyExecutor, SqlTable, TableExists, TableField};
+use crate::{
+    CreateTable, DatabaseSetup, EasyExecutor, SqlTable, TableExists, TableField, TableJoin,
+};
 
 #[derive(SqlInsert, Debug)]
 #[sql(table = EasySqlTables)]
@@ -71,6 +73,10 @@ impl SqlTable for EasySqlTables {
 
     fn primary_keys() -> std::vec::Vec<&'static str> {
         vec!["table_id"]
+    }
+
+    fn table_joins() -> Vec<TableJoin<'static>> {
+        vec![]
     }
 }
 

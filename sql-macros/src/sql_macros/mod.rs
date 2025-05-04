@@ -1,12 +1,14 @@
 mod sql;
+pub use sql::*;
 mod sql_where;
+pub use sql_where::*;
+mod table_join;
+pub use table_join::*;
 
 use easy_macros::{
     macros::always_context,
     syn::{self, parse::Parse},
 };
-pub use sql::*;
-pub use sql_where::*;
 
 mod keywords {
     use easy_macros::syn;

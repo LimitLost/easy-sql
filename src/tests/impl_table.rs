@@ -22,6 +22,10 @@ impl sql_crate::SqlTable for ExampleReferencedTable {
     fn primary_keys() -> Vec<&'static str> {
         vec!["id"]
     }
+
+    fn table_joins() -> Vec<sql_crate::TableJoin<'static>> {
+        vec![]
+    }
 }
 
 struct ExampleTable {
@@ -41,6 +45,10 @@ impl sql_crate::SqlTable for ExampleTable {
 
     fn primary_keys() -> Vec<&'static str> {
         vec!["id"]
+    }
+
+    fn table_joins() -> Vec<sql_crate::TableJoin<'static>> {
+        vec![]
     }
 }
 

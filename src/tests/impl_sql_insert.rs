@@ -1,7 +1,7 @@
 use anyhow::Context;
 use easy_macros::macros::always_context;
 
-use crate::{Connection, SqlInsert, SqlTable, SqlValueMaybeRef};
+use crate::{Connection, SqlInsert, SqlTable, SqlValueMaybeRef, TableJoin};
 
 struct ExampleTableStruct {
     id: i64,
@@ -64,6 +64,10 @@ impl SqlTable for ExampleTableStruct {
     }
     fn primary_keys() -> Vec<&'static str> {
         vec!["id"]
+    }
+
+    fn table_joins() -> Vec<TableJoin<'static>> {
+        vec![]
     }
 }
 
