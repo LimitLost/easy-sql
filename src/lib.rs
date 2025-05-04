@@ -29,7 +29,7 @@ pub use sql_macros::*;
 //Used by SqlTable derive macro (default attribute)
 pub use lazy_static::lazy_static;
 
-// #[cfg(test)]
+#[cfg(test)]
 mod tests;
 
 #[always_context]

@@ -1,3 +1,268 @@
 CompilationData(
-    tables: {},
+    tables: {
+        "9d9e3d2d-f9dc-406c-96ff-e9a33c9da0c1": TableData(
+            saved_versions: {
+                1: TableDataVersion(
+                    table_name: "example_table_renamed_to_something_else",
+                    fields: [
+                        TableField(
+                            name: "id",
+                            ty_to_bytes: false,
+                            sql_type: I32,
+                            default: None,
+                            is_not_null: true,
+                            is_unique: false,
+                        ),
+                        TableField(
+                            name: "field",
+                            ty_to_bytes: false,
+                            sql_type: I64,
+                            default: None,
+                            is_not_null: true,
+                            is_unique: false,
+                        ),
+                    ],
+                    primary_keys: [
+                        "id",
+                    ],
+                    auto_increment: false,
+                    foreign_keys: {},
+                ),
+            },
+            latest_version: 1,
+        ),
+        "c41fcf81-08e2-4b89-98e7-57dce7d984d6": TableData(
+            saved_versions: {
+                1: TableDataVersion(
+                    table_name: "example_table",
+                    fields: [
+                        TableField(
+                            name: "id",
+                            ty_to_bytes: false,
+                            sql_type: I32,
+                            default: None,
+                            is_not_null: true,
+                            is_unique: false,
+                        ),
+                        TableField(
+                            name: "field1",
+                            ty_to_bytes: false,
+                            sql_type: String,
+                            default: None,
+                            is_not_null: true,
+                            is_unique: false,
+                        ),
+                    ],
+                    primary_keys: [
+                        "id",
+                    ],
+                    auto_increment: false,
+                    foreign_keys: {},
+                ),
+            },
+            latest_version: 1,
+        ),
+        "2f9ce3ef-1506-4884-985c-6ebfd4a0c54c": TableData(
+            saved_versions: {
+                1: TableDataVersion(
+                    table_name: "example_table_with_multi_foreign_key",
+                    fields: [
+                        TableField(
+                            name: "id",
+                            ty_to_bytes: false,
+                            sql_type: I32,
+                            default: None,
+                            is_not_null: true,
+                            is_unique: false,
+                        ),
+                        TableField(
+                            name: "example_table_id",
+                            ty_to_bytes: false,
+                            sql_type: I32,
+                            default: None,
+                            is_not_null: true,
+                            is_unique: false,
+                        ),
+                        TableField(
+                            name: "example_table_id2",
+                            ty_to_bytes: false,
+                            sql_type: I64,
+                            default: None,
+                            is_not_null: true,
+                            is_unique: false,
+                        ),
+                    ],
+                    primary_keys: [
+                        "id",
+                    ],
+                    auto_increment: false,
+                    foreign_keys: {
+                        "ExampleTableMultiPrimaryKey,cascade": [
+                            "example_table_id",
+                        ],
+                        "ExampleTableMultiPrimaryKey": [
+                            "example_table_id2",
+                        ],
+                    },
+                ),
+            },
+            latest_version: 1,
+        ),
+        "21d36640-7002-49d4-b373-3a2d17c61ff1": TableData(
+            saved_versions: {
+                1: TableDataVersion(
+                    table_name: "example_table_increment",
+                    fields: [
+                        TableField(
+                            name: "id",
+                            ty_to_bytes: false,
+                            sql_type: I32,
+                            default: None,
+                            is_not_null: true,
+                            is_unique: false,
+                        ),
+                        TableField(
+                            name: "field",
+                            ty_to_bytes: false,
+                            sql_type: I64,
+                            default: None,
+                            is_not_null: true,
+                            is_unique: false,
+                        ),
+                    ],
+                    primary_keys: [
+                        "id",
+                    ],
+                    auto_increment: true,
+                    foreign_keys: {},
+                ),
+            },
+            latest_version: 1,
+        ),
+        "5abb2707-0b7c-486c-8ca4-beac5f4af281": TableData(
+            saved_versions: {
+                1: TableDataVersion(
+                    table_name: "example_table_default_value",
+                    fields: [
+                        TableField(
+                            name: "id",
+                            ty_to_bytes: false,
+                            sql_type: I32,
+                            default: None,
+                            is_not_null: true,
+                            is_unique: false,
+                        ),
+                        TableField(
+                            name: "field",
+                            ty_to_bytes: false,
+                            sql_type: I64,
+                            default: Some("5"),
+                            is_not_null: true,
+                            is_unique: false,
+                        ),
+                        TableField(
+                            name: "field_str",
+                            ty_to_bytes: false,
+                            sql_type: String,
+                            default: Some("\"Hello world\".to_string()"),
+                            is_not_null: true,
+                            is_unique: false,
+                        ),
+                    ],
+                    primary_keys: [
+                        "id",
+                    ],
+                    auto_increment: false,
+                    foreign_keys: {},
+                ),
+            },
+            latest_version: 1,
+        ),
+        "822ee817-0738-441e-b222-29a235fa7be3": TableData(
+            saved_versions: {
+                1: TableDataVersion(
+                    table_name: "example_table_with_foreign_key",
+                    fields: [
+                        TableField(
+                            name: "id",
+                            ty_to_bytes: false,
+                            sql_type: I32,
+                            default: None,
+                            is_not_null: true,
+                            is_unique: false,
+                        ),
+                        TableField(
+                            name: "example_increment_id",
+                            ty_to_bytes: false,
+                            sql_type: I32,
+                            default: None,
+                            is_not_null: true,
+                            is_unique: false,
+                        ),
+                        TableField(
+                            name: "example_table_id",
+                            ty_to_bytes: false,
+                            sql_type: I32,
+                            default: None,
+                            is_not_null: true,
+                            is_unique: false,
+                        ),
+                        TableField(
+                            name: "value",
+                            ty_to_bytes: false,
+                            sql_type: String,
+                            default: None,
+                            is_not_null: true,
+                            is_unique: false,
+                        ),
+                    ],
+                    primary_keys: [
+                        "id",
+                    ],
+                    auto_increment: false,
+                    foreign_keys: {
+                        "ExampleTable,cascade": [
+                            "example_table_id",
+                        ],
+                        "ExampleTableIncrement": [
+                            "example_increment_id",
+                        ],
+                    },
+                ),
+            },
+            latest_version: 1,
+        ),
+        "9a5884dd-3f0c-4323-bd5f-07fd1bbb10ed": TableData(
+            saved_versions: {
+                1: TableDataVersion(
+                    table_name: "example_table_multi_primary_key",
+                    fields: [
+                        TableField(
+                            name: "id",
+                            ty_to_bytes: false,
+                            sql_type: I32,
+                            default: None,
+                            is_not_null: true,
+                            is_unique: false,
+                        ),
+                        TableField(
+                            name: "id2",
+                            ty_to_bytes: false,
+                            sql_type: I64,
+                            default: None,
+                            is_not_null: true,
+                            is_unique: false,
+                        ),
+                    ],
+                    primary_keys: [
+                        "id",
+                        "id2",
+                    ],
+                    auto_increment: false,
+                    foreign_keys: {},
+                ),
+            },
+            latest_version: 1,
+        ),
+    },
 )

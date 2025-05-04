@@ -40,6 +40,9 @@ sql-build = {path = "./sql-build", optional = true}
 sql-compilation-data = {path = "./sql-compilation-data", default-features = false}
 sql-macros = {path = "./sql-macros"}
 
+[dev-dependencies]
+tokio = {version = "1", features = ["full"]} 
+
 [build-dependencies]
 easy-macros = {path = "../easy-macros", features = ["build"]}
 sql-build = {path = "./sql-build"}
