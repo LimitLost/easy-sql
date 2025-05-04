@@ -38,6 +38,22 @@ impl ToConvertSingle for Row {}
 
 #[always_context]
 #[async_trait]
+impl ToConvert for Option<Row> {
+    async fn get<'a>(
+        exec: impl Executor<'a, Database = Db>,
+        query: sqlx::query::Query<'a, Db, <Db as sqlx::Database>::Arguments<'a>>,
+    ) -> anyhow::Result<Self>
+    where
+        Self: Sized,
+    {
+        exec.fetch_optional(query)
+            .await
+            .with_context(context!("Failed to fetch optional row from SQL query"))
+    }
+}
+
+#[always_context]
+#[async_trait]
 impl ToConvert for () {
     async fn get<'a>(
         exec: impl Executor<'a, Database = Db>,
@@ -91,6 +107,24 @@ where
             result.push(T::convert(r)?);
         }
         Ok(result)
+    }
+}
+
+#[always_context]
+impl<Table, T> SqlOutput<Table, Option<Row>> for Option<T>
+where
+    T: SqlOutput<Table, Row>,
+{
+    fn sql_to_query<'a>(sql: &'a Sql<'a>) -> anyhow::Result<QueryData<'a>> {
+        T::sql_to_query(sql)
+    }
+    fn convert(data: Option<Row>) -> anyhow::Result<Self> {
+        Ok(if let Some(data) = data {
+            #[no_context_inputs]
+            Some(T::convert(data)?)
+        } else {
+            None
+        })
     }
 }
 
