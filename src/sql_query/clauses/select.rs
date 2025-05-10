@@ -3,40 +3,45 @@ use serde::{Deserialize, Serialize};
 
 use crate::SqlValueMaybeRef;
 
-use super::{GroupByClause, HavingClause, LimitClause, OrderByClause, WhereClause};
+use super::{GroupByClause, HavingClause, LimitClause, OrderByClause, WhereClause, WhereExpr};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub enum JoinType {
     Inner,
     Left,
     Right,
-    Full,
+    Cross,
 }
+
 #[derive(Debug, Serialize, Deserialize)]
-pub struct TableJoin {
-    table: String,
-    join_type: JoinType,
-    alias: Option<String>,
-    on: Option<(String, String)>,
+pub struct TableJoin<'a> {
+    pub table: &'static str,
+    pub join_type: JoinType,
+    pub alias: Option<String>,
+    pub on: Option<WhereExpr<'a>>,
 }
 
 #[always_context]
-impl TableJoin {
-    pub fn to_query_data(&self) -> String {
+impl<'a> TableJoin<'a> {
+    pub fn to_query_data(
+        &'a self,
+        current_binding_n: &mut usize,
+        bindings_list: &mut Vec<&'a SqlValueMaybeRef<'a>>,
+    ) -> String {
         let join_type_str = match self.join_type {
             JoinType::Inner => "INNER",
             JoinType::Left => "LEFT",
             JoinType::Right => "RIGHT",
-            JoinType::Full => "FULL",
+            JoinType::Cross => "CROSS",
         };
         let mut join_str = format!("{} JOIN `{}`", join_type_str, self.table);
         if let Some(alias) = &self.alias {
             join_str.push_str(&format!(" AS `{}`", alias));
         }
-        if let Some((left, right)) = &self.on {
+        if let Some(expr) = &self.on {
             join_str.push_str(&format!(
-                " ON `{}`.`{}` = `{}`.`{}`",
-                self.table, left, self.table, right
+                " ON {}",
+                expr.to_query_data(current_binding_n, bindings_list)
             ));
         }
         join_str

@@ -1,36 +1,14 @@
-Currently this library only supports SQLite.
+mod easy_lib {
+    pub use crate as sql;
+}
 
-# Future Features
-
-- Table join support
-- Allow for multiple `#[sql(table = ...)]` attributes on single struct
-- Support for Postgres
-- Support for syncing data to remote database provided by you
-- Renaming columns in table (with attribute, overwriting name set by the field name)
-- (Table editing) Support for changing more than just renaming table, columns and adding new columns
-- Check if foreign key column type is correct
-
-# Examples (they reference each other)
-
-- `.gitignore` setup (ignore build logs)
-
-```gitignore
-/easy_sql_logs
-```
-
-WARNING: Never gitignore `easy_sql.ron` file, it is used for generating migrations (and for checking foreign keys in the future)
-
-## Creating database and tables
-
-- define database structure and a simple table
-
-```rust
 use easy_lib::sql::{DatabaseSetup, SqlTable};
 
 #[derive(SqlTable)]
 // Needed because of automatic migration generation
 // Update this after you're done with making changes (NOT before)
 #[sql(version = 1)]
+#[sql(unique_id = "c41fcf81-08e2-4b89-98e7-57dce7d984d6")]
 struct ExampleTable {
     // Column name: `id`
     // Multiple primary keys supported
@@ -48,38 +26,29 @@ struct ExampleSubDatabase {
 
 #[derive(DatabaseSetup)]
 struct ExampleDatabase {
-   sub: ExampleSubDatabase,
+    sub: ExampleSubDatabase,
 }
-```
 
-- execute database creation
-
-```rust
 use easy_lib::sql::Database;
 
 // Save connection pool in a global variable
 // Use `lazy_static` library and `std::sync::Mutex` to do that
 lazy_static::lazy_static! {
-   static ref DB_BASE: std::sync::Mutex<Option<Database>> = Mutex::new(None);
+   static ref DB_BASE: std::sync::Mutex<Option<Database>> = Default::default();
    static ref DB: Database = DB_BASE.lock().unwrap().take().unwrap();
 }
 
 //Connect to database and save it for later use
-#[tokio::main]
+#[tokio::test]
 async fn main() -> anyhow::Result<()> {
     let db = Database::setup::<ExampleDatabase>("example.db").await?;
     *DB_BASE.lock().unwrap() = Some(db);
     Ok(())
 }
-```
 
-## Advanced table creation
-
-- Primary Key Auto Increment
-
-```rust
 #[derive(SqlTable)]
 #[sql(version = 1)]
+#[sql(unique_id = "21d36640-7002-49d4-b373-3a2d17c61ff1")]
 struct ExampleTableIncrement {
     // Column name: `id`
     #[sql(primary_key)]
@@ -88,27 +57,20 @@ struct ExampleTableIncrement {
     // Column name: `field`
     field: i64,
 }
-```
 
-- Multi column primary key
-
-```rust
 #[derive(SqlTable)]
 #[sql(version = 1)]
+#[sql(unique_id = "9a5884dd-3f0c-4323-bd5f-07fd1bbb10ed")]
 struct ExampleTableMultiPrimaryKey {
     #[sql(primary_key)]
     id: i32,
     #[sql(primary_key)]
     id2: i64,
 }
-```
-
-- with Foreign Key
-
-```rust
 
 #[derive(SqlTable)]
 #[sql(version = 1)]
+#[sql(unique_id = "822ee817-0738-441e-b222-29a235fa7be3")]
 struct ExampleTableWithForeignKey {
     #[sql(primary_key)]
     id: i32,
@@ -121,13 +83,9 @@ struct ExampleTableWithForeignKey {
     value: String,
 }
 
-```
-
-- Multi column foreign key
-
-```rust
 #[derive(SqlTable)]
 #[sql(version = 1)]
+#[sql(unique_id = "2f9ce3ef-1506-4884-985c-6ebfd4a0c54c")]
 struct ExampleTableWithMultiForeignKey {
     #[sql(primary_key)]
     id: i32,
@@ -138,13 +96,10 @@ struct ExampleTableWithMultiForeignKey {
     #[sql(foreign_key = ExampleTableMultiPrimaryKey)]
     example_table_id2: i64,
 }
-```
 
-- Default value for columns
-
-```rust
 #[derive(SqlTable)]
 #[sql(version = 1)]
+#[sql(unique_id = "5abb2707-0b7c-486c-8ca4-beac5f4af281")]
 struct ExampleTableDefaultValue {
     #[sql(primary_key)]
     id: i32,
@@ -153,94 +108,69 @@ struct ExampleTableDefaultValue {
     #[sql(default = "Hello world".to_string())]
     field_str: String,
 }
-```
 
-- Table Renaming
-
-```rust
 #[derive(SqlTable)]
 #[sql(version = 1)]
 #[sql(table_name = "example_table_renamed_to_something_else")]
+#[sql(unique_id = "9d9e3d2d-f9dc-406c-96ff-e9a33c9da0c1")]
 struct ExampleTableRenamed {
     #[sql(primary_key)]
     id: i32,
     field: i64,
 }
-```
 
-## Table manipulation
+use easy_lib::sql::{SqlInsert, SqlOutput, SqlUpdate};
 
-- Creating table manipulation structs with `SqlInsert`, `SqlUpdate` and `SqlOutput` derive macros
-
-```rust
-use easy_lib::sql::{SqlInsert, SqlUpdate, SqlOutput};
-
-//Field validity is automatically checked and errors will be shown on compile time if they are not
-#[derive(SqlInsert,SqlUpdate,SqlOutput)]
+#[derive(SqlInsert, SqlUpdate, SqlOutput)]
 #[sql(table = ExampleTableIncrement)]
-// because of `SqlInsert` you need to specify which table columns are default (not specified in the insert statement)
-// Multiple column example: #[sql(default = id, field2)]
 #[sql(default = id)]
-struct ExampleInsert{
-    field: i64,
+struct ExampleInsert {
+    pub field: i64,
 }
 
-```
+use easy_lib::sql::{sql, sql_convenience, sql_where};
 
-- Table manipulation functions
-
-```rust
-use easy_lib::sql::{sql_where,sql,sql_convenience};
-
-#[tokio::main]
+#[tokio::test]
 #[sql_convenience]
 async fn main2() -> anyhow::Result<()> {
     let db = Database::setup::<ExampleDatabase>("example.db").await?;
 
     // You can also use `db.conn()` if you don't want to start a transaction
-    let mut conn=db.transaction().await?;
-`
+    let mut conn = db.transaction().await?;
+
     // TODO Every (returning) function below has lazy variant, for example `insert_returning_lazy` and `get_lazy`
     // Which loads one row at a time, instead of all rows at once
 
     // Inserting data
     // There's also `insert_returning`
-    ExampleTableIncrement::insert(&mut conn, &ExampleInsert{field: 5}).await?;
+    ExampleTableIncrement::insert(&mut conn, &ExampleInsert { field: 5 }).await?;
     //sql_where! macro uses SQLite syntax
     // There's also `update_returning`
-    ExampleTableIncrement::update(&mut conn, ExampleInsert{field: 10}, sql_where!(id = 3)).await?;
+    ExampleTableIncrement::update(&mut conn, ExampleInsert { field: 10 }, sql_where!(id = 3))
+        .await?;
     // There's also `delete_returning`
     ExampleTableIncrement::delete(&mut conn, sql_where!(id = 1)).await?;
 
     // Selecting data
-    let example_result_vec:Vec<ExampleInsert> = ExampleTableIncrement::select(&mut conn, sql_where!(id = 2)).await?;
+    let example_result_vec: Vec<ExampleInsert> =
+        ExampleTableIncrement::select(&mut conn, sql_where!(id = 2)).await?;
     // Get is an alias for select
-    let example_result_single:ExampleInsert = ExampleTableIncrement::get(&mut conn, sql_where!(id = 2)).await?;
+    let example_result_single: ExampleInsert =
+        ExampleTableIncrement::get(&mut conn, sql_where!(id = 2)).await?;
+
     // sql! macro allows to do more complex queries
-    let example_result_maybe_single:Option<ExampleInsert> = ExampleTableIncrement::select(&mut conn, sql!(WHERE id = 2 ORDER BY id)).await?;
+    let example_result_maybe_single: Option<ExampleInsert> =
+        ExampleTableIncrement::select(&mut conn, sql!(WHERE id = 2 ORDER BY id)).await?;
 
     // You can also use `conn.rollback().await?` if you want to rollback the transaction
     conn.commit().await?;
     Ok(())
 }
-```
 
-## Table Joining
-
-- Creating joined table struct
-
-```rust
 use easy_lib::sql::table_join;
 
-// First Argument - Struct Name Representing the Joined Tables
-// `|` - Separator
 table_join!(JoinedExampleTables | ExampleTable LEFT JOIN ExampleTableWithForeignKey ON ExampleTable.id = ExampleTableWithForeignKey.example_table_id);
 
-```
-
-- Creating joined table data output
-
-```rust
 #[derive(SqlOutput)]
 #[sql(table = JoinedExampleTables)]
 struct JoinedExampleTableOutput {
@@ -248,6 +178,5 @@ struct JoinedExampleTableOutput {
     #[sql(field = ExampleTable.id)]
     id: i32,
     #[sql(field = ExampleTableWithForeignKey.value)]
-    value: String,
+    value: Option<String>,
 }
-```

@@ -19,6 +19,9 @@ bigdecimal = {version = "*", features = ["serde-json"]}
 # Add serde impl to decimal
 rust_decimal = {version = "1.37.1", features = ["serde-str"]}
 
+# Used in SqlTable derive macro (and tests)
+lazy_static = "*"
+
 easy-macros = {path = "../easy-macros", features = ["general"]}
 
 anyhow = "1"
@@ -38,11 +41,12 @@ sql-compilation-data = {path = "./sql-compilation-data", default-features = fals
 sql-macros = {path = "./sql-macros"}
 
 [dev-dependencies]
-lazy_static = "*"
+tokio = {version = "1", features = ["full"]} 
 
 [build-dependencies]
 easy-macros = {path = "../easy-macros", features = ["build"]}
 sql-build = {path = "./sql-build"}
+regex="*"
 
 [features]
 backend = ["sqlx/postgres"]

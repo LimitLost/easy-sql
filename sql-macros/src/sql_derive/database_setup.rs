@@ -36,7 +36,7 @@ pub fn database_setup(item: proc_macro::TokenStream) -> anyhow::Result<proc_macr
         let context=format!("Field `{}` with type `{}` of struct `{}` ",field_name, field_type_str, item.ident);
 
         quote! {
-            <#field_type as #sql_crate::DatabaseSetup>::setup(conn, used_table_names).await.with_context(#easy_macros_helpers_crate::context!(#context));
+            <#field_type as #sql_crate::DatabaseSetup>::setup(conn).await.with_context(#easy_macros_helpers_crate::context!(#context))?;
         }
     });
 
@@ -46,9 +46,10 @@ pub fn database_setup(item: proc_macro::TokenStream) -> anyhow::Result<proc_macr
         #[#async_trait_crate::async_trait]
         impl #sql_crate::DatabaseSetup for #item_name {
             async fn setup(
-                conn: &mut (impl #sql_crate::EasyExecutor + Send + Sync),
-                used_table_names: &mut Vec<String>,
+                conn: &mut (impl #sql_crate::EasyExecutor + Send + Sync)
             ) -> #easy_lib_crate::anyhow::Result<()> {
+                use #easy_lib_crate::anyhow::Context;
+
                 #(
                     #fields_mapped
                 )*

@@ -1,3 +1,4 @@
+pub mod joined_field;
 pub mod sql_column;
 pub mod sql_keyword;
 pub mod sql_limit;

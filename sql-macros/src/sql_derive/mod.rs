@@ -201,6 +201,7 @@ fn ty_to_variant(
 fn ty_str_enum_value(
     ty_str: &str,
     generic_arg: &Option<String>,
+    sql_crate: &TokenStream,
 ) -> anyhow::Result<Option<TokenStream>> {
     Ok(match ty_str {
         "IpAddr" | "bool" | "f32" | "f64" | "i8" | "i16" | "i32" | "i64" | "String"
@@ -212,7 +213,7 @@ fn ty_str_enum_value(
         }
         "Vec" => {
             if let Some(arg) = generic_arg {
-                let subtype = ty_str_enum_value(&arg, &None::<String>)?;
+                let subtype = ty_str_enum_value(&arg, &None::<String>, sql_crate)?;
                 if let Some(subtype) = subtype {
                     Some(quote! { List(Box::new(#subtype)) })
                 } else {
@@ -227,7 +228,7 @@ fn ty_str_enum_value(
                 match arg.as_str() {
                     "i32" | "i64" | "NaiveDate" | "NaiveDateTime" | "BigDecimal" | "Decimal" => {
                         let name_variant = quote::format_ident!("{}", ty_str.to_case(Case::Pascal));
-                        Some(quote! {Range(easy_sql::sql::SqlRangeType::#name_variant)})
+                        Some(quote! {Range(#sql_crate::SqlRangeType::#name_variant)})
                     }
                     _ => None,
                 }
@@ -241,7 +242,10 @@ fn ty_str_enum_value(
 
 #[always_context]
 ///Returns only type enum variant
-fn ty_enum_value(ty: &syn::Type) -> anyhow::Result<(Option<TokenStream>, bool)> {
+fn ty_enum_value(
+    ty: &syn::Type,
+    sql_crate: &TokenStream,
+) -> anyhow::Result<(Option<TokenStream>, bool)> {
     match ty {
         syn::Type::Path(type_path) => {
             let mut last_segment = type_path
@@ -310,7 +314,10 @@ fn ty_enum_value(ty: &syn::Type) -> anyhow::Result<(Option<TokenStream>, bool)> 
                 syn::PathArguments::Parenthesized(_) => None,
             };
 
-            Ok((ty_str_enum_value(&name_str, &generic_arg)?, not_null))
+            Ok((
+                ty_str_enum_value(&name_str, &generic_arg, sql_crate)?,
+                not_null,
+            ))
         }
         _ => {
             anyhow::bail!("Unsupported type: {}", ty.to_token_stream())

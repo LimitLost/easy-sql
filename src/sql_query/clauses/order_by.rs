@@ -3,13 +3,13 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct OrderBy {
-    column: String,
-    descending: bool,
+    pub column: String,
+    pub descending: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct OrderByClause {
-    order_by: Vec<OrderBy>,
+    pub order_by: Vec<OrderBy>,
 }
 
 #[always_context]

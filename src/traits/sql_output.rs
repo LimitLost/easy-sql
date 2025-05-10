@@ -1,7 +1,7 @@
 use anyhow::Context;
 use async_trait::async_trait;
 use easy_macros::{helpers::context, macros::always_context};
-use sqlx::Executor;
+use sqlx::{Executor, Row as SqlxRow};
 
 use crate::{Db, QueryData, Row, Sql};
 
@@ -35,6 +35,22 @@ impl ToConvert for Row {
 }
 #[always_context]
 impl ToConvertSingle for Row {}
+
+#[always_context]
+#[async_trait]
+impl ToConvert for Option<Row> {
+    async fn get<'a>(
+        exec: impl Executor<'a, Database = Db>,
+        query: sqlx::query::Query<'a, Db, <Db as sqlx::Database>::Arguments<'a>>,
+    ) -> anyhow::Result<Self>
+    where
+        Self: Sized,
+    {
+        exec.fetch_optional(query)
+            .await
+            .with_context(context!("Failed to fetch optional row from SQL query"))
+    }
+}
 
 #[always_context]
 #[async_trait]
@@ -95,11 +111,39 @@ where
 }
 
 #[always_context]
+impl<Table, T> SqlOutput<Table, Option<Row>> for Option<T>
+where
+    T: SqlOutput<Table, Row>,
+{
+    fn sql_to_query<'a>(sql: &'a Sql<'a>) -> anyhow::Result<QueryData<'a>> {
+        T::sql_to_query(sql)
+    }
+    fn convert(data: Option<Row>) -> anyhow::Result<Self> {
+        Ok(if let Some(data) = data {
+            #[no_context_inputs]
+            Some(T::convert(data)?)
+        } else {
+            None
+        })
+    }
+}
+
+#[always_context]
 impl<Table> SqlOutput<Table, ()> for () {
     fn sql_to_query<'a>(sql: &'a Sql<'a>) -> anyhow::Result<QueryData<'a>> {
         sql.query()
     }
     fn convert(_data: ()) -> anyhow::Result<Self> {
         Ok(())
+    }
+}
+
+#[always_context]
+impl<Table> SqlOutput<Table, Row> for bool {
+    fn sql_to_query<'a>(sql: &'a Sql<'a>) -> anyhow::Result<QueryData<'a>> {
+        sql.query()
+    }
+    fn convert(data: Row) -> anyhow::Result<Self> {
+        Ok(data.get(0))
     }
 }

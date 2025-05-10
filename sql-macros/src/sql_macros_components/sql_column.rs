@@ -39,7 +39,7 @@ impl SqlColumn {
                 });
 
                 let ident_str = ident.to_string();
-                quote! {#ident_str}
+                quote! {#ident_str.to_string()}
             }
         }
     }

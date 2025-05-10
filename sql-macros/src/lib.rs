@@ -57,6 +57,11 @@ pub fn sql_where(item: TokenStream) -> TokenStream {
     sql_macros::sql_where(item)
 }
 
+#[proc_macro]
+pub fn table_join(item: TokenStream) -> TokenStream {
+    sql_macros::table_join(item)
+}
+
 #[always_context]
 #[proc_macro_derive(DatabaseSetup)]
 #[macro_result]

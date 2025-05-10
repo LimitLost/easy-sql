@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct GroupByClause {
-    columns: Vec<String>,
+    pub columns: Vec<String>,
 }
 
 #[always_context]

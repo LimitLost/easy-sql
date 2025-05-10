@@ -274,3 +274,10 @@ sql_keyword!(null);
 
 sql_keyword!(asc);
 sql_keyword!(desc);
+
+sql_keyword!(inner);
+sql_keyword!(left);
+sql_keyword!(right);
+sql_keyword!(cross);
+sql_keyword!(join);
+sql_keyword!(on);

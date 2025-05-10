@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct LimitClause {
-    limit: usize,
+    pub limit: usize,
 }
 
 #[always_context]
