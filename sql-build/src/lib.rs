@@ -1,5 +1,5 @@
 use std::{
-    collections::{HashMap, hash_map::Entry},
+    collections::{hash_map::Entry, HashMap},
     io::Write,
     path::Path,
 };
@@ -10,10 +10,10 @@ use easy_macros::{
     helpers::context,
     macros::{all_syntax_cases, always_context, get_attributes},
     proc_macro2::LineColumn,
-    quote::{ToTokens, quote},
+    quote::{quote, ToTokens},
     syn::{
-        self, ItemFn, ItemImpl, ItemTrait, LitInt, LitStr, Macro, Meta, punctuated::Punctuated,
-        spanned::Spanned,
+        self, punctuated::Punctuated, spanned::Spanned, ItemFn, ItemImpl, ItemTrait, LitInt,
+        LitStr, Macro, Meta,
     },
 };
 use sql_compilation_data::{CompilationData, TableData, TableDataVersion};
@@ -421,7 +421,7 @@ fn handle_dir(
         for r in ignore_list.iter() {
             let path_str = entry_path.display().to_string();
 
-            if r.is_match(&path_str[base_path_len_bytes..]) {
+            if r.is_match(&path_str) {
                 // Ignore this entry
                 continue 'entries;
             }
