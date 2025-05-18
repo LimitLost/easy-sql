@@ -49,5 +49,5 @@ sql-build = {path = "./sql-build"}
 regex="*"
 
 [features]
-backend = ["sqlx/postgres"]
-frontend = ["sqlx/sqlite"]
+postgres = ["sqlx/postgres"]
+sqlite = ["sqlx/sqlite"]
