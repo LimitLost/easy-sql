@@ -22,12 +22,10 @@ pub use sqlx::Row as SqlxRow;
 
 pub use sql_compilation_data::SqlType;
 
-pub use async_trait::async_trait;
-
 pub use sql_macros::*;
 
 //Used by SqlTable derive macro (default attribute)
-pub use lazy_static::lazy_static;
+// pub use lazy_static::lazy_static;
 
 #[cfg(test)]
 mod tests;
