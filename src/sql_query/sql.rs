@@ -242,7 +242,7 @@ impl Sql<'_> {
         })
     }
 
-    pub(crate) fn query_output(
+    pub fn query_output(
         &self,
         requested_columns: Vec<RequestedColumn>,
     ) -> anyhow::Result<QueryData<'_>> {
