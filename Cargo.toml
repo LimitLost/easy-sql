@@ -12,33 +12,34 @@ sqlx = {version = "0.8", features = [
   "bigdecimal",
   "rust_decimal",
   "chrono",
-]}
-uuid = {version = "*", features = ["serde"]}
+], optional = true}
+uuid = {version = "*", features = ["serde"], optional = true}
 # Add serde impl to bigdecimal
-bigdecimal = {version = "*", features = ["serde-json"]}
+bigdecimal = {version = "*", features = ["serde-json"], optional = true}
 # Add serde impl to decimal
-rust_decimal = {version = "1.37.1", features = ["serde-str"]}
+rust_decimal = {version = "1.37.1", features = ["serde-str"], optional = true}
 
 # Used in SqlTable derive macro (and tests)
-lazy_static = "*"
+lazy_static = {version="*", optional = true}
 
-easy-macros = {path = "../easy-macros", features = ["general"]}
+easy-macros = {path = "../easy-macros", features = ["general"], optional = true}
 
-anyhow = "1"
-chrono = {version = "*", features = ["serde"]}
+anyhow = {version="1",optional = true}
+chrono = {version = "*", features = ["serde"], optional = true}
 
-bincode = {version = "2", features = ["serde"]}
-serde = {version = "1", features = ["derive"]}
+bincode = {version = "2", features = ["serde"], optional = true}
+serde = {version = "1", features = ["derive"], optional = true}
 
-async-trait = "0.1.88"
-futures = "0.3.31"
-futures-core = "0.3.31"
-pin-project = "1"
-tokio = {version = "1", features = ["sync"]}
+async-trait = {version="0.1.88", optional = true}
+futures = {version="0.3.31", optional = true}
+futures-core = {version="0.3.31", optional = true}
+pin-project = {version="1", optional = true}
+tokio = {version = "1", features = ["sync"], optional = true}
 
 sql-build = {path = "./sql-build", optional = true}
-sql-compilation-data = {path = "./sql-compilation-data", default-features = false}
-sql-macros = {path = "./sql-macros"}
+sql-compilation-data = {path = "./sql-compilation-data", default-features = false, optional = true}
+sql-macros = {path = "./sql-macros", optional = true}
+
 
 [dev-dependencies]
 tokio = {version = "1", features = ["full"]} 
@@ -49,5 +50,25 @@ sql-build = {path = "./sql-build"}
 regex="*"
 
 [features]
-postgres = ["sqlx/postgres"]
-sqlite = ["sqlx/sqlite"]
+default= []
+not_build = [
+  "dep:sqlx",
+"dep:uuid",
+  "dep:bigdecimal",
+"dep:rust_decimal",
+"dep:lazy_static",
+"dep:easy-macros",
+"dep:anyhow",
+"dep:chrono",
+"dep:bincode",
+"dep:serde",
+"dep:async-trait",
+"dep:futures",
+"dep:futures-core",
+"dep:pin-project",
+"dep:tokio",
+"dep:sql-compilation-data",
+"dep:sql-macros"]
+postgres = ["sqlx/postgres","not_build"]
+sqlite = ["sqlx/sqlite","not_build"]
+build = ["dep:sql-build"]
