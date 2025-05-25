@@ -175,7 +175,7 @@ pub trait SqlTable: Sized {
     async fn delete_returning_lazy<'a, Y: ToConvert + Send + Sync, T: SqlOutput<Self, Row>>(
         conn: &mut (impl EasyExecutor + Send + Sync),
         where_: Option<WhereClause<'a>>,
-        mut perform: impl FnMut(T) -> anyhow::Result<Option<Break>> + Send + Sync,
+        perform: impl FnMut(T) -> anyhow::Result<Option<Break>> + Send + Sync,
     ) -> anyhow::Result<()> {
         let sql = Sql::Delete {
             table: Self::table_name(),
@@ -224,7 +224,7 @@ pub trait SqlTable: Sized {
         conn: &mut (impl EasyExecutor + Send + Sync),
         update: U,
         where_: Option<WhereClause<'a>>,
-        mut perform: impl FnMut(T) -> anyhow::Result<Option<Break>> + Send + Sync,
+        perform: impl FnMut(T) -> anyhow::Result<Option<Break>> + Send + Sync,
     ) -> anyhow::Result<()> {
         let sql = Sql::Update {
             table: Self::table_name(),
