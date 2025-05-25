@@ -7,7 +7,7 @@ use easy_macros::{
     syn::{self, parse::Parse, punctuated::Punctuated},
 };
 
-use crate::sql_crate;
+use crate::{easy_lib_crate, sql_crate};
 
 use super::ty_to_variant;
 
