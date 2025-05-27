@@ -18,7 +18,7 @@ struct ExampleStruct {
 
 #[always_context]
 impl SqlUpdate<ExampleTableStruct> for ExampleStruct {
-    fn updates(&self) -> Vec<(String, crate::SqlValueMaybeRef<'_>)> {
+    fn updates(&self) -> anyhow::Result<Vec<(String, crate::SqlValueMaybeRef<'_>)>> {
         crate::never::never_fn(|| {
             //Check for validity
             let update_instance = crate::never::never_any::<Self>();
@@ -28,7 +28,7 @@ impl SqlUpdate<ExampleTableStruct> for ExampleStruct {
             table_instance.field2 = update_instance.field2;
             table_instance.field3 = update_instance.field3;
         });
-        vec![
+        Ok(vec![
             (
                 "field1".to_string(),
                 crate::SqlValueMaybeRef::Ref(crate::SqlValueRef::String(&self.field1)),
@@ -41,7 +41,7 @@ impl SqlUpdate<ExampleTableStruct> for ExampleStruct {
                 "field3".to_string(),
                 crate::SqlValueMaybeRef::Ref(crate::SqlValueRef::I64(&self.field3)),
             ),
-        ]
+        ])
     }
 }
 
@@ -53,7 +53,7 @@ struct ExampleStruct2 {
 
 #[always_context]
 impl SqlUpdate<ExampleTableStruct> for ExampleStruct2 {
-    fn updates(&self) -> Vec<(String, crate::SqlValueMaybeRef<'_>)> {
+    fn updates(&self) -> anyhow::Result<Vec<(String, crate::SqlValueMaybeRef<'_>)>> {
         //If Option is set to None then ignore
         crate::never::never_fn(|| {
             //Check for validity
@@ -81,6 +81,6 @@ impl SqlUpdate<ExampleTableStruct> for ExampleStruct2 {
                 crate::SqlValueMaybeRef::Ref(crate::SqlValueRef::I64(field3)),
             ));
         }
-        updates
+        Ok(updates)
     }
 }

@@ -71,21 +71,23 @@ pub fn sql_table(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::To
     let mut table_name = item_name.to_string().to_case(Case::Snake);
 
     //Use name provided by the user if it exists
-    for attr_data in get_attributes!(item, #[sql(table_name = __unknown__)]) {
+    if let Some(attr_data) = get_attributes!(item, #[sql(table_name = __unknown__)])
+        .into_iter()
+        .next()
+    {
         let lit_str: LitStr = syn::parse2(attr_data.clone())
             .context("Invalid table name provided, expected string with  quotes")?;
         table_name = lit_str.value();
-        break;
     }
 
     let insert_impl = sql_insert_base(
-        &item_name,
+        item_name,
         &fields,
         &item_name_tokens,
         vec![] as Vec<syn::Ident>,
     )?;
-    let update_impl = sql_update_base(&item_name, &fields, &item_name_tokens)?;
-    let output_impl = sql_output_base(&item_name, &fields, vec![], &item_name_tokens);
+    let update_impl = sql_update_base(item_name, &fields, &item_name_tokens, true)?;
+    let output_impl = sql_output_base(item_name, &fields, vec![], &item_name_tokens);
 
     let mut primary_keys = Vec::new();
     let mut foreign_keys = HashMap::new();
@@ -286,12 +288,12 @@ pub fn sql_table(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::To
             &item_name.to_token_stream(),
         )?;
 
-        if let Some(this_version) = table_data.saved_versions.get(&table_version) {
-            if this_version != &converted_to_version {
-                return Err(anyhow::anyhow!(
+        if let Some(this_version) = table_data.saved_versions.get(&table_version)
+            && this_version != &converted_to_version
+        {
+            return Err(anyhow::anyhow!(
                     "When you're done with making changes to the table, don't forget to update the version number in the #[sql(version = x)] attribute!"
                 )).with_context(context!("table in easy_sql.ron: {:?}\r\n\r\nnew table structure: {:?}",this_version,converted_to_version));
-            }
         }
 
         migrations

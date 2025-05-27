@@ -193,7 +193,7 @@ pub trait SqlTable: Sized {
         let where_ = where_.map(|(_, where_)| where_);
         let sql = Sql::Update {
             table: Self::table_name(),
-            set: update.updates(),
+            set: update.updates()?,
             where_,
         };
 
@@ -208,7 +208,7 @@ pub trait SqlTable: Sized {
         let where_ = where_.map(|(_, where_)| where_);
         let sql = Sql::Update {
             table: Self::table_name(),
-            set: update.updates(),
+            set: update.updates()?,
             where_,
         };
 
@@ -228,7 +228,7 @@ pub trait SqlTable: Sized {
     ) -> anyhow::Result<()> {
         let sql = Sql::Update {
             table: Self::table_name(),
-            set: update.updates(),
+            set: update.updates()?,
             where_,
         };
         conn.fetch_lazy(&sql, perform).await

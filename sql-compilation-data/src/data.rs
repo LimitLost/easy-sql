@@ -164,7 +164,7 @@ impl CompilationData {
                 if !data_path.exists() {
                     anyhow::bail!(
                         "`easy_lib::sql::build` in build script is required (for automatic migrations and checks); easy_sql.ron file not found in the project directory: {:?}",
-                        current_dir
+                        data_path
                     );
                 }
 

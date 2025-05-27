@@ -4,5 +4,5 @@ use crate::SqlValueMaybeRef;
 
 #[always_context]
 pub trait SqlUpdate<Table> {
-    fn updates(&self) -> Vec<(String, SqlValueMaybeRef<'_>)>;
+    fn updates(&self) -> anyhow::Result<Vec<(String, SqlValueMaybeRef<'_>)>>;
 }

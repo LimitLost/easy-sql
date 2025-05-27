@@ -1,13 +1,13 @@
 use easy_macros::{
     anyhow::{self, Context},
     helpers::{context, parse_macro_input},
-    macros::{always_context, get_attributes},
+    macros::{always_context, get_attributes, has_attributes},
     proc_macro2::TokenStream,
     quote::{ToTokens, quote},
     syn::{self, punctuated::Punctuated},
 };
 
-use crate::sql_crate;
+use crate::{easy_lib_crate, sql_crate};
 
 use super::ty_to_variant;
 
@@ -16,27 +16,36 @@ pub fn sql_update_base(
     item_name: &syn::Ident,
     fields: &Punctuated<syn::Field, syn::Token![,]>,
     table: &TokenStream,
+    sql_table_macro: bool,
 ) -> anyhow::Result<TokenStream> {
     let field_names = fields.iter().map(|field| field.ident.as_ref().unwrap());
     let field_names_str = field_names.clone().map(|field| field.to_string());
 
     let sql_crate = sql_crate();
+    let easy_lib_crate = easy_lib_crate();
 
     let mut update_values = Vec::new();
 
     for field in fields.iter() {
         let field_name = field.ident.as_ref().unwrap();
+
+        let bytes_allowed = if sql_table_macro {
+            has_attributes!(field, #[sql(bytes)])
+        } else {
+            true
+        };
+
         update_values.push(ty_to_variant(
             field_name.to_token_stream(),
             &field.ty,
             &sql_crate,
-            true,
+            bytes_allowed,
         )?);
     }
 
     Ok(quote! {
         impl #sql_crate::SqlUpdate<#table> for #item_name {
-            fn updates(&self) -> Vec<(String, #sql_crate::SqlValueMaybeRef<'_>)> {
+            fn updates(&self) -> #easy_lib_crate::anyhow::Result<Vec<(String, #sql_crate::SqlValueMaybeRef<'_>)>> {
                 #sql_crate::never::never_fn(|| {
                     //Check for validity
                     let update_instance = #sql_crate::never::never_any::<Self>();
@@ -44,12 +53,12 @@ pub fn sql_update_base(
 
                     #(table_instance.#field_names = update_instance.#field_names;)*
                 });
-                vec![
+                Ok(vec![
                     #((
                         #field_names_str.to_string(),
                         #update_values,
                     ),)*
-                ]
+                ])
             }
         }
 
@@ -81,5 +90,5 @@ pub fn sql_update(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::T
     #[no_context]
     let table = table.with_context(context!("Table attribute is required"))?;
 
-    sql_update_base(&item_name, &fields, &table).map(|e| e.into())
+    sql_update_base(&item_name, &fields, &table, false).map(|e| e.into())
 }
