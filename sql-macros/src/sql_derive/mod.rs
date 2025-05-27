@@ -43,10 +43,19 @@ fn ty_name_into_data(
     bytes_allowed: bool,
 ) -> anyhow::Result<TyData> {
     match ty {
+        "Option" => match generic_arg {
+            Some(arg) => {
+                //Ignore option, use the sub type
+                ty_name_into_data(arg, &None::<String>, bytes_allowed)
+            }
+            None => {
+                anyhow::bail!("No Generic argument or Invalid argument for Option type")
+            }
+        },
         //Handle both bytes and accepted type list
         "Vec" => match generic_arg {
             Some(arg) => {
-                let subtype_bytes = ty_name_into_data(&arg, &None::<String>, true)?.bytes();
+                let subtype_bytes = ty_name_into_data(arg, &None::<String>, true)?.bytes();
                 if bytes_allowed {
                     if subtype_bytes {
                         Ok(TyData::Binary)
@@ -172,7 +181,7 @@ fn ty_to_variant(
             Ok(match found {
                 TyData::Binary => {
                     quote! {
-                        easy_lib::sql::SqlValueMaybeRef::Value(easy_lib::sql::SqlValue::Binary(easy_lib::sql::to_binary(&self.#field_name)?))
+                        easy_lib::sql::SqlValueMaybeRef::Value(easy_lib::sql::SqlValue::Bytes(easy_lib::sql::to_binary(&self.#field_name)?))
                     }
                 }
                 TyData::IntoNoRef => {

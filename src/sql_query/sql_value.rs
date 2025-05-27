@@ -31,7 +31,6 @@ struct PgIntervalSerde2 {
     microseconds: i64,
 }
 
-
 #[always_context]
 impl From<&PgInterval> for PgIntervalSerde2 {
     fn from(value: &PgInterval) -> Self {
@@ -42,7 +41,6 @@ impl From<&PgInterval> for PgIntervalSerde2 {
         }
     }
 }
-
 
 #[always_context]
 impl From<PgInterval> for PgIntervalSerde2 {
@@ -522,6 +520,7 @@ pub enum SqlValueMaybeRef<'a> {
     Ref(SqlValueRef<'a>),
     Value(SqlValue),
     Vec(Vec<SqlValueMaybeRef<'a>>),
+    Option(Option<Box<SqlValueMaybeRef<'a>>>),
 }
 
 #[always_context]
@@ -535,6 +534,13 @@ impl<'a> Encode<'a, crate::Db> for SqlValueMaybeRef<'a> {
             SqlValueMaybeRef::Value(v) => v.encode_by_ref(buf),
             SqlValueMaybeRef::Vec(v) => {
                 <Vec<u8> as Encode<'a, crate::Db>>::encode_by_ref(&binary(v)?, buf)
+            }
+            SqlValueMaybeRef::Option(v) => {
+                if let Some(v) = v {
+                    v.encode_by_ref(buf)
+                } else {
+                    Ok(sqlx::encode::IsNull::Yes)
+                }
             }
         }
     }
@@ -550,6 +556,13 @@ impl<'a> Encode<'a, crate::Db> for SqlValueMaybeRef<'a> {
             SqlValueMaybeRef::Ref(v) => v.encode(buf),
             SqlValueMaybeRef::Value(v) => v.encode(buf),
             SqlValueMaybeRef::Vec(v) => <Vec<u8> as Encode<'a, crate::Db>>::encode(binary(v)?, buf),
+            SqlValueMaybeRef::Option(v) => {
+                if let Some(v) = v {
+                    v.encode(buf)
+                } else {
+                    Ok(sqlx::encode::IsNull::Yes)
+                }
+            }
         }
     }
 
@@ -558,6 +571,13 @@ impl<'a> Encode<'a, crate::Db> for SqlValueMaybeRef<'a> {
             SqlValueMaybeRef::Ref(v) => v.produces(),
             SqlValueMaybeRef::Value(v) => v.produces(),
             SqlValueMaybeRef::Vec(_) => Some(<Vec<u8> as sqlx::Type<crate::Db>>::type_info()),
+            SqlValueMaybeRef::Option(v) => {
+                if let Some(v) = v {
+                    v.produces()
+                } else {
+                    None
+                }
+            }
         }
     }
 }
@@ -586,6 +606,9 @@ impl serde::Serialize for SqlValueMaybeRef<'_> {
             SqlValueMaybeRef::Vec(v) => {
                 serializer.serialize_newtype_variant("SqlValueMaybeRef", 1, "Vec", v)
             }
+            SqlValueMaybeRef::Option(v) => {
+                serializer.serialize_newtype_variant("SqlValueMaybeRef", 2, "Option", v)
+            }
         }
     }
 }
@@ -598,6 +621,7 @@ mod value_serialize {
     pub enum SqlValueMaybeRef<'a> {
         Value(super::SqlValue),
         Vec(Vec<super::SqlValueMaybeRef<'a>>),
+        Option(Option<Box<super::SqlValueMaybeRef<'a>>>),
     }
 
     #[always_context]
@@ -606,6 +630,7 @@ mod value_serialize {
             match value {
                 SqlValueMaybeRef::Value(v) => Self::Value(v),
                 SqlValueMaybeRef::Vec(v) => Self::Vec(v),
+                SqlValueMaybeRef::Option(v) => Self::Option(v),
             }
         }
     }
@@ -922,5 +947,29 @@ impl From<std::ops::Range<Decimal>> for SqlValueMaybeRef<'_> {
 impl From<std::ops::Range<BigDecimal>> for SqlValueMaybeRef<'_> {
     fn from(value: std::ops::Range<BigDecimal>) -> Self {
         Self::Value(SqlValue::Range(SqlRangeValue::BigDecimal(value.into())))
+    }
+}
+
+//Option
+#[always_context]
+impl<'a, T: Into<SqlValueMaybeRef<'a>>> From<Option<T>> for SqlValueMaybeRef<'a> {
+    fn from(value: Option<T>) -> Self {
+        match value {
+            Some(v) => SqlValueMaybeRef::Option(Some(Box::new(v.into()))),
+            None => SqlValueMaybeRef::Option(None),
+        }
+    }
+}
+
+#[always_context]
+impl<'a, T: 'a> From<&'a Option<T>> for SqlValueMaybeRef<'a>
+where
+    &'a T: Into<SqlValueMaybeRef<'a>>,
+{
+    fn from(value: &'a Option<T>) -> Self {
+        match value {
+            Some(v) => SqlValueMaybeRef::Option(Some(Box::new(v.into()))),
+            None => SqlValueMaybeRef::Option(None),
+        }
     }
 }
