@@ -12,7 +12,7 @@ use easy_macros::{
     macros::always_context,
     proc_macro2::TokenStream,
     quote::{self, ToTokens, quote},
-    syn,
+    syn::{self, PathSegment},
 };
 pub use sql_insert::*;
 pub use sql_output::*;
@@ -55,6 +55,10 @@ fn ty_name_into_data(
         //Handle both bytes and accepted type list
         "Vec" => match generic_arg {
             Some(arg) => {
+                //Bytes list special case
+                if arg == "u8" {
+                    return Ok(TyData::IntoRef);
+                }
                 let subtype_bytes = ty_name_into_data(arg, &None::<String>, true)?.bytes();
                 if bytes_allowed {
                     if subtype_bytes {
@@ -131,6 +135,24 @@ fn ty_name_into_data(
     }
 }
 
+fn generic_arg_from_path(segment: &PathSegment) -> Option<String> {
+    match &segment.arguments {
+        syn::PathArguments::None => None,
+        syn::PathArguments::AngleBracketed(angle_bracketed_generic_arguments) => {
+            angle_bracketed_generic_arguments
+                .args
+                .first()
+                .and_then(|el| match el {
+                    syn::GenericArgument::Type(syn::Type::Path(ty)) => {
+                        ty.path.segments.last().map(|name| name.ident.to_string())
+                    }
+                    _ => None,
+                })
+        }
+        syn::PathArguments::Parenthesized(_) => None,
+    }
+}
+
 #[always_context]
 fn ty_to_variant(
     field_name: TokenStream,
@@ -154,27 +176,7 @@ fn ty_to_variant(
                 .with_context(context!("Type path is empty | ty: {:?}", type_path))?;
 
             //Get the last segment of the path in generic arg
-            let generic_arg = match &name.arguments {
-                syn::PathArguments::None => None,
-                syn::PathArguments::AngleBracketed(angle_bracketed_generic_arguments) => {
-                    angle_bracketed_generic_arguments
-                        .args
-                        .first()
-                        .map(|el| match el {
-                            syn::GenericArgument::Type(ty) => match ty {
-                                syn::Type::Path(type_path) => type_path
-                                    .path
-                                    .segments
-                                    .last()
-                                    .map(|name| name.ident.to_string()),
-                                _ => None,
-                            },
-                            _ => None,
-                        })
-                        .flatten()
-                }
-                syn::PathArguments::Parenthesized(_) => None,
-            };
+            let generic_arg = generic_arg_from_path(name);
 
             let found = ty_name_into_data(&name.ident.to_string(), &generic_arg, bytes_allowed)?;
 
