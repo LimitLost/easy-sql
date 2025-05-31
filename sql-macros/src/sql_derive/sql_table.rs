@@ -14,6 +14,7 @@ use sql_compilation_data::{CompilationData, TableDataVersion};
 use crate::{
     async_trait_crate, easy_lib_crate, easy_macros_helpers_crate, sql_crate,
     sql_derive::{sql_insert_base, sql_output_base, sql_update_base},
+    sql_macros_components::joined_field::JoinedField,
 };
 
 use super::ty_enum_value;
@@ -87,7 +88,12 @@ pub fn sql_table(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::To
         vec![] as Vec<syn::Ident>,
     )?;
     let update_impl = sql_update_base(item_name, &fields, &item_name_tokens, true)?;
-    let output_impl = sql_output_base(item_name, &fields, vec![], &item_name_tokens);
+    let output_impl = sql_output_base(
+        item_name,
+        &fields,
+        Vec::<JoinedField>::new(),
+        &item_name_tokens,
+    )?;
 
     let mut primary_keys = Vec::new();
     let mut foreign_keys = HashMap::new();

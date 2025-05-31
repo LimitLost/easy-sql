@@ -8,20 +8,18 @@ use easy_macros::{
 };
 
 use crate::{
-    easy_lib_crate, easy_macros_helpers_crate, sql_crate,
-    sql_macros_components::joined_field::JoinedField,
+    easy_lib_crate, easy_macros_helpers_crate, sql_crate, sql_derive::{generic_arg_from_path, ty_name_into_data, TyData}, sql_macros_components::joined_field::JoinedField
 };
 
+#[always_context]
 pub fn sql_output_base(
     item_name: &syn::Ident,
     fields: &Punctuated<syn::Field, syn::Token![,]>,
     joined_fields: Vec<JoinedField>,
     table: &TokenStream,
-) -> TokenStream {
+) -> anyhow::Result<TokenStream> {
     let field_names = fields.iter().map(|field| field.ident.as_ref().unwrap());
-    let field_names2 = field_names.clone();
     let field_names_str = field_names.clone().map(|field| field.to_string());
-    let field_names_str2 = field_names_str.clone();
 
     let joined_field_aliases=(0..joined_fields.len()).into_iter().map(|i|{
         format!("j___easy_sql_dont_use_this_name__joined_field_{}",i)
@@ -120,15 +118,6 @@ pub fn sql_output_base(
         format!("{{}}.{}",joined_field.table_field) 
     });
 
-    let context_strs = fields.iter().map(|field| {
-        format!(
-            "Getting field `{}` with type {} for struct `{}`",
-            field.ident.as_ref().unwrap(),
-            field.ty.to_token_stream(),
-            item_name
-        )
-    });
-
     let context_strs2 = joined_fields.iter().map(|joined_field| {
         format!(
             "Getting joined field `{}` with type {} for struct `{}` from table `{}`",
@@ -139,7 +128,67 @@ pub fn sql_output_base(
         )
     });
 
-    quote! {
+    let mut fields_quotes=Vec::new();
+
+    //Handle fields
+    for field in
+        fields.iter()
+    {
+        let field_name=field.ident.as_ref().unwrap();
+        let field_name_str = field_name.to_string();
+        let context_str=format!(
+            "Getting field `{}` with type {} for struct `{}`",
+            field.ident.as_ref().unwrap(),
+            field.ty.to_token_stream(),
+            item_name
+        );
+
+        let (field_ty_str,generic_arg)=match &field.ty{
+            syn::Type::Path(type_path) => {
+                let last_segment=type_path.path.segments.last().with_context(context!("Field type path is empty | ty: {}", type_path.to_token_stream()))?;
+                let generic_arg=generic_arg_from_path(last_segment);
+
+                (last_segment.ident.to_string(),generic_arg)
+            },
+            syn::Type::Tuple(type_tuple) => {
+                anyhow::bail!("Tuple field types are not supported yet | ty: {}", type_tuple.to_token_stream());
+            },
+            t => {
+                anyhow::bail!("Field type `{}` is not supported", t.to_token_stream());
+            },
+        };
+
+        let ty=ty_name_into_data(&field_ty_str, &generic_arg,true)?;
+
+        if let TyData::Binary=ty{
+            let context_str2=format!(
+                "Getting field `{}` with type {} for struct `{}` (Converting from binary)",
+                field.ident.as_ref().unwrap(),
+                field.ty.to_token_stream(),
+                item_name
+            );
+
+            fields_quotes.push(quote! {
+                #field_name: #sql_crate::from_binary_vec( <#sql_crate::Row as #sql_crate::SqlxRow>::try_get(&data, #field_name_str).with_context(
+                    context!(#context_str),
+                )?).with_context(
+                    context!(#context_str2),
+                )?,
+            });
+        }else{
+            fields_quotes.push(quote! {
+                #field_name: <#sql_crate::Row as #sql_crate::SqlxRow>::try_get(&data, #field_name_str).with_context(
+                    context!(#context_str),
+                )?,
+            });
+        }
+
+    }
+
+    //TODO Handle joined fields
+    //TODO Isn't todo above done?
+
+    Ok(quote! {
         impl #sql_crate::SqlOutput<#table, #sql_crate::Row> for #item_name {
             fn sql_to_query<'a>(sql: &'a #sql_crate::Sql<'a>) -> #easy_lib_crate::anyhow::Result<#sql_crate::QueryData<'a>> {
                 #sql_crate::never::never_fn(|| {
@@ -179,9 +228,7 @@ pub fn sql_output_base(
 
                 Ok(Self {
                     #(
-                        #field_names2: <#sql_crate::Row as #sql_crate::SqlxRow>::try_get(&data, #field_names_str2).with_context(
-                            context!(#context_strs),
-                        )?,
+                        #fields_quotes
                     )*
                     #(
                         #joined_checks_field_names: <#sql_crate::Row as #sql_crate::SqlxRow>::try_get(&data, #joined_field_aliases).with_context(
@@ -192,7 +239,7 @@ pub fn sql_output_base(
             }
         }
 
-    }
+    })
 }
 
 struct FieldAttribute{
@@ -265,5 +312,5 @@ pub fn sql_output(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::T
 
     // panic!("{}", result);
 
-    Ok(result.into())
+    result.map(|r|r.into())
 }
