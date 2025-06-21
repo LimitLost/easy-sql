@@ -39,6 +39,7 @@ fn table_function_check(fn_path: &syn::Path) -> Option<TokenStream> {
         | "get"
         | "select_lazy"
         | "get_lazy"
+        | "exists"
         | "insert"
         | "insert_returning"
         | "insert_returning_lazy"
@@ -78,7 +79,12 @@ fn after_call_check(item: &mut syn::ExprCall, context_info: &mut SqlData) {
 fn macro_check(item: &mut syn::Macro, context_info: &mut SqlData) {
     let path = item.path.to_token_stream().to_string();
     match path.as_str() {
-        "sql" | "sql_where" | "easy_lib::sql::sql" | "easy_lib::sql::sql_where" => {
+        "sql"
+        | "sql_where"
+        | "sql_where_debug"
+        | "easy_lib::sql::sql"
+        | "easy_lib::sql::sql_where"
+        | "easy_lib::sql::sql_where_debug" => {
             if let Some(table) = &context_info.potential_table {
                 if !item.tokens.to_string().starts_with("|") {
                     replace_with::replace_with_or_abort(&mut item.tokens, |current_tokens| {

@@ -2,11 +2,11 @@ use easy_macros::{
     macros::always_context,
     proc_macro2::TokenStream,
     quote::{quote, quote_spanned},
-    syn::{self, parse::Parse, spanned::Spanned},
+    syn::{self, Token, parse::Parse, punctuated::Punctuated, spanned::Spanned},
 };
 #[derive(Debug)]
 pub enum SqlColumn {
-    SpecificTableColumn(syn::Path, syn::Ident),
+    SpecificTableColumn(Punctuated<syn::Ident, Token![::]>, syn::Ident),
     Column(syn::Ident),
 }
 
@@ -48,18 +48,19 @@ impl SqlColumn {
 #[always_context]
 impl Parse for SqlColumn {
     fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
-        let path_or_ident: syn::Path = input.parse()?;
+        let path_or_ident: Punctuated<syn::Ident, Token![::]> =
+            Punctuated::parse_separated_nonempty(input)?;
         let lookahead2 = input.lookahead1();
         if lookahead2.peek(syn::Token![.]) {
             input.parse::<syn::Token![.]>()?;
             let ident: syn::Ident = input.parse()?;
             return Ok(SqlColumn::SpecificTableColumn(path_or_ident, ident));
+        } else if let Some(ident) = path_or_ident.first()
+            && path_or_ident.len() == 1
+        {
+            return Ok(SqlColumn::Column(ident.clone()));
         } else {
-            if let Some(ident) = path_or_ident.get_ident() {
-                return Ok(SqlColumn::Column(ident.clone()));
-            } else {
-                return Err(input.error("Expected identifier instead of path (or dot after path)"));
-            }
+            return Err(input.error("Expected identifier instead of path (or dot after path)"));
         }
     }
 }

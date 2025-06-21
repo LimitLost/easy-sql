@@ -9,6 +9,10 @@ use crate::{
 
 use super::{SqlInsert, SqlOutput, SqlUpdate, ToConvert};
 
+// THIS SHIT IS UNSTABLE, AAAAAAA
+// pub type Clauses<T,'a> = Option<(fn(T), impl CanBeSelectClause<'a> + Send + Sync);
+// pub type WhereClause<T,'a> = (fn(T), impl CanBeSelectClause<'a> + Send + Sync);
+
 #[always_context]
 #[async_trait]
 pub trait SqlTable: Sized {
@@ -17,7 +21,7 @@ pub trait SqlTable: Sized {
 
     fn table_joins() -> Vec<TableJoin<'static>>;
 
-    /// Use `sql!` or `sql_where!` macros to generate clauses (second argument to this function)
+    /// Use `sql!` or `sql_where!` macros to generate clauses (second argument to this function), or `None` for all rows
     async fn get<'a, Y: ToConvert + Send + Sync, T: SqlOutput<Self, Y>>(
         conn: &mut (impl EasyExecutor + Send + Sync),
         clauses: Option<(fn(Self), impl CanBeSelectClause<'a> + Send + Sync)>,
@@ -31,7 +35,7 @@ pub trait SqlTable: Sized {
         conn.query(&sql).await
     }
 
-    /// Use `sql!` or `sql_where!` macros to generate clauses (second argument to this function)
+    /// Use `sql!` or `sql_where!` macros to generate clauses (second argument to this function), or `None` for all rows
     /// # How to Async inside of closure
     /// (tokio example)
     /// ```rust
@@ -56,7 +60,7 @@ pub trait SqlTable: Sized {
 
     /// Alias for get
     ///
-    /// Use `sql!` or `sql_where!` macros to generate clauses (second argument to this function)
+    /// Use `sql!` or `sql_where!` macros to generate clauses (second argument to this function), or `None` for all rows
     async fn select<'a, Y: ToConvert + Send + Sync, T: SqlOutput<Self, Y>>(
         conn: &mut (impl EasyExecutor + Send + Sync),
         clauses: Option<(fn(Self), impl CanBeSelectClause<'a> + Send + Sync)>,
@@ -65,7 +69,7 @@ pub trait SqlTable: Sized {
     }
     /// Alias for get
     ///
-    /// Use `sql!` or `sql_where!` macros to generate clauses (second argument to this function)
+    /// Use `sql!` or `sql_where!` macros to generate clauses (second argument to this function), or `None` for all rows
     /// # How to Async inside of closure
     /// (tokio example)
     /// ```rust
@@ -82,7 +86,7 @@ pub trait SqlTable: Sized {
         Self::get_lazy(conn, clauses, perform).await
     }
 
-    /// Use `sql!` or `sql_where!` macros to generate clauses (second argument to this function)
+    /// Use `sql!` or `sql_where!` macros to generate clauses (second argument to this function), or `None` for all rows
     async fn exists<'a>(
         conn: &mut (impl EasyExecutor + Send + Sync),
         clauses: Option<(fn(Self), impl CanBeSelectClause<'a> + Send + Sync)>,

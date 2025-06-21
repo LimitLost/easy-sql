@@ -36,7 +36,7 @@ impl DatabaseInternal {
         Ok(())
     }
 }
-
+#[derive(Debug)]
 pub struct Database {
     connection_pool: sqlx::Pool<Db>,
     internal: Arc<Mutex<DatabaseInternal>>,

@@ -32,7 +32,7 @@ pub fn sql_where(item: proc_macro::TokenStream) -> proc_macro::TokenStream {
         }))
     };
 
-    // panic!("result: {}", result);
+    //panic!("result: {}", result);
 
     result.into()
 }

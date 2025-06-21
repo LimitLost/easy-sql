@@ -244,7 +244,7 @@ pub fn sql_table(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::To
         }
         let version: LitInt = syn::parse2(version.clone())
             .context("Expected literal int in the sql(version) attribute")?;
-        let n: u64 = version
+        let n: i64 = version
             .base10_parse()
             .context("Expected base10 literal int in the sql(version) attribute")?;
         table_version = Some(n);

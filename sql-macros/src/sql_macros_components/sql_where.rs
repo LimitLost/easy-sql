@@ -412,32 +412,6 @@ impl Parse for SqlValueIn {
     }
 }
 
-fn continue_parse_expr(
-    input: syn::parse::ParseStream,
-    current_expr: WhereExpr,
-) -> syn::Result<WhereExpr> {
-    let lookahead = input.lookahead1();
-    if input.is_empty() || next_clause_token(&lookahead) {
-        Ok(current_expr)
-    } else {
-        let first_expr = current_expr;
-        let mut next_exprs = vec![];
-        while !input.is_empty() {
-            let lookahead = input.lookahead1();
-            if next_clause_token(&lookahead) {
-                break;
-            }
-
-            let and_or = input.parse::<AndOr>()?;
-            let next = parse_where_expr_no_continue(&input)?;
-
-            next_exprs.push((and_or, next));
-        }
-
-        Ok(WhereExpr::AndOr(Box::new(first_expr), next_exprs))
-    }
-}
-
 fn continue_parse_value_no_expr(
     input: syn::parse::ParseStream,
     current_value: SqlValue,
@@ -524,18 +498,20 @@ fn continue_parse_value_maybe_expr(
     let lookahead = input.lookahead1();
 
     if lookahead.peek(sql_keyword::and) || lookahead.peek(sql_keyword::or) {
-        continue_parse_expr(input, WhereExpr::Value(current_value))
+        // We handle and/or in the WhereExpr::parse method
+        Ok(WhereExpr::Value(current_value))
     } else {
         continue_parse_value_no_expr(input, current_value, lookahead)
     }
 }
 
-fn parse_where_expr_no_continue(input: &syn::parse::ParseStream) -> syn::Result<WhereExpr> {
+fn sub_where_expr(input: syn::parse::ParseStream) -> syn::Result<WhereExpr> {
     let lookahead = input.lookahead1();
 
     if lookahead.peek(sql_keyword::not) {
         input.parse::<sql_keyword::not>()?;
-        let expr = parse_where_expr_no_continue(input)?;
+
+        let expr = sub_where_expr(input)?;
         Ok(WhereExpr::Not(Box::new(expr)))
     } else if lookahead.peek(syn::token::Paren) {
         let inside_paren;
@@ -545,13 +521,7 @@ fn parse_where_expr_no_continue(input: &syn::parse::ParseStream) -> syn::Result<
     } else if SqlValue::lookahead(&lookahead) {
         let parsed = input.parse::<SqlValue>()?;
 
-        if input.is_empty() {
-            return Ok(WhereExpr::Value(parsed));
-        }
-
-        let lookahead2 = input.lookahead1();
-
-        continue_parse_value_no_expr(input, parsed, lookahead2)
+        Ok(continue_parse_value_maybe_expr(input, parsed)?)
     } else {
         Err(lookahead.error())
     }
@@ -560,24 +530,41 @@ fn parse_where_expr_no_continue(input: &syn::parse::ParseStream) -> syn::Result<
 #[always_context]
 impl Parse for WhereExpr {
     fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
-        let lookahead = input.lookahead1();
+        let mut first_expr = None;
+        let mut next_exprs = vec![];
 
-        if lookahead.peek(sql_keyword::not) {
-            input.parse::<sql_keyword::not>()?;
-            let expr = input.parse::<WhereExpr>()?;
-            return Ok(WhereExpr::Not(Box::new(expr)));
-        } else if lookahead.peek(syn::token::Paren) {
-            let inside_paren;
-            syn::parenthesized!(inside_paren in input);
-            let expr = inside_paren.parse::<WhereExpr>()?;
-            let where_expr = WhereExpr::Parenthesized(Box::new(expr));
-            continue_parse_expr(input, where_expr)
-        } else if SqlValue::lookahead(&lookahead) {
-            let parsed = input.parse::<SqlValue>()?;
+        while !input.is_empty() {
+            let and_or = if first_expr.is_some() {
+                let lookahead = input.lookahead1();
 
-            continue_parse_value_maybe_expr(input, parsed)
+                if next_clause_token(&lookahead) {
+                    break;
+                }
+
+                Some(input.parse::<AndOr>()?)
+            } else {
+                None
+            };
+
+            let current_expr = sub_where_expr(&input)?;
+
+            if let Some(and_or) = and_or {
+                next_exprs.push((and_or, current_expr));
+            } else {
+                first_expr = Some(current_expr);
+            }
+        }
+
+        let first_expr = if let Some(first_expr) = first_expr {
+            first_expr
         } else {
-            Err(lookahead.error())
+            return Err(input.error("Expected a valid where expression, if you don't want to use any conditions, use `true`"));
+        };
+
+        if next_exprs.is_empty() {
+            Ok(first_expr)
+        } else {
+            Ok(WhereExpr::AndOr(Box::new(first_expr), next_exprs))
         }
     }
 }

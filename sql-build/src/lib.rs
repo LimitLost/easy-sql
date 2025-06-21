@@ -1,5 +1,5 @@
 use std::{
-    collections::{hash_map::Entry, HashMap},
+    collections::{HashMap, hash_map::Entry},
     io::Write,
     path::Path,
 };
@@ -10,10 +10,10 @@ use easy_macros::{
     helpers::context,
     macros::{all_syntax_cases, always_context, get_attributes},
     proc_macro2::LineColumn,
-    quote::{quote, ToTokens},
+    quote::{ToTokens, quote},
     syn::{
-        self, punctuated::Punctuated, spanned::Spanned, ItemFn, ItemImpl, ItemTrait, LitInt,
-        LitStr, Macro, Meta,
+        self, ItemFn, ItemImpl, ItemTrait, LitInt, LitStr, Macro, Meta, punctuated::Punctuated,
+        spanned::Spanned,
     },
 };
 use sql_compilation_data::{CompilationData, TableData, TableDataVersion};
@@ -124,7 +124,10 @@ fn struct_table_handle(
     for attr_data in get_attributes!(item, #[sql(unique_id = __unknown__)]) {
         if unique_id.is_some() {
             //Ignore multiple unique_id attributes, error should be shown by derive macro
-            return Ok(());
+            anyhow::bail!(
+                "Multiple unique_id attributes found, struct: {}",
+                item.to_token_stream()
+            );
         }
         let lit_str: LitStr = syn::parse2(attr_data.clone())?;
         unique_id = Some(lit_str.value());
@@ -152,20 +155,8 @@ fn struct_table_handle(
     //Check if table version has changed
     let mut version = None;
     for attr_data in get_attributes!(item, #[sql(version = __unknown__)]) {
-        let lit_int: LitInt = match syn::parse2(attr_data) {
-            Ok(lit_int) => lit_int,
-            Err(_) => {
-                //Ignore invalid attributes, error should be shown by derive macro
-                return Ok(());
-            }
-        };
-        version = match lit_int.base10_parse::<u64>() {
-            Ok(o) => Some(o),
-            Err(_) => {
-                //Ignore invalid attributes, error should be shown by derive macro
-                return Ok(());
-            }
-        };
+        let lit_int: LitInt = syn::parse2(attr_data.clone())?;
+        version = Some(lit_int.base10_parse::<i64>()?);
     }
 
     //Version attribute should exist. if it doesn't error by derive macro should be shown
@@ -412,7 +403,7 @@ fn handle_dir(
     // Iterate over all files
     'entries: for entry in files {
         #[no_context_inputs]
-        let entry = entry?;
+        let entry = entry.context("Directory Entry")?;
 
         // Get the file path
         let entry_path = entry.path();

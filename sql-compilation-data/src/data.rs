@@ -83,11 +83,11 @@ impl TableDataVersion {
             let default = get_attributes!(field, #[sql(default = __unknown__)])
                 .into_iter()
                 .next()
-                .map(|e| token_stream_to_consistent_string(e));
+                .map(token_stream_to_consistent_string);
 
             for foreign_key in get_attributes!(field, #[sql(foreign_key = __unknown__)])
                 .into_iter()
-                .map(|e| token_stream_to_consistent_string(e))
+                .map(token_stream_to_consistent_string)
             {
                 let fields: &mut Vec<String> = foreign_keys
                     .entry(foreign_key)
@@ -125,8 +125,8 @@ impl TableDataVersion {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct TableData {
-    pub saved_versions: HashMap<u64, TableDataVersion>,
-    pub latest_version: u64,
+    pub saved_versions: HashMap<i64, TableDataVersion>,
+    pub latest_version: i64,
 }
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CompilationData {
@@ -241,7 +241,7 @@ impl CompilationData {
         &self,
         current_unique_id: &str,
         latest_version: &TableDataVersion,
-        latest_version_number: u64,
+        latest_version_number: i64,
         sql_crate: &TokenStream,
         item_name: &TokenStream,
     ) -> anyhow::Result<TokenStream> {
@@ -364,62 +364,61 @@ impl CompilationData {
 
                 let field_name = new_field.name.as_str();
                 let data_type = new_field.sql_type.to_tokens(sql_crate);
-                let default_value = new_field.default.as_ref().map(|s| s.as_str()).unwrap();
                 let is_not_null = new_field.is_not_null;
                 let is_unique = new_field.is_unique;
 
-                let default_expr: syn::Expr = syn::parse_str(default_value)?;
+                let default_value = if let Some(default_value) = new_field.default.as_deref() {
+                    let default_expr: syn::Expr = syn::parse_str(default_value)?;
+                    if new_field.ty_to_bytes {
+                        let error_context = format!(
+                            "Converting default value `{default_value}` to bytes for field `{field_name}`, table_unique_id: `{current_unique_id}` migrating from version: `{version_number}` to version: `{latest_version_number}`",
+                        );
+                        //For compatibility sake
+                        let default_value = default_expr;
 
-                let default_value = if new_field.ty_to_bytes {
-                    let error_context = format!(
-                        "Converting default value `{}` to bytes for field `{}`, table_unique_id: `{}` migrating from version: `{}` to version: `{}`",
-                        default_value,
-                        field_name,
-                        current_unique_id,
-                        version_number,
-                        latest_version_number,
-                    );
-                    //For compatibility sake
-                    let default_value = default_expr;
+                        //Convert provided default value to bytes
+                        quote! {
+                            {
+                                //Test if default value to_bytes will be successful
+                                //Even in release mode, just in case, it's low cost anyway
+                                #sql_crate::to_bytes(#default_value).context(#error_context)?;
 
-                    //Convert provided default value to bytes
-                    quote! {
-                        {
-                            //Test if default value to_bytes will be successful
-                            //Even in release mode, just in case, it's low cost anyway
-                            #sql_crate::to_bytes(#default_value).context(#error_context)?;
+                                #sql_crate::lazy_static!{
+                                    static ref DEFAULT_VALUE: #sql_crate::SqlValueMaybeRef<'static> = #sql_crate::to_bytes(#default_value).unwrap().into();
+                                }
 
-                            #sql_crate::lazy_static!{
-                                static ref DEFAULT_VALUE: #sql_crate::SqlValueMaybeRef<'static> = #sql_crate::to_bytes(#default_value).unwrap().into();
+                                //Check if default value has valid type for the current column
+                                #sql_crate::never::never_fn(||{
+                                    let mut table_instance = #sql_crate::never::never_any::<#item_name>();
+                                    table_instance.#field_name = #default_value;
+                                });
+
+                                Some(&*DEFAULT_VALUE)
                             }
+                        }
+                    } else {
+                        //For compatibility sake
+                        let default_value = default_expr;
 
-                            //Check if default value has valid type for the current column
-                            #sql_crate::never::never_fn(||{
-                                let mut table_instance = #sql_crate::never::never_any::<#item_name>();
-                                table_instance.#field_name = #default_value;
-                            });
+                        quote! {
+                            {
+                                #sql_crate::lazy_static!{
+                                    static ref DEFAULT_VALUE: #sql_crate::SqlValueMaybeRef<'static> = (#default_value).into();
+                                }
 
-                            Some(&*DEFAULT_VALUE)
+                                //Check if default value has valid type for the current column
+                                #sql_crate::never::never_fn(||{
+                                    let mut table_instance = #sql_crate::never::never_any::<#item_name>();
+                                    table_instance.#field_name = #default_value;
+                                });
+
+                                Some(&*DEFAULT_VALUE)
+                            }
                         }
                     }
                 } else {
-                    //For compatibility sake
-                    let default_value = default_expr;
-
                     quote! {
-                        {
-                            #sql_crate::lazy_static!{
-                                static ref DEFAULT_VALUE: #sql_crate::SqlValueMaybeRef<'static> = (#default_value).into();
-                            }
-
-                            //Check if default value has valid type for the current column
-                            #sql_crate::never::never_fn(||{
-                                let mut table_instance = #sql_crate::never::never_any::<#item_name>();
-                                table_instance.#field_name = #default_value;
-                            });
-
-                            Some(&*DEFAULT_VALUE)
-                        }
+                        None
                     }
                 };
 
@@ -446,9 +445,9 @@ impl CompilationData {
                     if current_version_number == #version_number{
                         conn.query_setup(#sql_crate::AlterTable{
                             table_name: #table_name,
-                            changes: vec![#(#changes_needed),*],
+                            alters: vec![#(#changes_needed),*],
                         }).await?;
-                        #sql_crate::EasySqlTables::update_version(conn, #table_name, #version_number).await?;
+                        #sql_crate::EasySqlTables::update_version(conn, #table_name, #latest_version_number).await?;
                         return Ok(());
                     }
                 });

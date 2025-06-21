@@ -56,6 +56,11 @@ pub fn sql(item: TokenStream) -> TokenStream {
 pub fn sql_where(item: TokenStream) -> TokenStream {
     sql_macros::sql_where(item)
 }
+#[proc_macro]
+pub fn sql_where_debug(item: TokenStream) -> TokenStream {
+    let result = sql_macros::sql_where(item);
+    panic!("{}", result);
+}
 
 #[proc_macro]
 pub fn table_join(item: TokenStream) -> TokenStream {

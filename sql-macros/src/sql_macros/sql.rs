@@ -122,7 +122,7 @@ impl Parse for Input {
 
 pub fn sql(item: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let input = syn::parse_macro_input!(item as WrappedInput<Input>);
-    let table_ty = input.table;
+    let input_table = input.table;
     let input = input.input;
 
     let mut checks = Vec::new();
@@ -196,10 +196,18 @@ pub fn sql(item: proc_macro::TokenStream) -> proc_macro::TokenStream {
 
         let distinct = input.distinct;
 
+        let checks_tokens = if let Some(table_ty) = input_table {
+            quote! {
+                |___t___:#table_ty|{
+                    #(#checks)*
+                },
+            }
+        } else {
+            quote! {}
+        };
+
         quote! {
-            Some((|___t___:#table_ty|{
-                #(#checks)*
-            },
+            Some((#checks_tokens
             #sql_crate::SelectClauses {
                 distinct: #distinct,
 

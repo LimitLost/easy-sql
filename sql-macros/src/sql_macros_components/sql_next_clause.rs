@@ -10,4 +10,9 @@ pub fn next_clause_token(lookahead: &Lookahead1) -> bool {
         || lookahead.peek(sql_keyword::group)
         || lookahead.peek(sql_keyword::order)
         || lookahead.peek(sql_keyword::limit)
+        || lookahead.peek(sql_keyword::join)
+        || lookahead.peek(sql_keyword::inner)
+        || lookahead.peek(sql_keyword::left)
+        || lookahead.peek(sql_keyword::right)
+        || lookahead.peek(sql_keyword::cross)
 }
