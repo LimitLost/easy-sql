@@ -61,7 +61,9 @@ impl EasyExecutor for Transaction {
         let query = O::sql_to_query(sql)?;
         let query_sqlx = query.sqlx();
         #[no_context_inputs]
-        let row = Y::get(&mut *self.internal, query_sqlx).await?;
+        let row = Y::get(&mut *self.internal, query_sqlx)
+            .await
+            .with_context(|| format!("query: {query:?}"))?;
 
         //Inform about query DatabaseInternal
         #[no_context_inputs]
@@ -69,10 +71,12 @@ impl EasyExecutor for Transaction {
             .lock()
             .await
             .sql_request(&mut *self.internal, sql)
-            .await?;
+            .await
+            .with_context(|| format!("query: {query:?}"))?;
 
         #[no_context_inputs]
-        Ok(O::convert(row).context("Converting Row to Value")?)
+        Ok(O::convert(row)
+            .with_context(|| format!("Converting Row to Value | query: {query:?}"))?)
     }
 
     async fn query_setup<O: SetupSql + Send + Sync>(
@@ -122,13 +126,18 @@ impl EasyExecutor for Transaction {
             .lock()
             .await
             .sql_request(&mut *self.internal, sql)
-            .await?;
+            .await
+            .with_context(|| format!("query: {query_output:?}"))?;
 
         let rows = query_output.sqlx().fetch(&mut *self.internal);
 
         let mut mapped = rows.map(|e| {
-            e.context("Row fetching")
-                .and_then(|row| O::convert(row).context("Converting Row to Value"))
+            e.with_context(|| format!("Row fetching | query: {query_output:?}"))
+                .and_then(|row| {
+                    O::convert(row).with_context(|| {
+                        format!("Converting Row to Value | query: {query_output:?}")
+                    })
+                })
         });
 
         while let Some(row) = mapped.try_next().await? {
