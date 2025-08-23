@@ -51,11 +51,11 @@ impl EasySqlTables {
     pub async fn get_version(
         conn: &mut (impl EasyExecutor + Send + Sync),
         table_id: &str,
-    ) -> anyhow::Result<i64> {
+    ) -> anyhow::Result<Option<i64>> {
         #[no_context]
-        let version: EasySqlTableVersion =
+        let version: Option<EasySqlTableVersion> =
             EasySqlTables::select(conn, sql_where!(table_id = { table_id })).await?;
-        Ok(version.version)
+        Ok(version.map(|v| v.version))
     }
 }
 

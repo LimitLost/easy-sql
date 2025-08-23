@@ -19,11 +19,10 @@ all_syntax_cases! {
     }
     default_cases=>{
         fn macro_check(item: &mut syn::Macro, context_info: &mut SqlData);
-        fn call_check(item: &mut syn::ExprCall, context_info: &mut SqlData);
-        #[after_system]
-        fn after_call_check(item: &mut syn::ExprCall, context_info: &mut SqlData);
     }
-    special_cases=>{}
+    special_cases=>{
+        fn call_check(item: &mut syn::ExprCall, context_info: &mut SqlData);
+    }
 }
 
 fn table_function_check(fn_path: &syn::Path) -> Option<TokenStream> {
@@ -59,20 +58,25 @@ fn table_function_check(fn_path: &syn::Path) -> Option<TokenStream> {
 }
 
 fn call_check(item: &mut syn::ExprCall, context_info: &mut SqlData) {
+    let mut reset_after = false;
     match &*item.func {
         syn::Expr::Path(expr_path) => {
-            context_info.potential_table = table_function_check(&expr_path.path);
+            let before = context_info.potential_table.is_none();
+            let potential = table_function_check(&expr_path.path);
+            if before && potential.is_some() {
+                context_info.potential_table = potential;
+                reset_after = true;
+            }
         }
         _ => {}
     }
-}
 
-fn after_call_check(item: &mut syn::ExprCall, context_info: &mut SqlData) {
-    match &*item.func {
-        syn::Expr::Path(_) => {
-            context_info.potential_table = None;
-        }
-        _ => {}
+    for arg in item.args.iter_mut() {
+        macro_search_expr_handle(arg, context_info);
+    }
+
+    if reset_after {
+        context_info.potential_table = None;
     }
 }
 

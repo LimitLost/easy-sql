@@ -66,7 +66,6 @@ fn insert_query<'a>(
 
         for _ in 0..values.len() {
             values_str.push_str(&single_value_str(columns_len, &mut current_value_n));
-            values_str.push(',');
         }
         //Removes last comma
         values_str.pop();
@@ -220,7 +219,7 @@ impl Sql<'_> {
             } => {
                 let mut bindings_list = Vec::new();
                 let query_str = format!(
-                    "EXISTS ({})",
+                    "SELECT EXISTS ({})",
                     select_base(joins, table, clauses, &mut bindings_list, "1")
                 );
                 QueryData {

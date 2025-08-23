@@ -320,11 +320,11 @@ pub fn sql_table(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::To
             ) -> #easy_lib_crate::anyhow::Result<()> {
                 use #easy_lib_crate::anyhow::Context;
 
-                let table_exists = conn.query_setup(#sql_crate::TableExists{name: #table_name}).await.with_context(#easy_macros_helpers_crate::context!("Checking if table exists: {:?}",#table_name))?;
+                let current_version_number = #sql_crate::EasySqlTables::get_version(conn,#unique_id).await?;
 
-                if table_exists{
+                if let Some(current_version_number) = current_version_number{
                     use #sql_crate::EasyExecutor;
-                    let current_version_number = #sql_crate::EasySqlTables::get_version(conn,#unique_id).await?;
+
                     #migrations
                 }else{
                     use #sql_crate::EasyExecutor;
@@ -350,7 +350,7 @@ pub fn sql_table(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::To
                             .collect()
                         },
                     }).await?;
-                    #sql_crate::EasySqlTables::create(conn, #table_name.to_string(), #table_version_i64).await?;
+                    #sql_crate::EasySqlTables::create(conn, #unique_id.to_string(), #table_version_i64).await?;
                 }
 
                 Ok(())
@@ -378,7 +378,7 @@ pub fn sql_table(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::To
         #output_impl
     };
 
-    // panic!("{}", result);
+    //panic!("{}", result);
 
     Ok(result.into())
 }

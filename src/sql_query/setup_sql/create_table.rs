@@ -34,27 +34,25 @@ impl SetupSql for CreateTable {
     ) -> anyhow::Result<Self::Output> {
         let mut table_fields = String::new();
         let mut table_constrains = String::new();
-        let mut primary_keys = Vec::new();
 
         let mut bindings_list = Vec::new();
 
         for field in self.fields.into_iter() {
-            primary_keys.push(field.name);
-
             table_fields.push_str(&field.definition(&mut bindings_list));
         }
 
+        let primary_keys = self.primary_keys;
         //Primary key constraint
         if self.auto_increment {
             match primary_keys.first() {
                 Some(primary_key) if primary_keys.len() == 1 => {
                     table_constrains
-                        .push_str(&format!("PRIMARY KEY ({} AUTOINCREMENT)", primary_key));
+                        .push_str(&format!("PRIMARY KEY ({primary_key} AUTOINCREMENT),"));
                 }
                 _ => anyhow::bail!("Auto increment is only supported for single primary key"),
             }
         } else {
-            table_constrains.push_str(&format!("PRIMARY KEY ({})", primary_keys.join(", ")));
+            table_constrains.push_str(&format!("PRIMARY KEY ({}),", primary_keys.join(", ")));
         }
 
         //Foreign key constraints
@@ -64,8 +62,7 @@ impl SetupSql for CreateTable {
             let on_delete = if cascade { "ON DELETE CASCADE" } else { "" };
             let on_update = if cascade { "ON UPDATE CASCADE" } else { "" };
             table_constrains.push_str(&format!(
-                "FOREIGN KEY ({}) REFERENCES {}({}) {} {},",
-                referenced_fields, foreign_table, foreign_fields, on_delete, on_update
+                "FOREIGN KEY ({referenced_fields}) REFERENCES {foreign_table}({foreign_fields}) {on_delete} {on_update},"
             ));
         }
 

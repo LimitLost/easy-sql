@@ -18,11 +18,11 @@ use crate::Db;
 
 type QueryTy<'a> = sqlx::query::Query<'a, Db, <Db as sqlx::Database>::Arguments<'a>>;
 
+#[derive(Debug)]
 pub struct QueryData<'a> {
     query: String,
     bindings: Vec<&'a SqlValueMaybeRef<'a>>,
 }
-
 
 #[always_context]
 impl<'a> QueryData<'a> {
