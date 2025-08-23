@@ -2,17 +2,19 @@ use std::sync::Arc;
 
 use anyhow::Context;
 use easy_macros::macros::always_context;
-use sqlx::{Executor, sqlite::SqliteConnectOptions};
+use sqlx::Executor;
 
 use std::path::Path;
 use tokio::sync::Mutex;
 
 use super::{Connection, Transaction};
-use crate::{DatabaseSetup, Db, sql_query::Sql};
+use crate::{DatabaseSetup, Db, EasySqlTables, sql_query::Sql};
 
 /// TODO Will be used in the future to send data to the remote database
 #[derive(Debug, Default)]
 pub(crate) struct DatabaseInternal;
+
+pub use sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode};
 
 #[always_context]
 impl DatabaseInternal {
@@ -45,12 +47,41 @@ pub struct Database {
 #[always_context]
 impl Database {
     pub async fn setup<T: DatabaseSetup>(db_file_path: impl AsRef<Path>) -> anyhow::Result<Self> {
-        let connection_pool =
-            sqlx::Pool::<Db>::connect_with(SqliteConnectOptions::default().filename(&db_file_path))
-                .await?;
+        let connection_pool = sqlx::Pool::<Db>::connect_with(
+            SqliteConnectOptions::default()
+                .filename(&db_file_path)
+                .create_if_missing(true),
+        )
+        .await?;
+
+        let internal: Arc<Mutex<DatabaseInternal>> = Default::default();
+
+        let mut conn = Connection::new(connection_pool.acquire().await?, internal.clone());
+
+        EasySqlTables::setup(&mut conn).await?;
+        T::setup(&mut conn).await?;
+
         Ok(Database {
             connection_pool,
-            internal: Default::default(),
+            internal,
+        })
+    }
+
+    pub async fn setup_with_options<T: DatabaseSetup>(
+        options: SqliteConnectOptions,
+    ) -> anyhow::Result<Self> {
+        let connection_pool = sqlx::Pool::<Db>::connect_with(options.clone()).await?;
+
+        let internal: Arc<Mutex<DatabaseInternal>> = Default::default();
+
+        let mut conn = Connection::new(connection_pool.acquire().await?, internal.clone());
+
+        EasySqlTables::setup(&mut conn).await?;
+        T::setup(&mut conn).await?;
+
+        Ok(Database {
+            connection_pool,
+            internal,
         })
     }
 
