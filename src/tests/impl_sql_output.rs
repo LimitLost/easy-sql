@@ -32,14 +32,17 @@ impl crate::SqlOutput<ExampleTableStruct, crate::Row> for ExampleStruct {
 
         let requested_columns = vec![
             crate::RequestedColumn {
+                table_name: None,
                 name: "field1".to_owned(),
                 alias: None,
             },
             crate::RequestedColumn {
+                table_name: None,
                 name: "field2".to_owned(),
                 alias: None,
             },
             crate::RequestedColumn {
+                table_name: None,
                 name: "field3".to_owned(),
                 alias: None,
             },

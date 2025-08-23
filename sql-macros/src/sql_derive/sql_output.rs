@@ -115,7 +115,7 @@ pub fn sql_output_base(
     }).collect::<Vec<_>>();
 
     let joined_checks_column_name_format=joined_fields.iter().map(|joined_field|{
-        format!("{{}}.{}",joined_field.table_field) 
+        format!("{}",joined_field.table_field) 
     });
 
     let context_strs2 = joined_fields.iter().map(|joined_field| {
@@ -208,13 +208,15 @@ pub fn sql_output_base(
                 let requested_columns = vec![
                     #(
                         #sql_crate::RequestedColumn {
+                            table_name: None,
                             name: #field_names_str.to_owned(),
                             alias: None,
                         },
                     )*
                     #(
                         #sql_crate::RequestedColumn {
-                            name: format!(#joined_checks_column_name_format,<#joined_checks_table_names as #sql_crate::SqlTable>::table_name()),
+                            table_name: Some(<#joined_checks_table_names as #sql_crate::SqlTable>::table_name()),
+                            name: #joined_checks_column_name_format.to_owned(),
                             alias: Some(#joined_field_aliases.to_owned()),
                         },
                     )*

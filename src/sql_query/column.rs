@@ -9,6 +9,7 @@ pub struct Column {
 }
 #[derive(Debug)]
 pub struct RequestedColumn {
+    pub table_name: Option<&'static str>,
     pub name: String,
     pub alias: Option<String>,
 }
@@ -16,10 +17,15 @@ pub struct RequestedColumn {
 #[always_context]
 impl RequestedColumn {
     pub fn to_query_data(&self) -> String {
-        if let Some(alias) = &self.alias {
-            format!("`{}` AS `{}`", self.name, alias)
+        let table_name = if let Some(table) = self.table_name {
+            format!("`{table}`.")
         } else {
-            format!("`{}`", self.name)
+            String::new()
+        };
+        if let Some(alias) = &self.alias {
+            format!("{table_name}`{}` AS `{alias}`", self.name)
+        } else {
+            format!("{table_name}`{}`", self.name)
         }
     }
 }
