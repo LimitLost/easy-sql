@@ -4,6 +4,8 @@ mod sql_where;
 pub use sql_where::*;
 mod table_join;
 pub use table_join::*;
+mod sql_set;
+pub use sql_set::*;
 
 use easy_macros::{
     macros::always_context,

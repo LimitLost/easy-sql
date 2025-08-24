@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::SqlValueMaybeRef;
 
-use super::{GroupByClause, HavingClause, LimitClause, OrderByClause, WhereClause, WhereExpr};
+use super::{GroupByClause, HavingClause, LimitClause, OrderByClause, SqlExpr, WhereClause};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub enum JoinType {
@@ -18,7 +18,7 @@ pub struct TableJoin<'a> {
     pub table: &'static str,
     pub join_type: JoinType,
     pub alias: Option<String>,
-    pub on: Option<WhereExpr<'a>>,
+    pub on: Option<SqlExpr<'a>>,
 }
 
 #[always_context]

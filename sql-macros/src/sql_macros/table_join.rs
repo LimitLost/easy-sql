@@ -3,7 +3,7 @@ use easy_macros::quote::quote;
 use easy_macros::syn::{self, parse::Parse};
 
 use crate::sql_crate;
-use crate::sql_macros_components::sql_where::WhereExpr;
+use crate::sql_macros_components::sql_expr::SqlExpr;
 
 use crate::sql_macros_components::sql_keyword;
 
@@ -13,9 +13,9 @@ struct Input {
     joins: Vec<Join>,
 }
 enum Join {
-    Inner { table: syn::Path, on: WhereExpr },
-    Left { table: syn::Path, on: WhereExpr },
-    Right { table: syn::Path, on: WhereExpr },
+    Inner { table: syn::Path, on: SqlExpr },
+    Left { table: syn::Path, on: SqlExpr },
+    Right { table: syn::Path, on: SqlExpr },
     Cross { table: syn::Path },
 }
 
@@ -31,7 +31,7 @@ impl Parse for Join {
 
             input.parse::<sql_keyword::on>()?;
 
-            let on = input.parse::<WhereExpr>()?;
+            let on = input.parse::<SqlExpr>()?;
             Ok(Join::Inner { table, on })
         } else if lookahead.peek(sql_keyword::left) {
             input.parse::<sql_keyword::left>()?;
@@ -41,7 +41,7 @@ impl Parse for Join {
 
             input.parse::<sql_keyword::on>()?;
 
-            let on = input.parse::<WhereExpr>()?;
+            let on = input.parse::<SqlExpr>()?;
             Ok(Join::Left { table, on })
         } else if lookahead.peek(sql_keyword::right) {
             input.parse::<sql_keyword::right>()?;
@@ -51,7 +51,7 @@ impl Parse for Join {
 
             input.parse::<sql_keyword::on>()?;
 
-            let on = input.parse::<WhereExpr>()?;
+            let on = input.parse::<SqlExpr>()?;
             Ok(Join::Right { table, on })
         } else if lookahead.peek(sql_keyword::cross) {
             input.parse::<sql_keyword::cross>()?;
@@ -170,7 +170,7 @@ pub fn table_join(item: proc_macro::TokenStream) -> proc_macro::TokenStream {
         .map(|join| {
             let (table, join_type, on) = match join {
                 Join::Inner { table, on } => {
-                    let on = on.into_tokens_with_checks(&mut checks, &sql_crate);
+                    let on = on.into_tokens_with_checks(&mut checks, &sql_crate, true);
 
                     (
                         table,
@@ -179,7 +179,7 @@ pub fn table_join(item: proc_macro::TokenStream) -> proc_macro::TokenStream {
                     )
                 }
                 Join::Left { table, on } => {
-                    let on = on.into_tokens_with_checks(&mut checks, &sql_crate);
+                    let on = on.into_tokens_with_checks(&mut checks, &sql_crate, true);
 
                     (
                         table,
@@ -188,7 +188,7 @@ pub fn table_join(item: proc_macro::TokenStream) -> proc_macro::TokenStream {
                     )
                 }
                 Join::Right { table, on } => {
-                    let on = on.into_tokens_with_checks(&mut checks, &sql_crate);
+                    let on = on.into_tokens_with_checks(&mut checks, &sql_crate, true);
 
                     (
                         table,

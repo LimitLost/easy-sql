@@ -18,7 +18,7 @@ struct ExampleStruct {
 
 #[always_context]
 impl SqlUpdate<ExampleTableStruct> for ExampleStruct {
-    fn updates(&self) -> anyhow::Result<Vec<(String, crate::SqlValueMaybeRef<'_>)>> {
+    fn updates(&mut self) -> anyhow::Result<Vec<(String, crate::SqlExpr<'_>)>> {
         crate::never::never_fn(|| {
             //Check for validity
             let update_instance = crate::never::never_any::<Self>();
@@ -31,15 +31,21 @@ impl SqlUpdate<ExampleTableStruct> for ExampleStruct {
         Ok(vec![
             (
                 "field1".to_string(),
-                crate::SqlValueMaybeRef::Ref(crate::SqlValueRef::String(&self.field1)),
+                crate::SqlExpr::Value(crate::SqlValueMaybeRef::Ref(crate::SqlValueRef::String(
+                    &self.field1,
+                ))),
             ),
             (
                 "field2".to_string(),
-                crate::SqlValueMaybeRef::Ref(crate::SqlValueRef::I32(&self.field2)),
+                crate::SqlExpr::Value(crate::SqlValueMaybeRef::Ref(crate::SqlValueRef::I32(
+                    &self.field2,
+                ))),
             ),
             (
                 "field3".to_string(),
-                crate::SqlValueMaybeRef::Ref(crate::SqlValueRef::I64(&self.field3)),
+                crate::SqlExpr::Value(crate::SqlValueMaybeRef::Ref(crate::SqlValueRef::I64(
+                    &self.field3,
+                ))),
             ),
         ])
     }
@@ -53,7 +59,7 @@ struct ExampleStruct2 {
 
 #[always_context]
 impl SqlUpdate<ExampleTableStruct> for ExampleStruct2 {
-    fn updates(&self) -> anyhow::Result<Vec<(String, crate::SqlValueMaybeRef<'_>)>> {
+    fn updates(&mut self) -> anyhow::Result<Vec<(String, crate::SqlExpr<'_>)>> {
         //If Option is set to None then ignore
         crate::never::never_fn(|| {
             //Check for validity
@@ -67,18 +73,24 @@ impl SqlUpdate<ExampleTableStruct> for ExampleStruct2 {
         let mut updates = Vec::new();
         updates.push((
             "field1".to_string(),
-            crate::SqlValueMaybeRef::Ref(crate::SqlValueRef::String(&self.field1)),
+            crate::SqlExpr::Value(crate::SqlValueMaybeRef::Ref(crate::SqlValueRef::String(
+                &self.field1,
+            ))),
         ));
         if let Some(field2) = &self.field2 {
             updates.push((
                 "field2".to_string(),
-                crate::SqlValueMaybeRef::Ref(crate::SqlValueRef::I32(field2)),
+                crate::SqlExpr::Value(crate::SqlValueMaybeRef::Ref(crate::SqlValueRef::I32(
+                    field2,
+                ))),
             ));
         }
         if let Some(field3) = &self.field3 {
             updates.push((
                 "field3".to_string(),
-                crate::SqlValueMaybeRef::Ref(crate::SqlValueRef::I64(field3)),
+                crate::SqlExpr::Value(crate::SqlValueMaybeRef::Ref(crate::SqlValueRef::I64(
+                    field3,
+                ))),
             ));
         }
         Ok(updates)

@@ -128,7 +128,7 @@ struct ExampleInsert {
     pub field: i64,
 }
 
-use easy_lib::sql::{sql, sql_convenience, sql_where};
+use easy_lib::sql::{sql, sql_convenience, sql_set, sql_where};
 
 #[tokio::test]
 #[sql_convenience]
@@ -146,8 +146,17 @@ async fn main2() -> anyhow::Result<()> {
     ExampleTableIncrement::insert(&mut conn, &ExampleInsert { field: 5 }).await?;
     //sql_where! macro uses SQLite syntax
     // There's also `update_returning`
-    ExampleTableIncrement::update(&mut conn, ExampleInsert { field: 10 }, sql_where!(id = 3))
+    ExampleTableIncrement::update(&mut conn, &ExampleInsert { field: 10 }, sql_where!(id = 3))
         .await?;
+
+    //Use sql_set! macro to write more complex value updates
+    ExampleTableIncrement::update(
+        &mut conn,
+        sql_set!(field = field + 5, id = id * 1),
+        sql_where!(id = 3),
+    )
+    .await?;
+
     // There's also `delete_returning`
     ExampleTableIncrement::delete(&mut conn, sql_where!(id = 1)).await?;
 

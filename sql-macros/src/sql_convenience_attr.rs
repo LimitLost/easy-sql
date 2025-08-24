@@ -86,9 +86,13 @@ fn macro_check(item: &mut syn::Macro, context_info: &mut SqlData) {
         "sql"
         | "sql_where"
         | "sql_where_debug"
+        | "sql_set"
+        | "sql_set_debug"
         | "easy_lib::sql::sql"
         | "easy_lib::sql::sql_where"
-        | "easy_lib::sql::sql_where_debug" => {
+        | "easy_lib::sql::sql_where_debug"
+        | "easy_lib::sql::sql_set"
+        | "easy_lib::sql::sql_set_debug" => {
             if let Some(table) = &context_info.potential_table {
                 if !item.tokens.to_string().starts_with("|") {
                     replace_with::replace_with_or_abort(&mut item.tokens, |current_tokens| {

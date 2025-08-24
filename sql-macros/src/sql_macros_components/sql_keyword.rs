@@ -1,4 +1,4 @@
-use easy_macros::syn;
+use easy_macros::syn::{self, custom_punctuation};
 
 macro_rules! sql_keyword {
     ($ident:ident,$struct_name:ident) => {
@@ -254,6 +254,8 @@ macro_rules! impl_extra_traits_for_custom_keyword {
         }
     };
 }
+
+custom_punctuation!(DoubleArrow,->>);
 
 sql_keyword!(distinct);
 sql_keyword!(where, where_);

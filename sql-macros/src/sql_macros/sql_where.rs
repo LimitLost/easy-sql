@@ -1,10 +1,10 @@
-use crate::{sql_crate, sql_macros_components::sql_where::WhereExpr};
+use crate::{sql_crate, sql_macros_components::sql_expr::SqlExpr};
 use easy_macros::{quote::quote, syn};
 
 use super::WrappedInput;
 
 pub fn sql_where(item: proc_macro::TokenStream) -> proc_macro::TokenStream {
-    let input = syn::parse_macro_input!(item as WrappedInput<WhereExpr>);
+    let input = syn::parse_macro_input!(item as WrappedInput<SqlExpr>);
     let input_table = input.table;
 
     let input = input.input;
@@ -12,7 +12,7 @@ pub fn sql_where(item: proc_macro::TokenStream) -> proc_macro::TokenStream {
 
     let sql_crate = sql_crate();
 
-    let conditions_parsed = input.into_tokens_with_checks(&mut checks, &sql_crate);
+    let conditions_parsed = input.into_tokens_with_checks(&mut checks, &sql_crate, true);
 
     let checks_tokens = if let Some(table_ty) = input_table {
         quote! {

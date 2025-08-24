@@ -20,6 +20,8 @@ pub fn sql_update_base(
 ) -> anyhow::Result<TokenStream> {
     let field_names = fields.iter().map(|field| field.ident.as_ref().unwrap());
     let field_names_str = field_names.clone().map(|field| field.to_string());
+    let field_names2 = field_names.clone();
+    let field_names_str2 = field_names_str.clone();
 
     let sql_crate = sql_crate();
     let easy_lib_crate = easy_lib_crate();
@@ -35,17 +37,21 @@ pub fn sql_update_base(
             true
         };
 
-        update_values.push(ty_to_variant(
+        let ty_variant = ty_to_variant(
             field_name.to_token_stream(),
             &field.ty,
             &sql_crate,
             bytes_allowed,
-        )?);
+        )?;
+
+        update_values.push(quote! {
+            #sql_crate::SqlExpr::Value(#ty_variant)
+        });
     }
 
     Ok(quote! {
         impl #sql_crate::SqlUpdate<#table> for #item_name {
-            fn updates(&self) -> #easy_lib_crate::anyhow::Result<Vec<(String, #sql_crate::SqlValueMaybeRef<'_>)>> {
+            fn updates(&mut self) -> #easy_lib_crate::anyhow::Result<Vec<(String, #sql_crate::SqlExpr<'_>)>> {
                 #sql_crate::never::never_fn(|| {
                     //Check for validity
                     let update_instance = #sql_crate::never::never_any::<Self>();
@@ -56,6 +62,24 @@ pub fn sql_update_base(
                 Ok(vec![
                     #((
                         #field_names_str.to_string(),
+                        #update_values,
+                    ),)*
+                ])
+            }
+        }
+
+        impl #sql_crate::SqlUpdate<#table> for &#item_name {
+            fn updates(&mut self) -> #easy_lib_crate::anyhow::Result<Vec<(String, #sql_crate::SqlExpr<'_>)>> {
+                #sql_crate::never::never_fn(|| {
+                    //Check for validity
+                    let update_instance = #sql_crate::never::never_any::<#item_name>();
+                    let mut table_instance = #sql_crate::never::never_any::<#table>();
+
+                    #(table_instance.#field_names2 = update_instance.#field_names2;)*
+                });
+                Ok(vec![
+                    #((
+                        #field_names_str2.to_string(),
                         #update_values,
                     ),)*
                 ])

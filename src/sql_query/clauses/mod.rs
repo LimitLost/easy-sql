@@ -10,3 +10,7 @@ mod where_having;
 pub use where_having::*;
 mod can_be_select_clause;
 pub use can_be_select_clause::*;
+mod sql_expr;
+pub use sql_expr::*;
+mod update_set_clause;
+pub use update_set_clause::*;

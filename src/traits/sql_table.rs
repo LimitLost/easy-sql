@@ -191,7 +191,7 @@ pub trait SqlTable: Sized {
     /// Use `sql_where!` macro to generate the `check` and `where` clause
     async fn update<'a>(
         conn: &mut (impl EasyExecutor + Send + Sync),
-        update: impl SqlUpdate<Self> + Send + Sync,
+        mut update: impl SqlUpdate<Self> + Send + Sync,
         where_: Option<(fn(Self), WhereClause<'a>)>,
     ) -> anyhow::Result<()> {
         let where_ = where_.map(|(_, where_)| where_);
@@ -206,7 +206,7 @@ pub trait SqlTable: Sized {
     /// Use `sql_where!` macro to generate the where clause
     async fn update_returning<'a, Y: ToConvert + Send + Sync, T: SqlOutput<Self, Y>>(
         conn: &mut (impl EasyExecutor + Send + Sync),
-        update: impl SqlUpdate<Self> + Send + Sync,
+        mut update: impl SqlUpdate<Self> + Send + Sync,
         where_: Option<(fn(Self), WhereClause<'a>)>,
     ) -> anyhow::Result<T> {
         let where_ = where_.map(|(_, where_)| where_);
@@ -226,7 +226,7 @@ pub trait SqlTable: Sized {
         U: SqlUpdate<Self> + Send + Sync,
     >(
         conn: &mut (impl EasyExecutor + Send + Sync),
-        update: U,
+        mut update: U,
         where_: Option<WhereClause<'a>>,
         perform: impl FnMut(T) -> anyhow::Result<Option<Break>> + Send + Sync,
     ) -> anyhow::Result<()> {

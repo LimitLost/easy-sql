@@ -1,4 +1,4 @@
-use easy_macros::syn::parse::Lookahead1;
+use easy_macros::syn::{self, parse::Lookahead1};
 
 use super::sql_keyword;
 
@@ -15,4 +15,5 @@ pub fn next_clause_token(lookahead: &Lookahead1) -> bool {
         || lookahead.peek(sql_keyword::left)
         || lookahead.peek(sql_keyword::right)
         || lookahead.peek(sql_keyword::cross)
+        || lookahead.peek(syn::Token![,])
 }

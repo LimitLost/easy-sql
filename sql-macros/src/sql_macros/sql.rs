@@ -7,8 +7,8 @@ use easy_macros::{
 use crate::{
     sql_crate,
     sql_macros_components::{
-        sql_column::SqlColumn, sql_keyword, sql_limit::SqlLimit, sql_order_by::OrderBy,
-        sql_where::WhereExpr,
+        sql_column::SqlColumn, sql_expr::SqlExpr, sql_keyword, sql_limit::SqlLimit,
+        sql_order_by::OrderBy,
     },
 };
 
@@ -16,10 +16,10 @@ use super::WrappedInput;
 
 struct Input {
     distinct: bool,
-    where_: Option<WhereExpr>,
+    where_: Option<SqlExpr>,
     order_by: Option<Vec<OrderBy>>,
     group_by: Option<Vec<SqlColumn>>,
-    having: Option<WhereExpr>,
+    having: Option<SqlExpr>,
     limit: Option<SqlLimit>,
 }
 
@@ -133,7 +133,7 @@ pub fn sql(item: proc_macro::TokenStream) -> proc_macro::TokenStream {
         let where_ = input
             .where_
             .unwrap()
-            .into_tokens_with_checks(&mut checks, &sql_crate);
+            .into_tokens_with_checks(&mut checks, &sql_crate, true);
 
         quote! {
             Some((|___t___|{
@@ -147,7 +147,7 @@ pub fn sql(item: proc_macro::TokenStream) -> proc_macro::TokenStream {
         let where_ = input
             .where_
             .map(|w| {
-                let tokens = w.into_tokens_with_checks(&mut checks, &sql_crate);
+                let tokens = w.into_tokens_with_checks(&mut checks, &sql_crate, true);
 
                 quote! {Some(#sql_crate::WhereClause{
                     conditions:#tokens
@@ -169,7 +169,7 @@ pub fn sql(item: proc_macro::TokenStream) -> proc_macro::TokenStream {
         let having = input
             .having
             .map(|h| {
-                let tokens = h.into_tokens_with_checks(&mut checks, &sql_crate);
+                let tokens = h.into_tokens_with_checks(&mut checks, &sql_crate, true);
 
                 quote! {Some(#sql_crate::HavingClause{conditions: #tokens})}
             })

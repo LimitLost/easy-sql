@@ -4,6 +4,8 @@ use anyhow::Context;
 use easy_macros::macros::always_context;
 use serde::{Deserialize, Serialize};
 
+use crate::SqlExpr;
+
 use super::{QueryData, RequestedColumn, SelectClauses, SqlValueMaybeRef, TableJoin, WhereClause};
 
 fn single_value_str(columns_len: usize, current_value_n: &mut usize) -> String {
@@ -41,7 +43,7 @@ pub enum Sql<'a> {
     },
     Update {
         table: &'static str,
-        set: Vec<(String, SqlValueMaybeRef<'a>)>,
+        set: Vec<(String, SqlExpr<'a>)>,
         where_: Option<WhereClause<'a>>,
         //We don't allow for order by and limit since they are not in Postgres (only Sqlite)
     },
@@ -100,20 +102,21 @@ fn insert_query<'a>(
 #[always_context]
 fn update_query<'a>(
     table: &'static str,
-    set: &'a [(String, SqlValueMaybeRef<'a>)],
+    set: &'a [(String, SqlExpr<'a>)],
     where_: &'a Option<WhereClause>,
     returning: Option<&[RequestedColumn]>,
 ) -> anyhow::Result<QueryData<'a>> {
     let mut current_binding_n = 1;
+    let mut bindings_list = Vec::new();
+
     let mut set_str = String::new();
-    for (column, _) in set {
-        set_str.push_str(&format!("`{}` = ${},", column, current_binding_n));
+    for (column, value) in set {
+        let value_parsed = value.to_query_data(&mut current_binding_n, &mut bindings_list);
+        set_str.push_str(&format!("`{}` = {},", column, value_parsed));
         current_binding_n += 1;
     }
     //Removes last comma
     set_str.pop();
-
-    let mut bindings_list = Vec::new();
 
     let where_str = if let Some(w) = where_ {
         w.to_query_data(&mut current_binding_n, &mut bindings_list)
@@ -138,7 +141,7 @@ fn update_query<'a>(
 
     Ok(QueryData {
         query: query_str,
-        bindings: set.iter().map(|(_, v)| v).chain(bindings_list).collect(),
+        bindings: bindings_list,
     })
 }
 
