@@ -113,7 +113,6 @@ fn update_query<'a>(
     for (column, value) in set {
         let value_parsed = value.to_query_data(&mut current_binding_n, &mut bindings_list);
         set_str.push_str(&format!("`{}` = {},", column, value_parsed));
-        current_binding_n += 1;
     }
     //Removes last comma
     set_str.pop();
