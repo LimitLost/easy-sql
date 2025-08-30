@@ -8,3 +8,8 @@ mod impl_sql_output;
 mod impl_sql_update;
 mod impl_table;
 mod readme;
+
+mod delete;
+mod insert;
+mod select;
+mod update;
