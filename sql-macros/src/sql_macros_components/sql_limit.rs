@@ -39,7 +39,7 @@ impl SqlLimit {
         match self {
             SqlLimit::Literal(l) => {
                 quote! {#sql_crate::LimitClause{
-                    limit: #l,
+                    limit: #l as usize,
                 }}
             }
             SqlLimit::Expr(expr) => {

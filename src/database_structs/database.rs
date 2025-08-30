@@ -1,3 +1,5 @@
+#[cfg(test)]
+use std::path::PathBuf;
 use std::sync::Arc;
 
 use anyhow::Context;
@@ -12,7 +14,18 @@ use crate::{DatabaseSetup, Db, EasySqlTables, sql_query::Sql};
 
 /// TODO Will be used in the future to send data to the remote database
 #[derive(Debug, Default)]
-pub(crate) struct DatabaseInternal;
+pub(crate) struct DatabaseInternal {
+    #[cfg(test)]
+    test_db_file_path: Option<PathBuf>,
+}
+#[cfg(test)]
+impl Drop for DatabaseInternal {
+    fn drop(&mut self) {
+        if let Some(path) = &self.test_db_file_path {
+            let _ = std::fs::remove_file(path);
+        }
+    }
+}
 
 pub use sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode};
 
@@ -88,9 +101,48 @@ impl Database {
     pub async fn setup_in_memory<T: DatabaseSetup>() -> anyhow::Result<Self> {
         let connection_pool =
             sqlx::Pool::<Db>::connect_with(SqliteConnectOptions::default().in_memory(true)).await?;
+
+        let internal: Arc<Mutex<DatabaseInternal>> = Default::default();
+        let mut conn = Connection::new(connection_pool.acquire().await?, internal.clone());
+
+        EasySqlTables::setup(&mut conn).await?;
+        T::setup(&mut conn).await?;
+
         Ok(Database {
             connection_pool,
-            internal: Default::default(),
+            internal,
+        })
+    }
+
+    #[cfg(test)]
+    pub async fn setup_for_testing<T: DatabaseSetup>() -> anyhow::Result<Self> {
+        lazy_static::lazy_static! {
+            static ref CURRENT_NAME_N:Mutex<usize>=Default::default();
+        }
+        let current_path = std::env::current_dir()?;
+        let mut current_n = CURRENT_NAME_N.lock().await;
+        let test_db_path = current_path.join(format!("test_db_{}", *current_n));
+        *current_n += 1;
+
+        let connection_pool = sqlx::Pool::<Db>::connect_with(
+            SqliteConnectOptions::default()
+                .filename(&test_db_path)
+                .create_if_missing(true),
+        )
+        .await?;
+
+        let internal: Arc<Mutex<DatabaseInternal>> = Arc::new(Mutex::new(DatabaseInternal {
+            test_db_file_path: Some(test_db_path.clone()),
+        }));
+
+        let mut conn = Connection::new(connection_pool.acquire().await?, internal.clone());
+
+        EasySqlTables::setup(&mut conn).await?;
+        T::setup(&mut conn).await?;
+
+        Ok(Database {
+            connection_pool,
+            internal,
         })
     }
 

@@ -523,6 +523,76 @@ pub enum SqlValueMaybeRef<'a> {
     Option(Option<Box<SqlValueMaybeRef<'a>>>),
 }
 
+fn escape_sql(input: &str) -> String {
+    let mut escaped = String::new();
+    for character in input.chars() {
+        match character {
+            '\'' => escaped.push_str("''"), // Escape single quotes
+            _ => escaped.push(character),   // Other characters remain unchanged
+        }
+    }
+    escaped
+}
+
+#[always_context]
+impl SqlValueMaybeRef<'_> {
+    pub fn to_default(&self) -> anyhow::Result<String> {
+        Ok(match self {
+            SqlValueMaybeRef::Ref(v) => match v {
+                SqlValueRef::Bool(b) => b.to_string(),
+                SqlValueRef::F32(f) => f.to_string(),
+                SqlValueRef::F64(f) => f.to_string(),
+                SqlValueRef::I8(i) => i.to_string(),
+                SqlValueRef::I16(i) => i.to_string(),
+                SqlValueRef::I32(i) => i.to_string(),
+                SqlValueRef::I64(i) => i.to_string(),
+                SqlValueRef::String(s) => format!("'{}'", escape_sql(s)),
+                SqlValueRef::Str(s) => format!("'{}'", escape_sql(s)),
+                SqlValueRef::NaiveDate(naive_date) => {
+                    format!("'{}'", naive_date.format("%F"))
+                }
+                SqlValueRef::NaiveDateTime(naive_date_time) => {
+                    format!("'{}'", naive_date_time.format("%F %T%.f"))
+                }
+                SqlValueRef::NaiveTime(naive_time) => format!("'{}'", naive_time.format("%T%.f")),
+                _ => {
+                    anyhow::bail!("Default value on binary (BLOB) types is not supported!");
+                }
+            },
+            SqlValueMaybeRef::Value(v) => match v {
+                SqlValue::Bool(v2) => v2.to_string(),
+                SqlValue::F32(v2) => v2.to_string(),
+                SqlValue::F64(v2) => v2.to_string(),
+                SqlValue::I8(v2) => v2.to_string(),
+                SqlValue::I16(v2) => v2.to_string(),
+                SqlValue::I32(v2) => v2.to_string(),
+                SqlValue::I64(v2) => v2.to_string(),
+                SqlValue::String(s) => format!("'{}'", escape_sql(s)),
+                SqlValue::NaiveDate(naive_date) => {
+                    format!("'{}'", naive_date.format("%F"))
+                }
+                SqlValue::NaiveDateTime(naive_date_time) => {
+                    format!("'{}'", naive_date_time.format("%F %T%.f"))
+                }
+                SqlValue::NaiveTime(naive_time) => format!("'{}'", naive_time.format("%T%.f")),
+                _ => {
+                    anyhow::bail!("Default value on binary (BLOB) types is not supported!");
+                }
+            },
+            SqlValueMaybeRef::Vec(_) => {
+                anyhow::bail!("Default value on binary (BLOB) types is not supported!");
+            }
+            SqlValueMaybeRef::Option(v) => {
+                if let Some(v) = v {
+                    return v.to_default();
+                } else {
+                    "NULL".to_string()
+                }
+            }
+        })
+    }
+}
+
 #[always_context]
 impl<'a> Encode<'a, crate::Db> for SqlValueMaybeRef<'a> {
     fn encode_by_ref(

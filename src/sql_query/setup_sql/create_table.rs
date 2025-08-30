@@ -35,10 +35,8 @@ impl SetupSql for CreateTable {
         let mut table_fields = String::new();
         let mut table_constrains = String::new();
 
-        let mut bindings_list = Vec::new();
-
         for field in self.fields.into_iter() {
-            table_fields.push_str(&field.definition(&mut bindings_list));
+            table_fields.push_str(&field.definition()?);
         }
 
         let primary_keys = self.primary_keys;
@@ -81,10 +79,7 @@ impl SetupSql for CreateTable {
             self.table_name, table_fields, table_constrains
         );
 
-        let mut sqlx_query = sqlx::query(&query);
-        for binding in bindings_list {
-            sqlx_query = sqlx_query.bind(binding);
-        }
+        let sqlx_query = sqlx::query(&query);
 
         #[no_context]
         sqlx_query
