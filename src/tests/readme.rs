@@ -22,6 +22,7 @@ struct ExampleTable {
 #[derive(DatabaseSetup)]
 struct ExampleSubDatabase {
     t1: ExampleTable,
+    t2: ExampleTableIncrement,
 }
 
 #[derive(DatabaseSetup)]
@@ -133,7 +134,7 @@ use easy_lib::sql::{sql, sql_convenience, sql_set, sql_where};
 #[tokio::test]
 #[sql_convenience]
 async fn main2() -> anyhow::Result<()> {
-    let db = Database::setup::<ExampleDatabase>("example.db").await?;
+    let db = Database::setup_for_testing::<ExampleDatabase>().await?;
 
     // You can also use `db.conn()` if you don't want to start a transaction
     let mut conn = db.transaction().await?;
@@ -157,19 +158,19 @@ async fn main2() -> anyhow::Result<()> {
     )
     .await?;
 
-    // There's also `delete_returning`
-    ExampleTableIncrement::delete(&mut conn, sql_where!(id = 1)).await?;
-
     // Selecting data
     let example_result_vec: Vec<ExampleInsert> =
         ExampleTableIncrement::select(&mut conn, sql_where!(id = 2)).await?;
     // Get is an alias for select
     let example_result_single: ExampleInsert =
-        ExampleTableIncrement::get(&mut conn, sql_where!(id = 2)).await?;
+        ExampleTableIncrement::get(&mut conn, sql_where!(id = 1)).await?;
 
     // sql! macro allows to do more complex queries
     let example_result_maybe_single: Option<ExampleInsert> =
         ExampleTableIncrement::select(&mut conn, sql!(WHERE id = 2 ORDER BY id)).await?;
+
+    // There's also `delete_returning`
+    ExampleTableIncrement::delete(&mut conn, sql_where!(id = 1)).await?;
 
     // You can also use `conn.rollback().await?` if you want to rollback the transaction
     conn.commit().await?;
