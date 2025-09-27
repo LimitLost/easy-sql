@@ -6,7 +6,7 @@ use std::{
 
 use easy_macros::{
     anyhow::{self, Context},
-    helpers::{MacroResult, token_stream_to_consistent_string},
+    helpers::{TokensBuilder, token_stream_to_consistent_string},
     macros::{always_context, get_attributes, has_attributes},
     proc_macro2::TokenStream,
     quote::{ToTokens, quote},
@@ -268,7 +268,7 @@ impl CompilationData {
             .get(current_unique_id)
             .context("Table not found in Sql Compilation Data (easy_sql.ron)")?;
 
-        let mut result = MacroResult::default();
+        let mut result = TokensBuilder::default();
 
         for (version_number, version_data) in table_data.saved_versions.iter() {
             let mut changes_needed = Vec::new();
