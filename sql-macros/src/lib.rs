@@ -7,7 +7,7 @@ mod sql_derive;
 use easy_macros::{
     anyhow,
     helpers::find_crate_list,
-    macros::{always_context, macro_result},
+    macros::{always_context, anyhow_result},
     proc_macro2,
     quote::quote,
 };
@@ -79,42 +79,42 @@ pub fn table_join(item: TokenStream) -> TokenStream {
 
 #[always_context]
 #[proc_macro_derive(DatabaseSetup)]
-#[macro_result]
+#[anyhow_result]
 pub fn database_setup(item: TokenStream) -> anyhow::Result<TokenStream> {
     sql_derive::database_setup(item)
 }
 
 #[always_context]
 #[proc_macro_derive(SqlOutput, attributes(sql))]
-#[macro_result]
+#[anyhow_result]
 pub fn sql_output(item: TokenStream) -> anyhow::Result<TokenStream> {
     sql_derive::sql_output(item)
 }
 
 #[always_context]
 #[proc_macro_derive(SqlInsert, attributes(sql))]
-#[macro_result]
+#[anyhow_result]
 pub fn sql_insert(item: TokenStream) -> anyhow::Result<TokenStream> {
     sql_derive::sql_insert(item)
 }
 
 #[always_context]
 #[proc_macro_derive(SqlUpdate, attributes(sql))]
-#[macro_result]
+#[anyhow_result]
 pub fn sql_update(item: TokenStream) -> anyhow::Result<TokenStream> {
     sql_derive::sql_update(item)
 }
 
 #[always_context]
 #[proc_macro_derive(SqlTable, attributes(sql))]
-#[macro_result]
+#[anyhow_result]
 pub fn sql_table(item: TokenStream) -> anyhow::Result<TokenStream> {
     sql_derive::sql_table(item)
 }
 
 #[always_context]
 #[proc_macro_attribute]
-#[macro_result]
+#[anyhow_result]
 pub fn sql_convenience(attr: TokenStream, item: TokenStream) -> anyhow::Result<TokenStream> {
     sql_convenience_attr::sql_convenience(attr, item)
 }
