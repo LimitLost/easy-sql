@@ -1,5 +1,5 @@
 use crate::{sql_crate, sql_macros_components::sql_expr::SqlExpr};
-use easy_macros::{quote::quote, syn};
+use ::{quote::quote, syn};
 
 use super::WrappedInput;
 

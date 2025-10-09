@@ -11,6 +11,10 @@ regex = "1.11.1"
 convert_case = "0.8.0"
 chrono = "0.4.40"
 
+syn = { version = "2.0", features = ["full","extra-traits"]}
+quote = { version = "1.0" }
+anyhow = { version = "1" }
+
 sql-compilation-data = { path = "../sql-compilation-data", features = [
     "build",
 ] }

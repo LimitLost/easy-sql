@@ -1,12 +1,15 @@
-use easy_macros::{
-    anyhow,
-    helpers::parse_macro_input,
-    macros::always_context,
+use ::{
+    anyhow::{self, Context},
     quote::{ToTokens, quote},
     syn,
 };
 
-use crate::{async_trait_crate, easy_lib_crate, easy_macros_helpers_crate, sql_crate};
+use easy_macros::{
+    helpers::{TokensBuilder, parse_macro_input},
+    macros::always_context,
+};
+use sql_compilation_data::CompilationData;
+
 
 #[always_context]
 pub fn database_setup(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::TokenStream> {

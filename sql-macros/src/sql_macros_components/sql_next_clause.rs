@@ -1,4 +1,4 @@
-use easy_macros::syn::{self, parse::Lookahead1};
+use syn::{self, parse::Lookahead1};
 
 use super::sql_keyword;
 

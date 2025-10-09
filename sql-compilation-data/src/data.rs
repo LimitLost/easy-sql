@@ -4,13 +4,13 @@ use std::{
     str::FromStr,
 };
 
+use anyhow::{self, Context};
+use proc_macro2::TokenStream;
+use quote::{ToTokens, quote};
+
 use easy_macros::{
-    anyhow::{self, Context},
     helpers::{TokensBuilder, token_stream_to_consistent_string},
     macros::{always_context, get_attributes, has_attributes},
-    proc_macro2::TokenStream,
-    quote::{ToTokens, quote},
-    syn,
 };
 use serde::{Deserialize, Serialize, Serializer};
 

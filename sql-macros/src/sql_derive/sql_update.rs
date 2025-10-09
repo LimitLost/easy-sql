@@ -1,10 +1,12 @@
-use easy_macros::{
+use ::{
     anyhow::{self, Context},
-    helpers::{context, parse_macro_input},
-    macros::{always_context, get_attributes, has_attributes},
     proc_macro2::TokenStream,
     quote::{ToTokens, quote},
     syn::{self, punctuated::Punctuated},
+};
+use easy_macros::{
+    helpers::{context, parse_macro_input},
+    macros::{always_context, get_attributes, has_attributes},
 };
 
 use crate::{easy_lib_crate, sql_crate};

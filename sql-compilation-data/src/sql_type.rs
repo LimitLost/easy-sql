@@ -1,12 +1,12 @@
 #[cfg(feature = "data")]
-use easy_macros::{
+use ::{
     anyhow::{self, Context},
-    helpers::context,
-    macros::always_context,
     proc_macro2::TokenStream,
-    quote::ToTokens,
+    quote::{ToTokens, quote},
     syn,
 };
+#[cfg(feature = "data")]
+use easy_macros::{helpers::context, macros::always_context};
 use serde::{Deserialize, Serialize};
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub enum SqlRangeType {

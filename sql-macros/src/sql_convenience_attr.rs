@@ -1,10 +1,10 @@
-use easy_macros::{
-    anyhow,
-    helpers::parse_macro_input,
-    macros::{all_syntax_cases, always_context},
+use ::{
     proc_macro2::TokenStream,
     quote::{ToTokens, quote},
-    syn::{self},
+};
+use easy_macros::{
+    helpers::parse_macro_input,
+    macros::{all_syntax_cases, always_context},
 };
 
 #[derive(Debug, Default)]

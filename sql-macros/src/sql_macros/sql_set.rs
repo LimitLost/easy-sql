@@ -1,4 +1,4 @@
-use easy_macros::{
+use ::{
     quote::quote,
     syn::{self, parse::Parse},
 };

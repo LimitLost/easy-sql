@@ -1,10 +1,9 @@
-use easy_macros::{
-    macros::always_context,
+use ::{
     proc_macro2::TokenStream,
     quote::{quote, quote_spanned},
     syn::{self, Token, parse::Parse, punctuated::Punctuated, spanned::Spanned},
 };
-#[derive(Debug)]
+use easy_macros::macros::always_context;
 pub enum SqlColumn {
     SpecificTableColumn(Punctuated<syn::Ident, Token![::]>, syn::Ident),
     Column(syn::Ident),

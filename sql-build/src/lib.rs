@@ -4,17 +4,19 @@ use std::{
     path::Path,
 };
 
-use convert_case::{Case, Casing};
-use easy_macros::{
+use ::{
     anyhow::{self, Context},
-    helpers::context,
-    macros::{all_syntax_cases, always_context, get_attributes},
     proc_macro2::LineColumn,
     quote::{ToTokens, quote},
     syn::{
         self, ItemFn, ItemImpl, ItemTrait, LitInt, LitStr, Macro, Meta, punctuated::Punctuated,
         spanned::Spanned,
     },
+};
+use convert_case::{Case, Casing};
+use easy_macros::{
+    helpers::context,
+    macros::{all_syntax_cases, always_context, get_attributes},
 };
 use sql_compilation_data::{CompilationData, TableData, TableDataVersion};
 #[derive(Debug)]

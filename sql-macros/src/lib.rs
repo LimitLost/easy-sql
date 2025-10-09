@@ -4,12 +4,10 @@ mod sql_macros_components;
 
 mod sql_derive;
 
+use ::{proc_macro2, quote::quote};
 use easy_macros::{
-    anyhow,
     helpers::find_crate_list,
     macros::{always_context, anyhow_result},
-    proc_macro2,
-    quote::quote,
 };
 use proc_macro::TokenStream;
 

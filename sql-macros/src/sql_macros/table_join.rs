@@ -1,6 +1,5 @@
 use easy_macros::macros::always_context;
-use easy_macros::quote::quote;
-use easy_macros::syn::{self, parse::Parse};
+use syn::{self, parse::Parse};
 
 use crate::sql_crate;
 use crate::sql_macros_components::sql_expr::SqlExpr;

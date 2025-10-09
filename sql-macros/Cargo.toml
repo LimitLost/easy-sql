@@ -12,5 +12,10 @@ convert_case = "0.8.0"
 replace_with = "0.1.7"
 sql-compilation-data = { path = "../sql-compilation-data" }
 
+syn = { version = "2.0", features = ["full","extra-traits"] }
+quote = { version = "1.0"}
+proc-macro2 = { version = "1.0.100" }
+anyhow = { version = "1" }
+
 [build-dependencies]
 easy-macros = { path = "../../easy-macros", features = ["build"] }

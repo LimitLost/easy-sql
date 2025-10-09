@@ -7,13 +7,11 @@ pub use table_join::*;
 mod sql_set;
 pub use sql_set::*;
 
-use easy_macros::{
-    macros::always_context,
-    syn::{self, parse::Parse},
-};
+use syn::{self, parse::Parse};
+
+use easy_macros::macros::always_context;
 
 mod keywords {
-    use easy_macros::syn;
 
     syn::custom_keyword!(debug_info_mode);
 }

@@ -1,8 +1,8 @@
-use easy_macros::{
-    macros::always_context,
+use ::{
     quote::quote,
     syn::{self, parse::Parse},
 };
+use easy_macros::macros::always_context;
 
 use crate::{
     sql_crate,

@@ -3,17 +3,16 @@ use crate::sql_macros_components::sql_keyword::DoubleArrow;
 use super::{sql_column::SqlColumn, sql_next_clause::next_clause_token};
 
 use super::sql_keyword;
-use easy_macros::macros::always_context;
-use easy_macros::quote::ToTokens;
-use easy_macros::{
+use ::{
     proc_macro2::{self, TokenStream},
-    quote::{quote, quote_spanned},
     syn::{
         self,
         parse::{Lookahead1, Parse},
         spanned::Spanned,
     },
 };
+use easy_macros::macros::always_context;
+use quote::{ToTokens, quote, quote_spanned};
 
 pub enum Operator {
     ///AND Keyword

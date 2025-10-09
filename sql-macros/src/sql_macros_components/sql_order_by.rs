@@ -2,12 +2,12 @@ use super::{
     sql_column::SqlColumn,
     sql_keyword::{self},
 };
-use easy_macros::{
-    macros::always_context,
+use ::{
     proc_macro2::TokenStream,
     quote::quote,
     syn::{self, parse::Parse},
 };
+use easy_macros::macros::always_context;
 
 pub enum Order {
     Asc,

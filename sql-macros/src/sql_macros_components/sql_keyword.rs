@@ -1,4 +1,4 @@
-use easy_macros::syn::{self, custom_punctuation};
+use syn::{self, custom_punctuation};
 
 macro_rules! sql_keyword {
     ($ident:ident,$struct_name:ident) => {

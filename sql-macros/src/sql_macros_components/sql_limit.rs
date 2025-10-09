@@ -1,9 +1,9 @@
-use easy_macros::{
-    macros::always_context,
+use ::{
     proc_macro2::TokenStream,
     quote::{quote, quote_spanned},
     syn::{self, parse::Parse, spanned::Spanned},
 };
+use easy_macros::macros::always_context;
 
 pub enum SqlLimit {
     Literal(i64),
