@@ -1,5 +1,4 @@
-use easy_macros::syn;
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct JoinedField {
     pub field: syn::Field,
     pub table: syn::Path,

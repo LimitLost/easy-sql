@@ -12,7 +12,7 @@ use easy_macros::{
 use sql_compilation_data::CompilationData;
 
 use crate::{
-    easy_lib_crate, easy_macros_helpers_crate, sql_crate, sql_derive::{generic_arg_from_path, ty_name_into_data, TyData}, sql_macros_components::joined_field::JoinedField
+    easy_lib_crate, sql_crate, sql_derive::{generic_arg_from_path, ty_name_into_data, TyData}, sql_macros_components::joined_field::JoinedField
 };
 
 #[always_context]
@@ -21,6 +21,7 @@ pub fn sql_output_base(
     fields: &Punctuated<syn::Field, syn::Token![,]>,
     joined_fields: Vec<JoinedField>,
     table: &TokenStream,
+    driver: &TokenStream,
 ) -> anyhow::Result<TokenStream> {
     let field_names = fields.iter().map(|field| field.ident.as_ref().unwrap());
     let field_names_str = field_names.clone().map(|field| field.to_string());
@@ -31,7 +32,6 @@ pub fn sql_output_base(
 
     let sql_crate = sql_crate();
     let easy_lib_crate = easy_lib_crate();
-    let easy_macros_helpers_crate = easy_macros_helpers_crate();
 
     let joined_checks = joined_fields.iter().map(|joined_field| {
         let field_name = joined_field.field.ident.as_ref().unwrap();
@@ -173,7 +173,7 @@ pub fn sql_output_base(
             );
 
             fields_quotes.push(quote! {
-                #field_name: #sql_crate::from_binary_vec( <#sql_crate::Row as #sql_crate::SqlxRow>::try_get(&data, #field_name_str).with_context(
+                #field_name: #sql_crate::from_binary_vec( <#sql_crate::DriverRow<#driver> as #sql_crate::SqlxRow>::try_get(&data, #field_name_str).with_context(
                     context!(#context_str),
                 )?).with_context(
                     context!(#context_str2),
@@ -181,7 +181,7 @@ pub fn sql_output_base(
             });
         }else{
             fields_quotes.push(quote! {
-                #field_name: <#sql_crate::Row as #sql_crate::SqlxRow>::try_get(&data, #field_name_str).with_context(
+                #field_name: <#sql_crate::DriverRow<#driver> as #sql_crate::SqlxRow>::try_get(&data, #field_name_str).with_context(
                     context!(#context_str),
                 )?,
             });
@@ -193,8 +193,8 @@ pub fn sql_output_base(
     //TODO Isn't todo above done?
 
     Ok(quote! {
-        impl #sql_crate::SqlOutput<#table, #sql_crate::Row> for #item_name {
-            fn sql_to_query<'a>(sql: &'a #sql_crate::Sql<'a>) -> #easy_lib_crate::anyhow::Result<#sql_crate::QueryData<'a>> {
+        impl #sql_crate::SqlOutput<#table, #driver, #sql_crate::DriverRow<#driver>> for #item_name {
+            fn sql_to_query<'a>(sql: &'a #sql_crate::Sql<'a, #driver>) -> #easy_lib_crate::anyhow::Result<#sql_crate::QueryData<'a, #driver>> {
                 #sql_crate::never::never_fn(|| {
                     //Check for validity
                     let table_instance = #sql_crate::never::never_any::<#table>();
@@ -219,7 +219,7 @@ pub fn sql_output_base(
                     )*
                     #(
                         #sql_crate::RequestedColumn {
-                            table_name: Some(<#joined_checks_table_names as #sql_crate::SqlTable>::table_name()),
+                            table_name: Some(<#joined_checks_table_names as #sql_crate::SqlTable<#driver>>::table_name()),
                             name: #joined_checks_column_name_format.to_owned(),
                             alias: Some(#joined_field_aliases.to_owned()),
                         },
@@ -228,16 +228,16 @@ pub fn sql_output_base(
 
                 sql.query_output(requested_columns)
             }
-            fn convert<'r>(data: #sql_crate::Row) -> #easy_lib_crate::anyhow::Result<Self> {
-                use #easy_lib_crate::anyhow::Context;
-                use #easy_macros_helpers_crate::context;
+            fn convert(data: #sql_crate::DriverRow<#driver>) -> ::anyhow::Result<Self> {
+                use ::anyhow::Context;
+                use #sql_crate::macro_support::context;
 
                 Ok(Self {
                     #(
                         #fields_quotes
                     )*
                     #(
-                        #joined_checks_field_names: <#sql_crate::Row as #sql_crate::SqlxRow>::try_get(&data, #joined_field_aliases).with_context(
+                        #joined_checks_field_names: <#sql_crate::DriverRow<#driver> as #sql_crate::SqlxRow>::try_get(&data, #joined_field_aliases).with_context(
                             context!(#context_strs2),
                         )?,
                     )*
@@ -269,8 +269,8 @@ pub fn sql_output(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::T
     let item = parse_macro_input!(item as syn::ItemStruct);
     let item_name = &item.ident;
 
-    let fields = match item.fields {
-        syn::Fields::Named(fields_named) => fields_named.named,
+    let fields = match &item.fields {
+        syn::Fields::Named(fields_named) => fields_named.named.clone(),
         syn::Fields::Unnamed(_) => {
             anyhow::bail!("Unnamed struct fields is not supported")
         }
@@ -314,9 +314,22 @@ pub fn sql_output(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::T
     #[no_context]
     let table = table.with_context(context!("Table attribute is required"))?;
 
-    let result=sql_output_base(&item_name, &fields, joined_fields, &table);
+    let compilation_data = CompilationData::load(Vec::<String>::new(), false)?;
+
+    let supported_drivers = super::supported_drivers(&item, &compilation_data)?;
+
+    let mut result = TokensBuilder::default();
+    for driver in supported_drivers {
+        result.add(sql_output_base(
+            &item_name,
+            &fields,
+            joined_fields.clone(),
+            &table,
+            &driver.to_token_stream(),
+        )?);
+    }
 
     // panic!("{}", result);
 
-    result.map(|r|r.into())
+    Ok(result.finalize().into())
 }

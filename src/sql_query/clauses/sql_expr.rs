@@ -1,7 +1,7 @@
 use easy_macros::macros::always_context;
 use serde::{Deserialize, Serialize};
 
-use crate::SqlValueMaybeRef;
+use crate::Driver;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub enum Operator {
@@ -34,33 +34,40 @@ pub enum Operator {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub enum SqlExpr<'a> {
+pub enum SqlExpr<'a, D: Driver> {
     Error,
     Column(String),
-    ColumnFromTable { table: String, column: String },
-    Value(SqlValueMaybeRef<'a>),
-    Eq(Box<SqlExpr<'a>>, Box<SqlExpr<'a>>),
-    NotEq(Box<SqlExpr<'a>>, Box<SqlExpr<'a>>),
-    Gt(Box<SqlExpr<'a>>, Box<SqlExpr<'a>>),
-    GtEq(Box<SqlExpr<'a>>, Box<SqlExpr<'a>>),
-    Lt(Box<SqlExpr<'a>>, Box<SqlExpr<'a>>),
-    LtEq(Box<SqlExpr<'a>>, Box<SqlExpr<'a>>),
-    Like(Box<SqlExpr<'a>>, Box<SqlExpr<'a>>),
-    In(Box<SqlExpr<'a>>, Vec<SqlExpr<'a>>),
-    Between(Box<SqlExpr<'a>>, Box<SqlExpr<'a>>, Box<SqlExpr<'a>>),
-    IsNull(Box<SqlExpr<'a>>),
-    IsNotNull(Box<SqlExpr<'a>>),
-    OperatorChain(Box<SqlExpr<'a>>, Vec<(Operator, SqlExpr<'a>)>),
-    Not(Box<SqlExpr<'a>>),
-    Parenthesized(Box<SqlExpr<'a>>),
+    ColumnFromTable {
+        table: String,
+        column: String,
+    },
+    Value(D::Value<'a>),
+    Eq(Box<SqlExpr<'a, D>>, Box<SqlExpr<'a, D>>),
+    NotEq(Box<SqlExpr<'a, D>>, Box<SqlExpr<'a, D>>),
+    Gt(Box<SqlExpr<'a, D>>, Box<SqlExpr<'a, D>>),
+    GtEq(Box<SqlExpr<'a, D>>, Box<SqlExpr<'a, D>>),
+    Lt(Box<SqlExpr<'a, D>>, Box<SqlExpr<'a, D>>),
+    LtEq(Box<SqlExpr<'a, D>>, Box<SqlExpr<'a, D>>),
+    Like(Box<SqlExpr<'a, D>>, Box<SqlExpr<'a, D>>),
+    In(Box<SqlExpr<'a, D>>, Vec<SqlExpr<'a, D>>),
+    Between(
+        Box<SqlExpr<'a, D>>,
+        Box<SqlExpr<'a, D>>,
+        Box<SqlExpr<'a, D>>,
+    ),
+    IsNull(Box<SqlExpr<'a, D>>),
+    IsNotNull(Box<SqlExpr<'a, D>>),
+    OperatorChain(Box<SqlExpr<'a, D>>, Vec<(Operator, SqlExpr<'a, D>)>),
+    Not(Box<SqlExpr<'a, D>>),
+    Parenthesized(Box<SqlExpr<'a, D>>),
 }
 
 #[always_context]
-impl<'a> SqlExpr<'a> {
+impl<'a, D: Driver> SqlExpr<'a, D> {
     pub fn to_query_data(
         &'a self,
         current_binding_n: &mut usize,
-        bindings_list: &mut Vec<&'a SqlValueMaybeRef<'a>>,
+        bindings_list: &mut Vec<&'a D::Value<'a>>,
     ) -> String {
         match self {
             SqlExpr::Column(s) => {

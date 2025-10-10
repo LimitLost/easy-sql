@@ -4,6 +4,7 @@ use ::{
     syn::{self, Token, parse::Parse, punctuated::Punctuated, spanned::Spanned},
 };
 use easy_macros::macros::always_context;
+#[derive(Debug, Clone)]
 pub enum SqlColumn {
     SpecificTableColumn(Punctuated<syn::Ident, Token![::]>, syn::Ident),
     Column(syn::Ident),

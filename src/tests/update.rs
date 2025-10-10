@@ -3,7 +3,9 @@ mod easy_lib {
 }
 
 use anyhow::Context;
-use easy_lib::sql::{Database, SqlInsert, SqlOutput, SqlTable, SqlUpdate, sql_set, sql_where};
+use easy_lib::sql::{
+    SqlInsert, SqlOutput, SqlTable, SqlUpdate, sql_set, sql_where, sqlite::Database,
+};
 use easy_macros::macros::always_context;
 use sql_macros::sql_convenience;
 

@@ -37,8 +37,11 @@ pub fn sql_set(item: proc_macro::TokenStream) -> proc_macro::TokenStream {
 
     let sql_crate = sql_crate();
 
+    let driver = quote! {#sql_crate::Sqlite};
+
     for (column, where_expr) in input.updates {
-        let where_expr_parsed = where_expr.into_tokens_with_checks(&mut checks, &sql_crate, false);
+        let where_expr_parsed =
+            where_expr.into_tokens_with_checks(&mut checks, &sql_crate, false, &driver);
         let column_str = column.to_string();
         checks.push(quote! {
             ___t___.#column;

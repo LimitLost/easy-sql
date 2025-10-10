@@ -1,4 +1,10 @@
+use anyhow::Context;
+use easy_macros::helpers::{TokensBuilder, parse_macro_input};
 use easy_macros::macros::always_context;
+use quote::{ToTokens, quote};
+use sql_compilation_data::CompilationData;
+use syn::Path;
+use syn::punctuated::Punctuated;
 use syn::{self, parse::Parse};
 
 use crate::sql_crate;
@@ -7,6 +13,7 @@ use crate::sql_macros_components::sql_expr::SqlExpr;
 use crate::sql_macros_components::sql_keyword;
 
 struct Input {
+    drivers: Option<Punctuated<syn::Path, syn::Token![,]>>,
     struct_name: syn::Ident,
     main_table: syn::Path,
     joins: Vec<Join>,
@@ -69,6 +76,13 @@ impl Parse for Join {
 #[always_context]
 impl Parse for Input {
     fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
+        let mut drivers = None;
+        if input.peek(syn::token::Bracket) {
+            let content;
+            syn::bracketed!(content in input);
+            drivers = Some(content.parse_terminated(syn::Path::parse, syn::Token![,])?);
+        }
+
         let struct_name = input.parse::<syn::Ident>()?;
         // Separator
         input.parse::<syn::Token![|]>()?;
@@ -81,6 +95,7 @@ impl Parse for Input {
         }
 
         Ok(Input {
+            drivers,
             struct_name,
             main_table,
             joins,
@@ -88,8 +103,38 @@ impl Parse for Input {
     }
 }
 
-pub fn table_join(item: proc_macro::TokenStream) -> proc_macro::TokenStream {
-    let input = syn::parse_macro_input!(item as Input);
+#[always_context]
+fn supported_drivers(
+    current_drivers: Option<Punctuated<syn::Path, syn::Token![,]>>,
+    compilation_data: &CompilationData,
+) -> anyhow::Result<Vec<Path>> {
+    if let Some(drivers) = current_drivers {
+        if drivers.is_empty() {
+            anyhow::bail!(
+                "At least one driver must be provided in the [ ... ] list, or no list at all to use default drivers"
+            );
+        }
+        Ok(drivers.into_iter().collect())
+    } else if !compilation_data.default_drivers.is_empty() {
+        let mut drivers = Vec::new();
+        for driver_str in compilation_data.default_drivers.iter() {
+            let driver_ident: syn::Path = syn::parse_str(driver_str).with_context(||{
+                format!("easy_sql.ron is corrupted: Invalid driver name `{}`, expected valid Rust identifier",driver_str)
+            })?;
+            drivers.push(driver_ident);
+        }
+
+        Ok(drivers)
+    } else {
+        anyhow::bail!(
+            "No default drivers provided in the build script, please provide supported drivers by using [ExampleDriver1,ExampleDriver2] at the start of the macro"
+        );
+    }
+}
+
+#[always_context]
+pub fn table_join(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::TokenStream> {
+    let input = parse_macro_input!(item as Input);
 
     let sql_crate = sql_crate();
 
@@ -163,87 +208,122 @@ pub fn table_join(item: proc_macro::TokenStream) -> proc_macro::TokenStream {
         }))
         .collect::<Vec<_>>();
 
-    let table_joins = input
-        .joins
-        .into_iter()
-        .map(|join| {
-            let (table, join_type, on) = match join {
-                Join::Inner { table, on } => {
-                    let on = on.into_tokens_with_checks(&mut checks, &sql_crate, true);
+    let mut result = TokensBuilder::default();
 
-                    (
-                        table,
-                        quote! {#sql_crate::JoinType::Inner},
-                        quote! {Some(#on)},
-                    )
-                }
-                Join::Left { table, on } => {
-                    let on = on.into_tokens_with_checks(&mut checks, &sql_crate, true);
+    let compilation_data = CompilationData::load(Vec::<String>::new(), false)?;
 
-                    (
-                        table,
-                        quote! {#sql_crate::JoinType::Left},
-                        quote! {Some(#on)},
-                    )
-                }
-                Join::Right { table, on } => {
-                    let on = on.into_tokens_with_checks(&mut checks, &sql_crate, true);
+    let supported_drivers = supported_drivers(input.drivers.clone(), &compilation_data)?;
 
-                    (
-                        table,
-                        quote! {#sql_crate::JoinType::Right},
-                        quote! {Some(#on)},
-                    )
-                }
-                Join::Cross { table } => {
-                    (table, quote! {#sql_crate::JoinType::Cross}, quote! {None})
-                }
-            };
-
-            let alias = quote! {None};
-
-            quote! {
-                #sql_crate::TableJoin{
-                    table: <#table as #sql_crate::SqlTable>::table_name(),
-                    join_type: #join_type,
-                    alias: #alias,
-                    on: #on,
-                }
-            }
-        })
-        .collect::<Vec<_>>();
-
-    let result = quote! {
+    result.add(quote! {
         struct #item_name;
 
-        impl #sql_crate::SqlTable for #item_name {
-            fn table_name() -> &'static str {
-                <#main_table_struct as #sql_crate::SqlTable>::table_name()
-            }
-
-            fn primary_keys() -> Vec<&'static str>{
-                vec![]
-            }
-
-            fn table_joins() -> Vec<#sql_crate::TableJoin<'static>> {
-                let _ = |___t___:#item_name|{
-                    #(#checks)*
-                };
-
-                vec![
-                    #(#table_joins),*
-                ]
-            }
-        }
-
-        impl #sql_crate::HasTable<#main_table_struct> for #item_name{}
-
-        #(impl #sql_crate::HasTable<#has_table_impls> for #item_name{})*
-
         #(#has_table_joined_impls)*
-    };
+    });
+
+    for driver in supported_drivers {
+        let driver_tokens = driver.to_token_stream();
+        let table_joins_base = input
+            .joins
+            .iter()
+            .map(|join| {
+                let (table, join_type, on) = match join {
+                    Join::Inner { table, on } => {
+                        let on = on.clone().into_tokens_with_checks(
+                            &mut checks,
+                            &sql_crate,
+                            true,
+                            &driver_tokens,
+                        );
+
+                        (
+                            table,
+                            quote! {#sql_crate::JoinType::Inner},
+                            quote! {Some(#on)},
+                        )
+                    }
+                    Join::Left { table, on } => {
+                        let on = on.clone().into_tokens_with_checks(
+                            &mut checks,
+                            &sql_crate,
+                            true,
+                            &driver_tokens,
+                        );
+
+                        (
+                            table,
+                            quote! {#sql_crate::JoinType::Left},
+                            quote! {Some(#on)},
+                        )
+                    }
+                    Join::Right { table, on } => {
+                        let on = on.clone().into_tokens_with_checks(
+                            &mut checks,
+                            &sql_crate,
+                            true,
+                            &driver_tokens,
+                        );
+
+                        (
+                            table,
+                            quote! {#sql_crate::JoinType::Right},
+                            quote! {Some(#on)},
+                        )
+                    }
+                    Join::Cross { table } => {
+                        (table, quote! {#sql_crate::JoinType::Cross}, quote! {None})
+                    }
+                };
+                (table, join_type, on)
+            })
+            .collect::<Vec<_>>();
+
+        let table_joins = table_joins_base
+            .into_iter()
+            .map(|(table, join_type, on)| {
+                let alias = quote! {None};
+
+                quote! {
+                    #sql_crate::TableJoin::<#driver_tokens>{
+                        table: <#table as #sql_crate::SqlTable<#driver>>::table_name(),
+                        join_type: #join_type,
+                        alias: #alias,
+                        on: #on,
+                    }
+                }
+            })
+            .collect::<Vec<_>>();
+
+        result.add(quote! {
+
+            impl #sql_crate::SqlTable<#driver> for #item_name {
+                fn table_name() -> &'static str {
+                    <#main_table_struct as #sql_crate::SqlTable<#driver>>::table_name()
+                }
+
+                fn primary_keys() -> Vec<&'static str>{
+                    vec![]
+                }
+
+                fn table_joins() -> Vec<#sql_crate::TableJoin<'static,#driver>> {
+                    let _ = |___t___:#item_name|{
+                        #(#checks)*
+                    };
+
+                    vec![
+                        #(#table_joins),*
+                    ]
+                }
+            }
+
+            impl #sql_crate::HasTable<#main_table_struct> for #item_name{}
+
+            #(impl #sql_crate::HasTable<#has_table_impls> for #item_name{})*
+
+
+        });
+    }
 
     // panic!("{}", result.to_string());
 
-    result.into()
+    Ok(result.finalize().into())
 }

@@ -406,4 +406,7 @@ CompilationData(
             latest_version: 1,
         ),
     },
+    default_drivers: [
+        "crate::Sqlite",
+    ],
 )

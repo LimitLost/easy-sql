@@ -10,6 +10,9 @@ use sqlx::{
     postgres::types::{PgInterval, PgRange},
 };
 
+use super::Db;
+use crate::DriverValue;
+
 #[derive(Serialize, Deserialize)]
 #[serde(remote = "PgRange")]
 struct PgRangeSerde<T> {
@@ -271,248 +274,216 @@ pub enum SqlValue {
 }
 
 #[always_context]
-impl<'a> Encode<'a, crate::Db> for SqlValueRef<'a> {
+impl<'a> Encode<'a, Db> for SqlValueRef<'a> {
     fn encode_by_ref(
         &self,
-        buf: &mut <crate::Db as sqlx::Database>::ArgumentBuffer<'a>,
+        buf: &mut <Db as sqlx::Database>::ArgumentBuffer<'a>,
     ) -> Result<sqlx::encode::IsNull, sqlx::error::BoxDynError> {
         match self {
-            SqlValueRef::IpAddr(v) => {
-                <Vec<u8> as Encode<'a, crate::Db>>::encode_by_ref(&binary(v)?, buf)
-            }
-            SqlValueRef::Bool(v) => <bool as Encode<'a, crate::Db>>::encode_by_ref(v, buf),
-            SqlValueRef::F32(v) => <f32 as Encode<'a, crate::Db>>::encode_by_ref(v, buf),
-            SqlValueRef::F64(v) => <f64 as Encode<'a, crate::Db>>::encode_by_ref(v, buf),
-            SqlValueRef::I8(v) => <i8 as Encode<'a, crate::Db>>::encode_by_ref(v, buf),
-            SqlValueRef::I16(v) => <i16 as Encode<'a, crate::Db>>::encode_by_ref(v, buf),
-            SqlValueRef::I32(v) => <i32 as Encode<'a, crate::Db>>::encode_by_ref(v, buf),
-            SqlValueRef::I64(v) => <i64 as Encode<'a, crate::Db>>::encode_by_ref(v, buf),
-            SqlValueRef::String(v) => <String as Encode<'a, crate::Db>>::encode_by_ref(v, buf),
-            SqlValueRef::Str(v) => <&str as Encode<'a, crate::Db>>::encode_by_ref(v, buf),
-            SqlValueRef::Interval(v) => <Vec<u8> as Encode<'a, crate::Db>>::encode_by_ref(
+            SqlValueRef::IpAddr(v) => <Vec<u8> as Encode<'a, Db>>::encode_by_ref(&binary(v)?, buf),
+            SqlValueRef::Bool(v) => <bool as Encode<'a, Db>>::encode_by_ref(v, buf),
+            SqlValueRef::F32(v) => <f32 as Encode<'a, Db>>::encode_by_ref(v, buf),
+            SqlValueRef::F64(v) => <f64 as Encode<'a, Db>>::encode_by_ref(v, buf),
+            SqlValueRef::I8(v) => <i8 as Encode<'a, Db>>::encode_by_ref(v, buf),
+            SqlValueRef::I16(v) => <i16 as Encode<'a, Db>>::encode_by_ref(v, buf),
+            SqlValueRef::I32(v) => <i32 as Encode<'a, Db>>::encode_by_ref(v, buf),
+            SqlValueRef::I64(v) => <i64 as Encode<'a, Db>>::encode_by_ref(v, buf),
+            SqlValueRef::String(v) => <String as Encode<'a, Db>>::encode_by_ref(v, buf),
+            SqlValueRef::Str(v) => <&str as Encode<'a, Db>>::encode_by_ref(v, buf),
+            SqlValueRef::Interval(v) => <Vec<u8> as Encode<'a, Db>>::encode_by_ref(
                 &binary(PgIntervalSerde2::from(*v))?,
                 buf,
             ),
-            SqlValueRef::Bytes(v) => <Vec<u8> as Encode<'a, crate::Db>>::encode_by_ref(v, buf),
-            SqlValueRef::List(v) => {
-                <Vec<u8> as Encode<'a, crate::Db>>::encode_by_ref(&binary(v)?, buf)
-            }
-            SqlValueRef::Array(v) => {
-                <Vec<u8> as Encode<'a, crate::Db>>::encode_by_ref(&binary(v)?, buf)
-            }
+            SqlValueRef::Bytes(v) => <Vec<u8> as Encode<'a, Db>>::encode_by_ref(v, buf),
+            SqlValueRef::List(v) => <Vec<u8> as Encode<'a, Db>>::encode_by_ref(&binary(v)?, buf),
+            SqlValueRef::Array(v) => <Vec<u8> as Encode<'a, Db>>::encode_by_ref(&binary(v)?, buf),
             SqlValueRef::NaiveDate(v) => {
-                <chrono::NaiveDate as Encode<'a, crate::Db>>::encode_by_ref(v, buf)
+                <chrono::NaiveDate as Encode<'a, Db>>::encode_by_ref(v, buf)
             }
             SqlValueRef::NaiveDateTime(v) => {
-                <chrono::NaiveDateTime as Encode<'a, crate::Db>>::encode_by_ref(v, buf)
+                <chrono::NaiveDateTime as Encode<'a, Db>>::encode_by_ref(v, buf)
             }
             SqlValueRef::NaiveTime(v) => {
-                <chrono::NaiveTime as Encode<'a, crate::Db>>::encode_by_ref(v, buf)
+                <chrono::NaiveTime as Encode<'a, Db>>::encode_by_ref(v, buf)
             }
-            SqlValueRef::Uuid(v) => <uuid::Uuid as Encode<'a, crate::Db>>::encode_by_ref(v, buf),
-            SqlValueRef::Decimal(v) => {
-                <Vec<u8> as Encode<'a, crate::Db>>::encode_by_ref(&binary(v)?, buf)
-            }
+            SqlValueRef::Uuid(v) => <uuid::Uuid as Encode<'a, Db>>::encode_by_ref(v, buf),
+            SqlValueRef::Decimal(v) => <Vec<u8> as Encode<'a, Db>>::encode_by_ref(&binary(v)?, buf),
             SqlValueRef::BigDecimal(v) => {
-                <Vec<u8> as Encode<'a, crate::Db>>::encode_by_ref(&binary(v)?, buf)
+                <Vec<u8> as Encode<'a, Db>>::encode_by_ref(&binary(v)?, buf)
             }
-            SqlValueRef::Range(v) => {
-                <Vec<u8> as Encode<'a, crate::Db>>::encode_by_ref(&binary(v)?, buf)
-            }
+            SqlValueRef::Range(v) => <Vec<u8> as Encode<'a, Db>>::encode_by_ref(&binary(v)?, buf),
         }
     }
 
     /* fn encode(
         self,
-        buf: &mut <crate::Db as sqlx::Database>::ArgumentBuffer<'a>,
+        buf: &mut <Db as sqlx::Database>::ArgumentBuffer<'a>,
     ) -> Result<sqlx::encode::IsNull, sqlx::error::BoxDynError>
     where
         Self: Sized,
     {
         match self {
-            SqlValue::IpAddr(v) => <Vec<u8> as Encode<'a, crate::Db>>::encode(binary(v)?, buf),
-            SqlValue::Bool(v) => <bool as Encode<'a, crate::Db>>::encode(v, buf),
-            SqlValue::F32(v) => <f32 as Encode<'a, crate::Db>>::encode(v, buf),
-            SqlValue::F64(v) => <f64 as Encode<'a, crate::Db>>::encode(v, buf),
-            SqlValue::I8(v) => <i8 as Encode<'a, crate::Db>>::encode(v, buf),
-            SqlValue::I16(v) => <i16 as Encode<'a, crate::Db>>::encode(v, buf),
-            SqlValue::I32(v) => <i32 as Encode<'a, crate::Db>>::encode(v, buf),
-            SqlValue::I64(v) => <i64 as Encode<'a, crate::Db>>::encode(v, buf),
-            SqlValue::String(v) => <String as Encode<'a, crate::Db>>::encode(v, buf),
+            SqlValue::IpAddr(v) => <Vec<u8> as Encode<'a, Db>>::encode(binary(v)?, buf),
+            SqlValue::Bool(v) => <bool as Encode<'a, Db>>::encode(v, buf),
+            SqlValue::F32(v) => <f32 as Encode<'a, Db>>::encode(v, buf),
+            SqlValue::F64(v) => <f64 as Encode<'a, Db>>::encode(v, buf),
+            SqlValue::I8(v) => <i8 as Encode<'a, Db>>::encode(v, buf),
+            SqlValue::I16(v) => <i16 as Encode<'a, Db>>::encode(v, buf),
+            SqlValue::I32(v) => <i32 as Encode<'a, Db>>::encode(v, buf),
+            SqlValue::I64(v) => <i64 as Encode<'a, Db>>::encode(v, buf),
+            SqlValue::String(v) => <String as Encode<'a, Db>>::encode(v, buf),
             SqlValue::Interval(v) => {
-                <Vec<u8> as Encode<'a, crate::Db>>::encode(binary(PgIntervalSerde2::from(v))?, buf)
+                <Vec<u8> as Encode<'a, Db>>::encode(binary(PgIntervalSerde2::from(v))?, buf)
             }
-            SqlValue::Bytes(v) => <Vec<u8> as Encode<'a, crate::Db>>::encode(v, buf),
-            SqlValue::List(v) => <Vec<u8> as Encode<'a, crate::Db>>::encode(binary(v)?, buf),
-            SqlValue::Array(v) => <Vec<u8> as Encode<'a, crate::Db>>::encode(binary(v)?, buf),
-            SqlValue::NaiveDate(v) => <chrono::NaiveDate as Encode<'a, crate::Db>>::encode(v, buf),
+            SqlValue::Bytes(v) => <Vec<u8> as Encode<'a, Db>>::encode(v, buf),
+            SqlValue::List(v) => <Vec<u8> as Encode<'a, Db>>::encode(binary(v)?, buf),
+            SqlValue::Array(v) => <Vec<u8> as Encode<'a, Db>>::encode(binary(v)?, buf),
+            SqlValue::NaiveDate(v) => <chrono::NaiveDate as Encode<'a, Db>>::encode(v, buf),
             SqlValue::NaiveDateTime(v) => {
-                <chrono::NaiveDateTime as Encode<'a, crate::Db>>::encode(v, buf)
+                <chrono::NaiveDateTime as Encode<'a, Db>>::encode(v, buf)
             }
-            SqlValue::NaiveTime(v) => <chrono::NaiveTime as Encode<'a, crate::Db>>::encode(v, buf),
-            SqlValue::Uuid(v) => <uuid::Uuid as Encode<'a, crate::Db>>::encode(v, buf),
-            SqlValue::Decimal(v) => <Vec<u8> as Encode<'a, crate::Db>>::encode(binary(v)?, buf),
-            SqlValue::BigDecimal(v) => <Vec<u8> as Encode<'a, crate::Db>>::encode(binary(v)?, buf),
-            SqlValue::Range(v) => <Vec<u8> as Encode<'a, crate::Db>>::encode(binary(v)?, buf),
+            SqlValue::NaiveTime(v) => <chrono::NaiveTime as Encode<'a, Db>>::encode(v, buf),
+            SqlValue::Uuid(v) => <uuid::Uuid as Encode<'a, Db>>::encode(v, buf),
+            SqlValue::Decimal(v) => <Vec<u8> as Encode<'a, Db>>::encode(binary(v)?, buf),
+            SqlValue::BigDecimal(v) => <Vec<u8> as Encode<'a, Db>>::encode(binary(v)?, buf),
+            SqlValue::Range(v) => <Vec<u8> as Encode<'a, Db>>::encode(binary(v)?, buf),
         }
     } */
 
-    fn produces(&self) -> Option<<crate::Db as sqlx::Database>::TypeInfo> {
+    fn produces(&self) -> Option<<Db as sqlx::Database>::TypeInfo> {
         Some(match self {
-            SqlValueRef::IpAddr(_) => <Vec<u8> as sqlx::Type<crate::Db>>::type_info(),
-            SqlValueRef::Bool(_) => <bool as sqlx::Type<crate::Db>>::type_info(),
-            SqlValueRef::F32(_) => <f32 as sqlx::Type<crate::Db>>::type_info(),
-            SqlValueRef::F64(_) => <f64 as sqlx::Type<crate::Db>>::type_info(),
-            SqlValueRef::I8(_) => <i8 as sqlx::Type<crate::Db>>::type_info(),
-            SqlValueRef::I16(_) => <i16 as sqlx::Type<crate::Db>>::type_info(),
-            SqlValueRef::I32(_) => <i32 as sqlx::Type<crate::Db>>::type_info(),
-            SqlValueRef::I64(_) => <i64 as sqlx::Type<crate::Db>>::type_info(),
-            SqlValueRef::String(_) => <String as sqlx::Type<crate::Db>>::type_info(),
-            SqlValueRef::Str(_) => <&str as sqlx::Type<crate::Db>>::type_info(),
-            SqlValueRef::Interval(_) => <Vec<u8> as sqlx::Type<crate::Db>>::type_info(),
-            SqlValueRef::Bytes(_) => <Vec<u8> as sqlx::Type<crate::Db>>::type_info(),
-            SqlValueRef::List(_) => <Vec<u8> as sqlx::Type<crate::Db>>::type_info(),
-            SqlValueRef::Array(_) => <Vec<u8> as sqlx::Type<crate::Db>>::type_info(),
-            SqlValueRef::NaiveDate(_) => <chrono::NaiveDate as sqlx::Type<crate::Db>>::type_info(),
-            SqlValueRef::NaiveDateTime(_) => {
-                <chrono::NaiveDateTime as sqlx::Type<crate::Db>>::type_info()
-            }
-            SqlValueRef::NaiveTime(_) => <chrono::NaiveDate as sqlx::Type<crate::Db>>::type_info(),
-            SqlValueRef::Uuid(_) => <uuid::Uuid as sqlx::Type<crate::Db>>::type_info(),
-            SqlValueRef::Decimal(_) => <Vec<u8> as sqlx::Type<crate::Db>>::type_info(),
-            SqlValueRef::BigDecimal(_) => <Vec<u8> as sqlx::Type<crate::Db>>::type_info(),
-            SqlValueRef::Range(_) => <Vec<u8> as sqlx::Type<crate::Db>>::type_info(),
+            SqlValueRef::IpAddr(_) => <Vec<u8> as sqlx::Type<Db>>::type_info(),
+            SqlValueRef::Bool(_) => <bool as sqlx::Type<Db>>::type_info(),
+            SqlValueRef::F32(_) => <f32 as sqlx::Type<Db>>::type_info(),
+            SqlValueRef::F64(_) => <f64 as sqlx::Type<Db>>::type_info(),
+            SqlValueRef::I8(_) => <i8 as sqlx::Type<Db>>::type_info(),
+            SqlValueRef::I16(_) => <i16 as sqlx::Type<Db>>::type_info(),
+            SqlValueRef::I32(_) => <i32 as sqlx::Type<Db>>::type_info(),
+            SqlValueRef::I64(_) => <i64 as sqlx::Type<Db>>::type_info(),
+            SqlValueRef::String(_) => <String as sqlx::Type<Db>>::type_info(),
+            SqlValueRef::Str(_) => <&str as sqlx::Type<Db>>::type_info(),
+            SqlValueRef::Interval(_) => <Vec<u8> as sqlx::Type<Db>>::type_info(),
+            SqlValueRef::Bytes(_) => <Vec<u8> as sqlx::Type<Db>>::type_info(),
+            SqlValueRef::List(_) => <Vec<u8> as sqlx::Type<Db>>::type_info(),
+            SqlValueRef::Array(_) => <Vec<u8> as sqlx::Type<Db>>::type_info(),
+            SqlValueRef::NaiveDate(_) => <chrono::NaiveDate as sqlx::Type<Db>>::type_info(),
+            SqlValueRef::NaiveDateTime(_) => <chrono::NaiveDateTime as sqlx::Type<Db>>::type_info(),
+            SqlValueRef::NaiveTime(_) => <chrono::NaiveDate as sqlx::Type<Db>>::type_info(),
+            SqlValueRef::Uuid(_) => <uuid::Uuid as sqlx::Type<Db>>::type_info(),
+            SqlValueRef::Decimal(_) => <Vec<u8> as sqlx::Type<Db>>::type_info(),
+            SqlValueRef::BigDecimal(_) => <Vec<u8> as sqlx::Type<Db>>::type_info(),
+            SqlValueRef::Range(_) => <Vec<u8> as sqlx::Type<Db>>::type_info(),
         })
     }
 }
 
 #[always_context]
-impl sqlx::Type<crate::Db> for SqlValueRef<'_> {
-    fn type_info() -> <crate::Db as sqlx::Database>::TypeInfo {
+impl sqlx::Type<Db> for SqlValueRef<'_> {
+    fn type_info() -> <Db as sqlx::Database>::TypeInfo {
         //Overriden by Encode anyway
-        <Vec<u8> as sqlx::Type<crate::Db>>::type_info()
+        <Vec<u8> as sqlx::Type<Db>>::type_info()
     }
 }
 
 #[always_context]
-impl<'a> Encode<'a, crate::Db> for SqlValue {
+impl<'a> Encode<'a, Db> for SqlValue {
     fn encode_by_ref(
         &self,
-        buf: &mut <crate::Db as sqlx::Database>::ArgumentBuffer<'a>,
+        buf: &mut <Db as sqlx::Database>::ArgumentBuffer<'a>,
     ) -> Result<sqlx::encode::IsNull, sqlx::error::BoxDynError> {
         match self {
-            SqlValue::IpAddr(v) => {
-                <Vec<u8> as Encode<'a, crate::Db>>::encode_by_ref(&binary(v)?, buf)
-            }
-            SqlValue::Bool(v) => <bool as Encode<'a, crate::Db>>::encode_by_ref(v, buf),
-            SqlValue::F32(v) => <f32 as Encode<'a, crate::Db>>::encode_by_ref(v, buf),
-            SqlValue::F64(v) => <f64 as Encode<'a, crate::Db>>::encode_by_ref(v, buf),
-            SqlValue::I8(v) => <i8 as Encode<'a, crate::Db>>::encode_by_ref(v, buf),
-            SqlValue::I16(v) => <i16 as Encode<'a, crate::Db>>::encode_by_ref(v, buf),
-            SqlValue::I32(v) => <i32 as Encode<'a, crate::Db>>::encode_by_ref(v, buf),
-            SqlValue::I64(v) => <i64 as Encode<'a, crate::Db>>::encode_by_ref(v, buf),
-            SqlValue::String(v) => <String as Encode<'a, crate::Db>>::encode_by_ref(v, buf),
-            SqlValue::Interval(v) => <Vec<u8> as Encode<'a, crate::Db>>::encode_by_ref(
+            SqlValue::IpAddr(v) => <Vec<u8> as Encode<'a, Db>>::encode_by_ref(&binary(v)?, buf),
+            SqlValue::Bool(v) => <bool as Encode<'a, Db>>::encode_by_ref(v, buf),
+            SqlValue::F32(v) => <f32 as Encode<'a, Db>>::encode_by_ref(v, buf),
+            SqlValue::F64(v) => <f64 as Encode<'a, Db>>::encode_by_ref(v, buf),
+            SqlValue::I8(v) => <i8 as Encode<'a, Db>>::encode_by_ref(v, buf),
+            SqlValue::I16(v) => <i16 as Encode<'a, Db>>::encode_by_ref(v, buf),
+            SqlValue::I32(v) => <i32 as Encode<'a, Db>>::encode_by_ref(v, buf),
+            SqlValue::I64(v) => <i64 as Encode<'a, Db>>::encode_by_ref(v, buf),
+            SqlValue::String(v) => <String as Encode<'a, Db>>::encode_by_ref(v, buf),
+            SqlValue::Interval(v) => <Vec<u8> as Encode<'a, Db>>::encode_by_ref(
                 &binary(PgIntervalSerde2::from(*v))?,
                 buf,
             ),
-            SqlValue::Bytes(v) => <Vec<u8> as Encode<'a, crate::Db>>::encode_by_ref(v, buf),
-            SqlValue::List(v) => {
-                <Vec<u8> as Encode<'a, crate::Db>>::encode_by_ref(&binary(v)?, buf)
-            }
-            SqlValue::Array(v) => {
-                <Vec<u8> as Encode<'a, crate::Db>>::encode_by_ref(&binary(v)?, buf)
-            }
-            SqlValue::NaiveDate(v) => {
-                <chrono::NaiveDate as Encode<'a, crate::Db>>::encode_by_ref(v, buf)
-            }
+            SqlValue::Bytes(v) => <Vec<u8> as Encode<'a, Db>>::encode_by_ref(v, buf),
+            SqlValue::List(v) => <Vec<u8> as Encode<'a, Db>>::encode_by_ref(&binary(v)?, buf),
+            SqlValue::Array(v) => <Vec<u8> as Encode<'a, Db>>::encode_by_ref(&binary(v)?, buf),
+            SqlValue::NaiveDate(v) => <chrono::NaiveDate as Encode<'a, Db>>::encode_by_ref(v, buf),
             SqlValue::NaiveDateTime(v) => {
-                <chrono::NaiveDateTime as Encode<'a, crate::Db>>::encode_by_ref(v, buf)
+                <chrono::NaiveDateTime as Encode<'a, Db>>::encode_by_ref(v, buf)
             }
-            SqlValue::NaiveTime(v) => {
-                <chrono::NaiveTime as Encode<'a, crate::Db>>::encode_by_ref(v, buf)
-            }
-            SqlValue::Uuid(v) => <uuid::Uuid as Encode<'a, crate::Db>>::encode_by_ref(v, buf),
-            SqlValue::Decimal(v) => {
-                <Vec<u8> as Encode<'a, crate::Db>>::encode_by_ref(&binary(v)?, buf)
-            }
-            SqlValue::BigDecimal(v) => {
-                <Vec<u8> as Encode<'a, crate::Db>>::encode_by_ref(&binary(v)?, buf)
-            }
-            SqlValue::Range(v) => {
-                <Vec<u8> as Encode<'a, crate::Db>>::encode_by_ref(&binary(v)?, buf)
-            }
+            SqlValue::NaiveTime(v) => <chrono::NaiveTime as Encode<'a, Db>>::encode_by_ref(v, buf),
+            SqlValue::Uuid(v) => <uuid::Uuid as Encode<'a, Db>>::encode_by_ref(v, buf),
+            SqlValue::Decimal(v) => <Vec<u8> as Encode<'a, Db>>::encode_by_ref(&binary(v)?, buf),
+            SqlValue::BigDecimal(v) => <Vec<u8> as Encode<'a, Db>>::encode_by_ref(&binary(v)?, buf),
+            SqlValue::Range(v) => <Vec<u8> as Encode<'a, Db>>::encode_by_ref(&binary(v)?, buf),
         }
     }
 
     fn encode(
         self,
-        buf: &mut <crate::Db as sqlx::Database>::ArgumentBuffer<'a>,
+        buf: &mut <Db as sqlx::Database>::ArgumentBuffer<'a>,
     ) -> Result<sqlx::encode::IsNull, sqlx::error::BoxDynError>
     where
         Self: Sized,
     {
         match self {
-            SqlValue::IpAddr(v) => <Vec<u8> as Encode<'a, crate::Db>>::encode(binary(v)?, buf),
-            SqlValue::Bool(v) => <bool as Encode<'a, crate::Db>>::encode(v, buf),
-            SqlValue::F32(v) => <f32 as Encode<'a, crate::Db>>::encode(v, buf),
-            SqlValue::F64(v) => <f64 as Encode<'a, crate::Db>>::encode(v, buf),
-            SqlValue::I8(v) => <i8 as Encode<'a, crate::Db>>::encode(v, buf),
-            SqlValue::I16(v) => <i16 as Encode<'a, crate::Db>>::encode(v, buf),
-            SqlValue::I32(v) => <i32 as Encode<'a, crate::Db>>::encode(v, buf),
-            SqlValue::I64(v) => <i64 as Encode<'a, crate::Db>>::encode(v, buf),
-            SqlValue::String(v) => <String as Encode<'a, crate::Db>>::encode(v, buf),
+            SqlValue::IpAddr(v) => <Vec<u8> as Encode<'a, Db>>::encode(binary(v)?, buf),
+            SqlValue::Bool(v) => <bool as Encode<'a, Db>>::encode(v, buf),
+            SqlValue::F32(v) => <f32 as Encode<'a, Db>>::encode(v, buf),
+            SqlValue::F64(v) => <f64 as Encode<'a, Db>>::encode(v, buf),
+            SqlValue::I8(v) => <i8 as Encode<'a, Db>>::encode(v, buf),
+            SqlValue::I16(v) => <i16 as Encode<'a, Db>>::encode(v, buf),
+            SqlValue::I32(v) => <i32 as Encode<'a, Db>>::encode(v, buf),
+            SqlValue::I64(v) => <i64 as Encode<'a, Db>>::encode(v, buf),
+            SqlValue::String(v) => <String as Encode<'a, Db>>::encode(v, buf),
             SqlValue::Interval(v) => {
-                <Vec<u8> as Encode<'a, crate::Db>>::encode(binary(PgIntervalSerde2::from(v))?, buf)
+                <Vec<u8> as Encode<'a, Db>>::encode(binary(PgIntervalSerde2::from(v))?, buf)
             }
-            SqlValue::Bytes(v) => <Vec<u8> as Encode<'a, crate::Db>>::encode(v, buf),
-            SqlValue::List(v) => <Vec<u8> as Encode<'a, crate::Db>>::encode(binary(v)?, buf),
-            SqlValue::Array(v) => <Vec<u8> as Encode<'a, crate::Db>>::encode(binary(v)?, buf),
-            SqlValue::NaiveDate(v) => <chrono::NaiveDate as Encode<'a, crate::Db>>::encode(v, buf),
-            SqlValue::NaiveDateTime(v) => {
-                <chrono::NaiveDateTime as Encode<'a, crate::Db>>::encode(v, buf)
-            }
-            SqlValue::NaiveTime(v) => <chrono::NaiveTime as Encode<'a, crate::Db>>::encode(v, buf),
-            SqlValue::Uuid(v) => <uuid::Uuid as Encode<'a, crate::Db>>::encode(v, buf),
-            SqlValue::Decimal(v) => <Vec<u8> as Encode<'a, crate::Db>>::encode(binary(v)?, buf),
-            SqlValue::BigDecimal(v) => <Vec<u8> as Encode<'a, crate::Db>>::encode(binary(v)?, buf),
-            SqlValue::Range(v) => <Vec<u8> as Encode<'a, crate::Db>>::encode(binary(v)?, buf),
+            SqlValue::Bytes(v) => <Vec<u8> as Encode<'a, Db>>::encode(v, buf),
+            SqlValue::List(v) => <Vec<u8> as Encode<'a, Db>>::encode(binary(v)?, buf),
+            SqlValue::Array(v) => <Vec<u8> as Encode<'a, Db>>::encode(binary(v)?, buf),
+            SqlValue::NaiveDate(v) => <chrono::NaiveDate as Encode<'a, Db>>::encode(v, buf),
+            SqlValue::NaiveDateTime(v) => <chrono::NaiveDateTime as Encode<'a, Db>>::encode(v, buf),
+            SqlValue::NaiveTime(v) => <chrono::NaiveTime as Encode<'a, Db>>::encode(v, buf),
+            SqlValue::Uuid(v) => <uuid::Uuid as Encode<'a, Db>>::encode(v, buf),
+            SqlValue::Decimal(v) => <Vec<u8> as Encode<'a, Db>>::encode(binary(v)?, buf),
+            SqlValue::BigDecimal(v) => <Vec<u8> as Encode<'a, Db>>::encode(binary(v)?, buf),
+            SqlValue::Range(v) => <Vec<u8> as Encode<'a, Db>>::encode(binary(v)?, buf),
         }
     }
 
-    fn produces(&self) -> Option<<crate::Db as sqlx::Database>::TypeInfo> {
+    fn produces(&self) -> Option<<Db as sqlx::Database>::TypeInfo> {
         Some(match self {
-            SqlValue::IpAddr(_) => <Vec<u8> as sqlx::Type<crate::Db>>::type_info(),
-            SqlValue::Bool(_) => <bool as sqlx::Type<crate::Db>>::type_info(),
-            SqlValue::F32(_) => <f32 as sqlx::Type<crate::Db>>::type_info(),
-            SqlValue::F64(_) => <f64 as sqlx::Type<crate::Db>>::type_info(),
-            SqlValue::I8(_) => <i8 as sqlx::Type<crate::Db>>::type_info(),
-            SqlValue::I16(_) => <i16 as sqlx::Type<crate::Db>>::type_info(),
-            SqlValue::I32(_) => <i32 as sqlx::Type<crate::Db>>::type_info(),
-            SqlValue::I64(_) => <i64 as sqlx::Type<crate::Db>>::type_info(),
-            SqlValue::String(_) => <String as sqlx::Type<crate::Db>>::type_info(),
-            SqlValue::Interval(_) => <Vec<u8> as sqlx::Type<crate::Db>>::type_info(),
-            SqlValue::Bytes(_) => <Vec<u8> as sqlx::Type<crate::Db>>::type_info(),
-            SqlValue::List(_) => <Vec<u8> as sqlx::Type<crate::Db>>::type_info(),
-            SqlValue::Array(_) => <Vec<u8> as sqlx::Type<crate::Db>>::type_info(),
-            SqlValue::NaiveDate(_) => <chrono::NaiveDate as sqlx::Type<crate::Db>>::type_info(),
-            SqlValue::NaiveDateTime(_) => {
-                <chrono::NaiveDateTime as sqlx::Type<crate::Db>>::type_info()
-            }
-            SqlValue::NaiveTime(_) => <chrono::NaiveDate as sqlx::Type<crate::Db>>::type_info(),
-            SqlValue::Uuid(_) => <uuid::Uuid as sqlx::Type<crate::Db>>::type_info(),
-            SqlValue::Decimal(_) => <Vec<u8> as sqlx::Type<crate::Db>>::type_info(),
-            SqlValue::BigDecimal(_) => <Vec<u8> as sqlx::Type<crate::Db>>::type_info(),
-            SqlValue::Range(_) => <Vec<u8> as sqlx::Type<crate::Db>>::type_info(),
+            SqlValue::IpAddr(_) => <Vec<u8> as sqlx::Type<Db>>::type_info(),
+            SqlValue::Bool(_) => <bool as sqlx::Type<Db>>::type_info(),
+            SqlValue::F32(_) => <f32 as sqlx::Type<Db>>::type_info(),
+            SqlValue::F64(_) => <f64 as sqlx::Type<Db>>::type_info(),
+            SqlValue::I8(_) => <i8 as sqlx::Type<Db>>::type_info(),
+            SqlValue::I16(_) => <i16 as sqlx::Type<Db>>::type_info(),
+            SqlValue::I32(_) => <i32 as sqlx::Type<Db>>::type_info(),
+            SqlValue::I64(_) => <i64 as sqlx::Type<Db>>::type_info(),
+            SqlValue::String(_) => <String as sqlx::Type<Db>>::type_info(),
+            SqlValue::Interval(_) => <Vec<u8> as sqlx::Type<Db>>::type_info(),
+            SqlValue::Bytes(_) => <Vec<u8> as sqlx::Type<Db>>::type_info(),
+            SqlValue::List(_) => <Vec<u8> as sqlx::Type<Db>>::type_info(),
+            SqlValue::Array(_) => <Vec<u8> as sqlx::Type<Db>>::type_info(),
+            SqlValue::NaiveDate(_) => <chrono::NaiveDate as sqlx::Type<Db>>::type_info(),
+            SqlValue::NaiveDateTime(_) => <chrono::NaiveDateTime as sqlx::Type<Db>>::type_info(),
+            SqlValue::NaiveTime(_) => <chrono::NaiveDate as sqlx::Type<Db>>::type_info(),
+            SqlValue::Uuid(_) => <uuid::Uuid as sqlx::Type<Db>>::type_info(),
+            SqlValue::Decimal(_) => <Vec<u8> as sqlx::Type<Db>>::type_info(),
+            SqlValue::BigDecimal(_) => <Vec<u8> as sqlx::Type<Db>>::type_info(),
+            SqlValue::Range(_) => <Vec<u8> as sqlx::Type<Db>>::type_info(),
         })
     }
 }
 
 #[always_context]
-impl sqlx::Type<crate::Db> for SqlValue {
-    fn type_info() -> <crate::Db as sqlx::Database>::TypeInfo {
+impl sqlx::Type<Db> for SqlValue {
+    fn type_info() -> <Db as sqlx::Database>::TypeInfo {
         //Overriden by Encode anyway
-        <Vec<u8> as sqlx::Type<crate::Db>>::type_info()
+        <Vec<u8> as sqlx::Type<Db>>::type_info()
     }
 }
 #[derive(Debug)]
@@ -535,8 +506,8 @@ fn escape_sql(input: &str) -> String {
 }
 
 #[always_context]
-impl SqlValueMaybeRef<'_> {
-    pub fn to_default(&self) -> anyhow::Result<String> {
+impl<'a> DriverValue<'a, super::Db> for SqlValueMaybeRef<'a> {
+    fn to_default(&self) -> anyhow::Result<String> {
         Ok(match self {
             SqlValueMaybeRef::Ref(v) => match v {
                 SqlValueRef::Bool(b) => b.to_string(),
@@ -594,16 +565,16 @@ impl SqlValueMaybeRef<'_> {
 }
 
 #[always_context]
-impl<'a> Encode<'a, crate::Db> for SqlValueMaybeRef<'a> {
+impl<'a> Encode<'a, Db> for SqlValueMaybeRef<'a> {
     fn encode_by_ref(
         &self,
-        buf: &mut <crate::Db as sqlx::Database>::ArgumentBuffer<'a>,
+        buf: &mut <Db as sqlx::Database>::ArgumentBuffer<'a>,
     ) -> Result<sqlx::encode::IsNull, sqlx::error::BoxDynError> {
         match self {
             SqlValueMaybeRef::Ref(v) => v.encode_by_ref(buf),
             SqlValueMaybeRef::Value(v) => v.encode_by_ref(buf),
             SqlValueMaybeRef::Vec(v) => {
-                <Vec<u8> as Encode<'a, crate::Db>>::encode_by_ref(&binary(v)?, buf)
+                <Vec<u8> as Encode<'a, Db>>::encode_by_ref(&binary(v)?, buf)
             }
             SqlValueMaybeRef::Option(v) => {
                 if let Some(v) = v {
@@ -617,7 +588,7 @@ impl<'a> Encode<'a, crate::Db> for SqlValueMaybeRef<'a> {
 
     fn encode(
         self,
-        buf: &mut <crate::Db as sqlx::Database>::ArgumentBuffer<'a>,
+        buf: &mut <Db as sqlx::Database>::ArgumentBuffer<'a>,
     ) -> Result<sqlx::encode::IsNull, sqlx::error::BoxDynError>
     where
         Self: Sized,
@@ -625,7 +596,7 @@ impl<'a> Encode<'a, crate::Db> for SqlValueMaybeRef<'a> {
         match self {
             SqlValueMaybeRef::Ref(v) => v.encode(buf),
             SqlValueMaybeRef::Value(v) => v.encode(buf),
-            SqlValueMaybeRef::Vec(v) => <Vec<u8> as Encode<'a, crate::Db>>::encode(binary(v)?, buf),
+            SqlValueMaybeRef::Vec(v) => <Vec<u8> as Encode<'a, Db>>::encode(binary(v)?, buf),
             SqlValueMaybeRef::Option(v) => {
                 if let Some(v) = v {
                     v.encode(buf)
@@ -636,11 +607,11 @@ impl<'a> Encode<'a, crate::Db> for SqlValueMaybeRef<'a> {
         }
     }
 
-    fn produces(&self) -> Option<<crate::Db as sqlx::Database>::TypeInfo> {
+    fn produces(&self) -> Option<<Db as sqlx::Database>::TypeInfo> {
         match self {
             SqlValueMaybeRef::Ref(v) => v.produces(),
             SqlValueMaybeRef::Value(v) => v.produces(),
-            SqlValueMaybeRef::Vec(_) => Some(<Vec<u8> as sqlx::Type<crate::Db>>::type_info()),
+            SqlValueMaybeRef::Vec(_) => Some(<Vec<u8> as sqlx::Type<Db>>::type_info()),
             SqlValueMaybeRef::Option(v) => {
                 if let Some(v) = v {
                     v.produces()
@@ -653,10 +624,10 @@ impl<'a> Encode<'a, crate::Db> for SqlValueMaybeRef<'a> {
 }
 
 #[always_context]
-impl sqlx::Type<crate::Db> for SqlValueMaybeRef<'_> {
-    fn type_info() -> <crate::Db as sqlx::Database>::TypeInfo {
+impl sqlx::Type<Db> for SqlValueMaybeRef<'_> {
+    fn type_info() -> <Db as sqlx::Database>::TypeInfo {
         //Overriden by Encode anyway
-        <Vec<u8> as sqlx::Type<crate::Db>>::type_info()
+        <Vec<u8> as sqlx::Type<Db>>::type_info()
     }
 }
 

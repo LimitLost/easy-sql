@@ -30,7 +30,7 @@ struct ExampleDatabase {
     sub: ExampleSubDatabase,
 }
 
-use easy_lib::sql::Database;
+use easy_lib::sql::sqlite::Database;
 
 // Save connection pool in a global variable
 // Use `lazy_static` library and `std::sync::Mutex` to do that
@@ -42,7 +42,7 @@ lazy_static::lazy_static! {
 //Connect to database and save it for later use
 #[tokio::test]
 async fn main() -> anyhow::Result<()> {
-    let db = Database::setup::<ExampleDatabase>("example.db").await?;
+    let db = Database::setup::<ExampleDatabase>("example.db", Default::default()).await?;
     *DB_BASE.lock().unwrap() = Some(db);
     Ok(())
 }
@@ -178,6 +178,7 @@ async fn main2() -> anyhow::Result<()> {
 }
 
 use easy_lib::sql::table_join;
+use sql_macros::table_join_debug;
 
 table_join!(JoinedExampleTables | ExampleTable LEFT JOIN ExampleTableWithForeignKey ON ExampleTable.id = ExampleTableWithForeignKey.example_table_id);
 

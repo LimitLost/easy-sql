@@ -12,7 +12,9 @@ pub fn sql_where(item: proc_macro::TokenStream) -> proc_macro::TokenStream {
 
     let sql_crate = sql_crate();
 
-    let conditions_parsed = input.into_tokens_with_checks(&mut checks, &sql_crate, true);
+    let driver = quote! {#sql_crate::Sqlite};
+
+    let conditions_parsed = input.into_tokens_with_checks(&mut checks, &sql_crate, true, &driver);
 
     let checks_tokens = if let Some(table_ty) = input_table {
         quote! {
@@ -27,7 +29,7 @@ pub fn sql_where(item: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let result = quote! {
         Some((
             #checks_tokens
-        #sql_crate::WhereClause{
+        #sql_crate::WhereClause::<#driver>{
             conditions: #conditions_parsed
         }))
     };

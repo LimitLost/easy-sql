@@ -1,17 +1,18 @@
 use std::ops::DerefMut;
 
+use super::Sqlite;
 use anyhow::Context;
-use async_trait::async_trait;
 use easy_macros::{helpers::context, macros::always_context};
+use sqlx::SqliteConnection;
 
-use crate::{RawConnection, SetupSql, TableField};
+use crate::{SetupSql, TableField};
 
-pub enum AlterTableSingle {
+pub enum AlterTableSingle<'a> {
     RenameTable {
         new_table_name: &'static str,
     },
     AddColumn {
-        column: TableField,
+        column: TableField<'a, Sqlite>,
     },
     RenameColumn {
         old_column_name: &'static str,
@@ -19,19 +20,18 @@ pub enum AlterTableSingle {
     },
 }
 
-pub struct AlterTable {
+pub struct AlterTable<'a> {
     pub table_name: &'static str,
-    pub alters: Vec<AlterTableSingle>,
+    pub alters: Vec<AlterTableSingle<'a>>,
 }
 
 #[always_context]
-#[async_trait]
-impl SetupSql for AlterTable {
+impl<'a> SetupSql<Sqlite> for AlterTable<'a> {
     type Output = ();
 
-    async fn query<'a>(
+    async fn query(
         self,
-        exec: &mut (impl DerefMut<Target = RawConnection> + Send + Sync),
+        exec: &mut (impl DerefMut<Target = SqliteConnection> + Send + Sync),
     ) -> anyhow::Result<Self::Output> {
         let mut queries_done = Vec::new();
 

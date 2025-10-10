@@ -12,6 +12,11 @@ mod sql_query;
 mod traits;
 
 #[cfg(feature = "not_build")]
+mod drivers;
+#[cfg(feature = "not_build")]
+pub use drivers::*;
+
+#[cfg(feature = "not_build")]
 pub use {
     database_structs::*, easy_executor::*, sql_compilation_data::SqlType, sql_macros::*,
     sql_query::*, sqlx::Row as SqlxRow, traits::*,
@@ -19,15 +24,6 @@ pub use {
 
 #[cfg(feature = "not_build")]
 use {easy_macros::macros::always_context, serde::de::DeserializeOwned};
-
-#[cfg(feature = "not_build")]
-type Db = sqlx::Sqlite;
-#[cfg(feature = "not_build")]
-type ConnectionInternal = sqlx::pool::PoolConnection<Db>;
-#[cfg(feature = "not_build")]
-pub type Row = sqlx::sqlite::SqliteRow;
-#[cfg(feature = "not_build")]
-pub(crate) type RawConnection = sqlx::SqliteConnection;
 
 #[cfg(test)]
 #[cfg(feature = "not_build")]
@@ -68,4 +64,8 @@ pub fn to_binary<T: serde::Serialize>(value: T) -> anyhow::Result<Vec<u8>> {
     let result = bincode::serde::encode_to_vec(value, bincode::config::standard())?;
 
     Ok(result)
+}
+
+pub mod macro_support {
+    pub use easy_macros::helpers::context;
 }

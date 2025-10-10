@@ -1,12 +1,12 @@
-use std::fmt::Display;
+use std::fmt::{Debug, Display};
 
 use anyhow::Context;
 use easy_macros::macros::always_context;
 use serde::{Deserialize, Serialize};
 
-use crate::SqlExpr;
+use crate::{Driver, SqlExpr};
 
-use super::{QueryData, RequestedColumn, SelectClauses, SqlValueMaybeRef, TableJoin, WhereClause};
+use super::{QueryData, RequestedColumn, SelectClauses, TableJoin, WhereClause};
 
 fn single_value_str(columns_len: usize, current_value_n: &mut usize) -> String {
     let mut single_value_str = String::new();
@@ -24,43 +24,43 @@ fn single_value_str(columns_len: usize, current_value_n: &mut usize) -> String {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub enum Sql<'a> {
+pub enum Sql<'a, D: Driver> {
     Select {
         // We don't provide output columns here, they are provided inside of SqlOutput trait
         table: &'static str,
-        joins: Vec<TableJoin<'a>>,
-        clauses: SelectClauses<'a>,
+        joins: Vec<TableJoin<'a, D>>,
+        clauses: SelectClauses<'a, D>,
     },
     Exists {
         table: &'static str,
-        joins: Vec<TableJoin<'a>>,
-        clauses: SelectClauses<'a>,
+        joins: Vec<TableJoin<'a, D>>,
+        clauses: SelectClauses<'a, D>,
     },
     Insert {
         table: &'static str,
         columns: Vec<String>,
-        values: Vec<Vec<SqlValueMaybeRef<'a>>>,
+        values: Vec<Vec<D::Value<'a>>>,
     },
     Update {
         table: &'static str,
-        set: Vec<(String, SqlExpr<'a>)>,
-        where_: Option<WhereClause<'a>>,
+        set: Vec<(String, SqlExpr<'a, D>)>,
+        where_: Option<WhereClause<'a, D>>,
         //We don't allow for order by and limit since they are not in Postgres (only Sqlite)
     },
     Delete {
         table: &'static str,
-        where_: Option<WhereClause<'a>>,
+        where_: Option<WhereClause<'a, D>>,
         //We don't allow for order by and limit since they are not in Postgres (only Sqlite)
     },
 }
 
 #[always_context]
-fn insert_query<'a>(
+fn insert_query<'a, D: Driver>(
     table: &'static str,
     columns: &[String],
-    values: &'a Vec<Vec<SqlValueMaybeRef>>,
+    values: &'a Vec<Vec<D::Value<'a>>>,
     returning: Option<&[RequestedColumn]>,
-) -> anyhow::Result<QueryData<'a>> {
+) -> anyhow::Result<QueryData<'a, D>> {
     let values_str = {
         let mut current_value_n = 1;
         let columns_len = columns.len();
@@ -100,12 +100,12 @@ fn insert_query<'a>(
 }
 
 #[always_context]
-fn update_query<'a>(
+fn update_query<'a, D: Driver>(
     table: &'static str,
-    set: &'a [(String, SqlExpr<'a>)],
-    where_: &'a Option<WhereClause>,
+    set: &'a [(String, SqlExpr<'a, D>)],
+    where_: &'a Option<WhereClause<'a, D>>,
     returning: Option<&[RequestedColumn]>,
-) -> anyhow::Result<QueryData<'a>> {
+) -> anyhow::Result<QueryData<'a, D>> {
     let mut current_binding_n = 1;
     let mut bindings_list = Vec::new();
 
@@ -145,11 +145,11 @@ fn update_query<'a>(
 }
 
 #[always_context]
-fn delete_query<'a>(
+fn delete_query<'a, D: Driver>(
     table: &'static str,
-    where_: &'a Option<WhereClause>,
+    where_: &'a Option<WhereClause<'a, D>>,
     returning: Option<&[RequestedColumn]>,
-) -> anyhow::Result<QueryData<'a>> {
+) -> anyhow::Result<QueryData<'a, D>> {
     let mut current_binding_n = 1;
     let mut bindings_list = Vec::new();
 
@@ -180,11 +180,11 @@ fn delete_query<'a>(
     })
 }
 
-fn select_base<'a>(
-    joins: &'a [TableJoin],
+fn select_base<'a, D: Driver>(
+    joins: &'a [TableJoin<'a, D>],
     table: &'static str,
-    clauses: &'a SelectClauses,
-    bindings_list: &mut Vec<&'a SqlValueMaybeRef<'a>>,
+    clauses: &'a SelectClauses<'a, D>,
+    bindings_list: &mut Vec<&'a D::Value<'a>>,
     requested_str: impl Display,
 ) -> String {
     let distinct = if clauses.distinct { " DISTINCT" } else { "" };
@@ -208,8 +208,8 @@ fn select_base<'a>(
 }
 
 #[always_context]
-impl Sql<'_> {
-    pub(crate) fn query(&self) -> anyhow::Result<QueryData<'_>> {
+impl<'a, D: Driver + Debug> Sql<'a, D> {
+    pub(crate) fn query(&'a self) -> anyhow::Result<QueryData<'a, D>> {
         Ok(match self {
             Sql::Select { .. } => {
                 anyhow::bail!("Select query, but no output expected | self: {:?}", self)
@@ -222,7 +222,7 @@ impl Sql<'_> {
                 let mut bindings_list = Vec::new();
                 let query_str = format!(
                     "SELECT EXISTS ({})",
-                    select_base(joins, table, clauses, &mut bindings_list, "1")
+                    select_base::<D>(joins, table, clauses, &mut bindings_list, "1")
                 );
                 QueryData {
                     query: query_str,
@@ -244,9 +244,9 @@ impl Sql<'_> {
     }
 
     pub fn query_output(
-        &self,
+        &'a self,
         requested_columns: Vec<RequestedColumn>,
-    ) -> anyhow::Result<QueryData<'_>> {
+    ) -> anyhow::Result<QueryData<'a, D>> {
         Ok(match self {
             Sql::Select {
                 table,
@@ -267,7 +267,7 @@ impl Sql<'_> {
                 let mut bindings_list = Vec::new();
 
                 let query_str =
-                    select_base(joins, table, clauses, &mut bindings_list, requested_str);
+                    select_base::<D>(joins, table, clauses, &mut bindings_list, requested_str);
 
                 QueryData {
                     query: query_str,

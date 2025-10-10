@@ -38,17 +38,14 @@ fn easy_macros_helpers_crate() -> proc_macro2::TokenStream {
     }
 }
 
-fn async_trait_crate() -> proc_macro2::TokenStream {
-    if let Some(found) = find_crate_list(&[("easy-lib", quote! {}), ("async-trait", quote! {})]) {
-        found
-    } else {
-        quote! {self}
-    }
-}
-
 #[proc_macro]
 pub fn sql(item: TokenStream) -> TokenStream {
     sql_macros::sql(item)
+}
+#[proc_macro]
+pub fn sql_debug(item: TokenStream) -> TokenStream {
+    let result = sql_macros::sql(item);
+    panic!("{}", result);
 }
 #[proc_macro]
 pub fn sql_where(item: TokenStream) -> TokenStream {
@@ -70,9 +67,20 @@ pub fn sql_set_debug(item: TokenStream) -> TokenStream {
     panic!("{}", result);
 }
 
+#[always_context]
 #[proc_macro]
-pub fn table_join(item: TokenStream) -> TokenStream {
+#[anyhow_result]
+pub fn table_join(item: TokenStream) -> anyhow::Result<TokenStream> {
     sql_macros::table_join(item)
+}
+
+#[always_context]
+#[proc_macro]
+#[anyhow_result]
+#[no_context]
+pub fn table_join_debug(item: TokenStream) -> anyhow::Result<TokenStream> {
+    let result = sql_macros::table_join(item)?;
+    panic!("{}", result);
 }
 
 #[always_context]

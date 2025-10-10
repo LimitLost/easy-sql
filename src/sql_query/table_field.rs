@@ -2,19 +2,19 @@ use anyhow::Context;
 use easy_macros::{helpers::context, macros::always_context};
 use sql_compilation_data::SqlType;
 
-use super::SqlValueMaybeRef;
+use crate::{Driver, DriverValue};
 
 #[derive(Debug)]
-pub struct TableField {
+pub struct TableField<'a, D: Driver> {
     pub name: &'static str,
     pub data_type: SqlType,
     pub is_unique: bool,
     pub is_not_null: bool,
-    pub default: Option<&'static SqlValueMaybeRef<'static>>,
+    pub default: Option<&'a D::Value<'a>>,
 }
 
 #[always_context]
-impl TableField {
+impl<'a, D: Driver> TableField<'a, D> {
     pub fn definition(self) -> anyhow::Result<String> {
         let TableField {
             name,

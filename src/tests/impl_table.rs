@@ -1,11 +1,10 @@
-use async_trait::async_trait;
 use easy_macros::macros::always_context;
 
 struct DatabaseSetupTest {
     t: ExampleTable,
 }
 
-use crate as sql_crate;
+use crate::{self as sql_crate, Driver, EasySqlTables_create, Sqlite};
 use easy_macros as easy_lib_crate;
 use easy_macros::helpers as easy_macros_helpers_crate;
 
@@ -14,7 +13,7 @@ struct ExampleReferencedTable {
 }
 
 #[always_context]
-impl sql_crate::SqlTable for ExampleReferencedTable {
+impl sql_crate::SqlTable<Sqlite> for ExampleReferencedTable {
     fn table_name() -> &'static str {
         "example_table2"
     }
@@ -23,7 +22,7 @@ impl sql_crate::SqlTable for ExampleReferencedTable {
         vec!["id"]
     }
 
-    fn table_joins() -> Vec<sql_crate::TableJoin<'static>> {
+    fn table_joins() -> Vec<sql_crate::TableJoin<'static, Sqlite>> {
         vec![]
     }
 }
@@ -38,7 +37,7 @@ struct ExampleTable {
 }
 
 #[always_context]
-impl sql_crate::SqlTable for ExampleTable {
+impl sql_crate::SqlTable<Sqlite> for ExampleTable {
     fn table_name() -> &'static str {
         "example_table"
     }
@@ -47,21 +46,20 @@ impl sql_crate::SqlTable for ExampleTable {
         vec!["id"]
     }
 
-    fn table_joins() -> Vec<sql_crate::TableJoin<'static>> {
+    fn table_joins() -> Vec<sql_crate::TableJoin<'static, Sqlite>> {
         vec![]
     }
 }
 
 #[always_context]
-#[async_trait]
-impl sql_crate::DatabaseSetup for ExampleTable {
-    async fn setup(conn: &mut (impl crate::EasyExecutor + Send + Sync)) -> anyhow::Result<()> {
+#[no_context_inputs]
+impl sql_crate::DatabaseSetup<Sqlite> for ExampleTable {
+    async fn setup(
+        conn: &mut (impl crate::EasyExecutor<Sqlite> + Send + Sync),
+    ) -> anyhow::Result<()> {
         use ::anyhow::Context;
 
-        let table_exists = conn
-            .query_setup(sql_crate::TableExists {
-                name: "example_table",
-            })
+        let table_exists = <Sqlite as Driver>::table_exists(conn, "example_table")
             .await
             .with_context(easy_macros_helpers_crate::context!(
                 "Checking if table exists: {:?}",
@@ -71,34 +69,34 @@ impl sql_crate::DatabaseSetup for ExampleTable {
         if table_exists {
             //TODO Get Table Version and migrate (alter table + update version) if neccessary
         } else {
-            use sql_crate::EasyExecutor;
             // Create table and create version in EasySqlTables
-            conn.query_setup(sql_crate::CreateTable {
-                table_name: "example_table",
-                fields: vec![sql_crate::TableField {
+            <Sqlite as Driver>::create_table(
+                conn,
+                "example_table2",
+                vec![sql_crate::TableField::<Sqlite> {
                     name: "id",
                     data_type: sql_crate::SqlType::I64,
                     is_unique: false,
                     is_not_null: true,
                     default: None,
                 }],
-                auto_increment: true,
-                primary_keys: vec!["id"],
-                foreign_keys: {
+                vec!["id"],
+                true,
+                {
                     vec![(
-                        <ExampleReferencedTable as sql_crate::SqlTable>::table_name(),
+                        <ExampleReferencedTable as sql_crate::SqlTable<Sqlite>>::table_name(),
                         (
                             vec!["field3"],
-                            <ExampleReferencedTable as sql_crate::SqlTable>::primary_keys(),
+                            <ExampleReferencedTable as sql_crate::SqlTable<Sqlite>>::primary_keys(),
                             false,
                         ),
                     )]
                     .into_iter()
                     .collect()
                 },
-            })
+            )
             .await?;
-            sql_crate::EasySqlTables::create(conn, "table_name".to_string(), 5).await?;
+            EasySqlTables_create!(Sqlite, conn, "table_name".to_string(), 5);
         }
 
         //If table doesn't exist ( https://stackoverflow.com/questions/1601151/how-do-i-check-in-sqlite-whether-a-table-exists )

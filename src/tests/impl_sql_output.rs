@@ -1,6 +1,6 @@
 use easy_macros::macros::always_context;
 
-use crate::{QueryData, Sql};
+use crate::{DriverRow, QueryData, Sql, Sqlite};
 
 struct ExampleTableStruct {
     field0: String,
@@ -17,8 +17,8 @@ struct ExampleStruct {
 }
 //Remove in derive
 #[always_context]
-impl crate::SqlOutput<ExampleTableStruct, crate::Row> for ExampleStruct {
-    fn sql_to_query<'a>(sql: &'a Sql<'a>) -> anyhow::Result<QueryData<'a>> {
+impl crate::SqlOutput<ExampleTableStruct, Sqlite, DriverRow<Sqlite>> for ExampleStruct {
+    fn sql_to_query<'a>(sql: &'a Sql<'a, Sqlite>) -> anyhow::Result<QueryData<'a, Sqlite>> {
         crate::never::never_fn(|| {
             //Check for validity
             let table_instance = crate::never::never_any::<ExampleTableStruct>();
@@ -52,18 +52,18 @@ impl crate::SqlOutput<ExampleTableStruct, crate::Row> for ExampleStruct {
     }
     //Remove in derive
     #[no_context]
-    fn convert<'r>(data: crate::Row) -> anyhow::Result<Self> {
+    fn convert<'r>(data: DriverRow<Sqlite>) -> anyhow::Result<Self> {
         use anyhow::Context;
         use easy_macros::helpers::context;
 
         Ok(Self {
-            field1: <crate::Row as crate::SqlxRow>::try_get(&data, "field1").with_context(
+            field1: <DriverRow<Sqlite> as crate::SqlxRow>::try_get(&data, "field1").with_context(
                 context!("Getting field `field1` with type String for struct ExampleStruct"),
             )?,
-            field2: <crate::Row as crate::SqlxRow>::try_get(&data, "field2").with_context(
+            field2: <DriverRow<Sqlite> as crate::SqlxRow>::try_get(&data, "field2").with_context(
                 context!("Getting field `field2` with type i32 for struct ExampleStruct"),
             )?,
-            field3: <crate::Row as crate::SqlxRow>::try_get(&data, "field3").with_context(
+            field3: <DriverRow<Sqlite> as crate::SqlxRow>::try_get(&data, "field3").with_context(
                 context!("Getting field `field3` with type i64 for struct ExampleStruct"),
             )?,
         })

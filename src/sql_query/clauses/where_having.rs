@@ -1,19 +1,19 @@
 use easy_macros::macros::always_context;
 use serde::{Deserialize, Serialize};
 
-use crate::{SqlExpr, SqlValueMaybeRef};
+use crate::{Driver, SqlExpr};
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct WhereClause<'a> {
-    pub conditions: SqlExpr<'a>,
+pub struct WhereClause<'a, D: Driver> {
+    pub conditions: SqlExpr<'a, D>,
 }
 
 #[always_context]
-impl<'a> WhereClause<'a> {
+impl<'a, D: Driver> WhereClause<'a, D> {
     pub fn to_query_data(
         &'a self,
         current_binding_n: &mut usize,
-        bindings_list: &mut Vec<&'a SqlValueMaybeRef<'a>>,
+        bindings_list: &mut Vec<&'a D::Value<'a>>,
     ) -> String {
         format!(
             "WHERE {}",
@@ -24,16 +24,16 @@ impl<'a> WhereClause<'a> {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct HavingClause<'a> {
-    pub conditions: SqlExpr<'a>,
+pub struct HavingClause<'a, D: Driver> {
+    pub conditions: SqlExpr<'a, D>,
 }
 
 #[always_context]
-impl<'a> HavingClause<'a> {
+impl<'a, D: Driver> HavingClause<'a, D> {
     pub fn to_query_data(
         &'a self,
         current_binding_n: &mut usize,
-        bindings_list: &mut Vec<&'a SqlValueMaybeRef<'a>>,
+        bindings_list: &mut Vec<&'a D::Value<'a>>,
     ) -> String {
         format!(
             "HAVING {}",

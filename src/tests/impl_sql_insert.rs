@@ -1,7 +1,9 @@
 use anyhow::Context;
 use easy_macros::macros::always_context;
 
-use crate::{Connection, SqlInsert, SqlTable, SqlValueMaybeRef, TableJoin};
+use crate::{
+    Connection, Driver, SqlInsert, SqlTable, Sqlite, TableJoin, sqlite::DatabaseInternalDefault,
+};
 
 struct ExampleTableStruct {
     id: i64,
@@ -21,7 +23,7 @@ struct ExampleStruct {
 }
 
 #[always_context]
-impl SqlInsert<ExampleTableStruct> for ExampleStruct {
+impl SqlInsert<ExampleTableStruct, Sqlite> for ExampleStruct {
     fn insert_columns() -> Vec<String> {
         crate::never::never_fn(|| {
             //Check for validity
@@ -46,19 +48,19 @@ impl SqlInsert<ExampleTableStruct> for ExampleStruct {
         ]
     }
 
-    fn insert_values(&self) -> anyhow::Result<Vec<Vec<SqlValueMaybeRef<'_>>>> {
+    fn insert_values(&self) -> anyhow::Result<Vec<Vec<<Sqlite as Driver>::Value<'_>>>> {
         Ok(vec![vec![
-            crate::SqlValueMaybeRef::Ref(crate::SqlValueRef::String(&self.field0)),
-            crate::SqlValueMaybeRef::Ref(crate::SqlValueRef::String(&self.field1)),
-            crate::SqlValueMaybeRef::Ref(crate::SqlValueRef::I32(&self.field2)),
-            crate::SqlValueMaybeRef::Ref(crate::SqlValueRef::I64(&self.field3)),
-            crate::SqlValueMaybeRef::Ref(crate::SqlValueRef::I16(&self.field4)),
+            (&self.field0).into(),
+            (&self.field1).into(),
+            (&self.field2).into(),
+            (&self.field3).into(),
+            (&self.field4).into(),
         ]])
     }
 }
 
 #[always_context]
-impl SqlTable for ExampleTableStruct {
+impl SqlTable<Sqlite> for ExampleTableStruct {
     fn table_name() -> &'static str {
         "table"
     }
@@ -66,13 +68,13 @@ impl SqlTable for ExampleTableStruct {
         vec!["id"]
     }
 
-    fn table_joins() -> Vec<TableJoin<'static>> {
+    fn table_joins() -> Vec<TableJoin<'static, Sqlite>> {
         vec![]
     }
 }
 
 #[always_context]
-async fn test(conn: &mut Connection) -> anyhow::Result<()> {
+async fn test(conn: &mut Connection<Sqlite, DatabaseInternalDefault>) -> anyhow::Result<()> {
     let to_insert = ExampleStruct {
         field0: "value0".to_string(),
         field1: "value1".to_string(),

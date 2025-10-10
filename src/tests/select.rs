@@ -3,11 +3,9 @@ mod easy_lib {
 }
 
 use anyhow::Context;
-use easy_lib::sql::{Database, SqlInsert, SqlOutput, SqlTable, SqlUpdate, sql_where};
+use easy_lib::sql::{SqlInsert, SqlOutput, SqlTable, SqlUpdate, sql_where, sqlite::Database};
 use easy_macros::macros::always_context;
 use sql_macros::{sql, sql_convenience};
-
-use crate::WhereClause;
 
 #[derive(SqlTable, Debug)]
 #[sql(version = 1)]
@@ -132,8 +130,7 @@ async fn test_select_all_rows() -> anyhow::Result<()> {
         .await?;
     }
     let rows: Vec<ExampleSelectInsert> =
-        ExampleTableSelect::select(&mut conn, None::<(fn(ExampleTableSelect), WhereClause<'_>)>)
-            .await?;
+        ExampleTableSelect::select(&mut conn, sql_where!(true)).await?;
     assert_eq!(rows.len(), 3);
     conn.rollback().await?;
     Ok(())
@@ -258,8 +255,12 @@ async fn test_select_ordering() -> anyhow::Result<()> {
         )
         .await?;
     }
-    let rows: Vec<ExampleSelectInsert> =
-        ExampleTableSelect::select(&mut conn, sql!(ORDER BY field ASC)).await?;
+    let rows: Vec<ExampleSelectInsert> = ExampleTableSelect::select(
+        &mut conn,
+        #[context(no)]
+        sql!(ORDER BY field ASC),
+    )
+    .await?;
     assert_eq!(rows[0].field, 1);
     assert_eq!(rows[2].field, 3);
     conn.rollback().await?;

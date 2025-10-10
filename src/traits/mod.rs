@@ -12,5 +12,9 @@ mod sql_table;
 pub use sql_table::*;
 mod has_table_traits;
 pub use has_table_traits::*;
+mod driver;
+pub use driver::*;
+mod database_internal;
+pub use database_internal::*;
 
 //TODO when joining tables create trait "HasTable"

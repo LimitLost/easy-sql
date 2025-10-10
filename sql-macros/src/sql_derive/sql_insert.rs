@@ -10,7 +10,7 @@ use easy_macros::{
 };
 use sql_compilation_data::CompilationData;
 
-use crate::{easy_lib_crate, sql_crate};
+use crate::sql_crate;
 
 use super::ty_to_variant;
 
@@ -31,13 +31,13 @@ pub fn sql_insert_base(
     item_name: &syn::Ident,
     fields: &Punctuated<syn::Field, syn::Token![,]>,
     table: &TokenStream,
+    driver: &TokenStream,
     defaults: Vec<syn::Ident>,
 ) -> anyhow::Result<TokenStream> {
     let field_names = fields.iter().map(|field| field.ident.as_ref().unwrap());
     let field_names_str = field_names.clone().map(|field| field.to_string());
 
     let sql_crate = sql_crate();
-    let easy_lib_crate = easy_lib_crate();
 
     let mut insert_values = Vec::new();
 
@@ -46,13 +46,14 @@ pub fn sql_insert_base(
         insert_values.push(ty_to_variant(
             field_name.to_token_stream(),
             &field.ty,
+            driver,
             &sql_crate,
             true,
         )?);
     }
 
     Ok(quote! {
-        impl #sql_crate::SqlInsert<#table> for #item_name {
+        impl #sql_crate::SqlInsert<#table,#driver> for #item_name {
             fn insert_columns() -> Vec<String> {
                 #sql_crate::never::never_fn(|| {
                     //Check for validity
@@ -74,7 +75,7 @@ pub fn sql_insert_base(
                 ]
             }
 
-            fn insert_values(&self) -> #easy_lib_crate::anyhow::Result<Vec<Vec<#sql_crate::SqlValueMaybeRef<'_>>>> {
+            fn insert_values(&self) -> ::anyhow::Result<Vec<Vec<<#driver as #sql_crate::Driver>::Value<'_>>>> {
                 Ok(vec![vec![
                     #(#insert_values),*
                 ]])
@@ -89,8 +90,8 @@ pub fn sql_insert(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::T
     let item = parse_macro_input!(item as syn::ItemStruct);
     let item_name = &item.ident;
 
-    let fields = match item.fields {
-        syn::Fields::Named(fields_named) => fields_named.named,
+    let fields = match &item.fields {
+        syn::Fields::Named(fields_named) => &fields_named.named,
         syn::Fields::Unnamed(_) => {
             anyhow::bail!("Unnamed struct fields is not supported")
         }
@@ -119,9 +120,21 @@ pub fn sql_insert(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::T
         defaults.extend(parsed.fields.into_iter());
     }
 
-    sql_insert_base(&item_name, &fields, &table, defaults).map(|e| {
-        // panic!("{}", e);
+    let compilation_data = CompilationData::load(Vec::<String>::new(), false)?;
 
-        e.into()
-    })
+    let supported_drivers = super::supported_drivers(&item, &compilation_data)?;
+
+    let mut result = TokensBuilder::default();
+
+    for driver in supported_drivers {
+        result.add(sql_insert_base(
+            &item_name,
+            &fields,
+            &table,
+            &driver.to_token_stream(),
+            defaults.clone(),
+        )?);
+    }
+
+    Ok(result.finalize().into())
 }

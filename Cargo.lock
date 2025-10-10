@@ -126,17 +126,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7c02d123df017efcdfbd739ef81735b36c5ba83ec3c59c80a9d7ecc718f92e50"
 
 [[package]]
-name = "async-trait"
-version = "0.1.89"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9035ad2d096bed7955a320ee7e2230574d28fd3c3a0f186cbea1ff3c7eed5dbb"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 2.0.100",
-]
-
-[[package]]
 name = "atoi"
 version = "2.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -573,7 +562,6 @@ name = "easy-sql"
 version = "0.9.0"
 dependencies = [
  "anyhow",
- "async-trait",
  "bigdecimal",
  "bincode",
  "chrono",
@@ -1872,21 +1860,28 @@ dependencies = [
 name = "sql-build"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "chrono",
  "convert_case",
  "easy-macros",
  "proc-macro2",
+ "quote",
  "regex",
  "sql-compilation-data",
+ "syn 2.0.100",
 ]
 
 [[package]]
 name = "sql-compilation-data"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "easy-macros",
+ "proc-macro2",
+ "quote",
  "ron",
  "serde",
+ "syn 2.0.100",
  "uuid",
 ]
 
@@ -1894,10 +1889,14 @@ dependencies = [
 name = "sql-macros"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "convert_case",
  "easy-macros",
+ "proc-macro2",
+ "quote",
  "replace_with",
  "sql-compilation-data",
+ "syn 2.0.100",
 ]
 
 [[package]]

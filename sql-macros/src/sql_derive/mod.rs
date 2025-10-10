@@ -11,14 +11,17 @@ use ::{
     syn::{self, PathSegment},
 };
 use convert_case::{Case, Casing};
+pub use database_setup::*;
 use easy_macros::{
     helpers::context,
     macros::{always_context, get_attributes},
 };
+use sql_compilation_data::CompilationData;
 pub use sql_insert::*;
 pub use sql_output::*;
 pub use sql_table::*;
 pub use sql_update::*;
+use syn::{ItemStruct, Path, punctuated::Punctuated};
 
 enum TyData {
     Binary,
@@ -158,6 +161,7 @@ fn generic_arg_from_path(segment: &PathSegment) -> Option<String> {
 fn ty_to_variant(
     field_name: TokenStream,
     ty: &syn::Type,
+    driver: &TokenStream,
     crate_prefix: &TokenStream,
     bytes_allowed: bool,
 ) -> anyhow::Result<TokenStream> {
@@ -166,9 +170,13 @@ fn ty_to_variant(
             //Convert into Vec
             anyhow::bail!("Arrays are not supported yet")
         }
-        syn::Type::Paren(type_paren) => {
-            ty_to_variant(field_name, &type_paren.elem, crate_prefix, bytes_allowed)
-        }
+        syn::Type::Paren(type_paren) => ty_to_variant(
+            field_name,
+            &type_paren.elem,
+            driver,
+            crate_prefix,
+            bytes_allowed,
+        ),
         syn::Type::Path(type_path) => {
             let name = type_path
                 .path
@@ -184,7 +192,7 @@ fn ty_to_variant(
             Ok(match found {
                 TyData::Binary => {
                     quote! {
-                        easy_lib::sql::SqlValueMaybeRef::Value(easy_lib::sql::SqlValue::Bytes(easy_lib::sql::to_binary(&self.#field_name)?))
+                        <#driver as #crate_prefix::Driver>::binary_value(easy_lib::sql::to_binary(&self.#field_name)?)
                     }
                 }
                 TyData::IntoNoRef => {
@@ -334,5 +342,50 @@ fn ty_enum_value(
         _ => {
             anyhow::bail!("Unsupported type: {}", ty.to_token_stream())
         }
+    }
+}
+
+#[always_context]
+fn supported_drivers(
+    item: &ItemStruct,
+    compilation_data: &CompilationData,
+) -> anyhow::Result<Vec<Path>> {
+    if let Some(attr_data) = get_attributes!(item, #[sql(drivers = __unknown__)])
+        .into_iter()
+        .next()
+    {
+        struct DriversParsed {
+            drivers: Punctuated<syn::Path, syn::Token![,]>,
+        }
+
+        impl syn::parse::Parse for DriversParsed {
+            fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
+                let drivers = Punctuated::parse_terminated(input)?;
+                Ok(DriversParsed { drivers })
+            }
+        }
+
+        let DriversParsed { drivers } = syn::parse2(attr_data.clone())
+            .context("Invalid drivers provided, expected comma separated list of identifiers")?;
+        if drivers.is_empty() {
+            anyhow::bail!(
+                "At least one driver must be provided in the #[sql(drivers = ...)] attribute"
+            );
+        }
+        Ok(drivers.into_iter().collect())
+    } else if !compilation_data.default_drivers.is_empty() {
+        let mut drivers = Vec::new();
+        for driver_str in compilation_data.default_drivers.iter() {
+            let driver_ident: syn::Path = syn::parse_str(driver_str).with_context(||{
+                format!("easy_sql.ron is corrupted: Invalid driver name `{}`, expected valid Rust identifier",driver_str)
+            })?;
+            drivers.push(driver_ident);
+        }
+
+        Ok(drivers)
+    } else {
+        anyhow::bail!(
+            "No default drivers provided in the build script, please provide supported drivers using #[sql(drivers = ExampleDriver1,ExampleDriver2])] attribute"
+        );
     }
 }

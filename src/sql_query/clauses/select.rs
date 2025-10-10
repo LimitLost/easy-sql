@@ -1,9 +1,8 @@
-use easy_macros::macros::always_context;
-use serde::{Deserialize, Serialize};
-
-use crate::SqlValueMaybeRef;
+use crate::Driver;
 
 use super::{GroupByClause, HavingClause, LimitClause, OrderByClause, SqlExpr, WhereClause};
+use easy_macros::macros::always_context;
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub enum JoinType {
@@ -14,19 +13,19 @@ pub enum JoinType {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct TableJoin<'a> {
+pub struct TableJoin<'a, D: Driver> {
     pub table: &'static str,
     pub join_type: JoinType,
     pub alias: Option<String>,
-    pub on: Option<SqlExpr<'a>>,
+    pub on: Option<SqlExpr<'a, D>>,
 }
 
 #[always_context]
-impl<'a> TableJoin<'a> {
+impl<'a, D: Driver> TableJoin<'a, D> {
     pub fn to_query_data(
         &'a self,
         current_binding_n: &mut usize,
-        bindings_list: &mut Vec<&'a SqlValueMaybeRef<'a>>,
+        bindings_list: &mut Vec<&'a D::Value<'a>>,
     ) -> String {
         let join_type_str = match self.join_type {
             JoinType::Inner => "INNER",
@@ -49,21 +48,21 @@ impl<'a> TableJoin<'a> {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct SelectClauses<'a> {
+pub struct SelectClauses<'a, D: Driver> {
     pub distinct: bool,
-    pub where_: Option<WhereClause<'a>>,
+    pub where_: Option<WhereClause<'a, D>>,
     pub group_by: Option<GroupByClause>,
-    pub having: Option<HavingClause<'a>>,
+    pub having: Option<HavingClause<'a, D>>,
     pub order_by: Option<OrderByClause>,
     pub limit: Option<LimitClause>,
 }
 
 #[always_context]
-impl<'a> SelectClauses<'a> {
+impl<'a, D: Driver> SelectClauses<'a, D> {
     pub fn to_query_data(
         &'a self,
         current_binding_n: &mut usize,
-        bindings_list: &mut Vec<&'a SqlValueMaybeRef<'a>>,
+        bindings_list: &mut Vec<&'a D::Value<'a>>,
     ) -> String {
         let where_str = if let Some(w) = &self.where_ {
             w.to_query_data(current_binding_n, bindings_list)

@@ -14,6 +14,7 @@ use ::{
 use easy_macros::macros::always_context;
 use quote::{ToTokens, quote, quote_spanned};
 
+#[derive(Debug, Clone)]
 pub enum Operator {
     ///AND Keyword
     And,
@@ -95,6 +96,7 @@ impl Parse for Operator {
     }
 }
 
+#[derive(Debug, Clone)]
 pub enum SqlExpr {
     Value(SqlValue),
     Parenthesized(Box<SqlExpr>),
@@ -120,7 +122,8 @@ impl SqlExpr {
         checks: &mut Vec<TokenStream>,
         sql_crate: &TokenStream,
         perform_bool_check: bool,
-    ) -> easy_macros::proc_macro2::TokenStream {
+        driver: &TokenStream,
+    ) -> proc_macro2::TokenStream {
         match self {
             SqlExpr::Value(sql_value) => match sql_value {
                 SqlValue::Column(sql_column) => match sql_column {
@@ -145,7 +148,7 @@ impl SqlExpr {
                         let ident_str = ident.to_string();
                         quote_spanned! {ident.span()=>
                             #sql_crate::SqlExpr::ColumnFromTable{
-                                table: <#path as #sql_crate::SqlTable>::table_name().to_owned(),
+                                table: <#path as #sql_crate::SqlTable<#driver>>::table_name().to_owned(),
                                 column: #ident_str.to_string(),
                             }
                         }
@@ -170,7 +173,7 @@ impl SqlExpr {
                         match lit {
                             syn::Lit::Bool(lit_bool) => {
                                 quote_spanned! {lit_bool.span()=>
-                                    #sql_crate::SqlExpr::Value(#lit_bool.into())
+                                    #sql_crate::SqlExpr::<#driver>::Value((#lit_bool).into())
                                 }
                             }
                             l => {
@@ -184,13 +187,13 @@ impl SqlExpr {
                                     }
                                 });
                                 quote! {
-                                    #sql_crate::SqlExpr::Value(true.into())
+                                    #sql_crate::SqlExpr::<#driver>::Value((true).into())
                                 }
                             }
                         }
                     } else {
                         quote_spanned! {lit.span()=>
-                            #sql_crate::SqlExpr::Value(#lit.into())
+                            #sql_crate::SqlExpr::<#driver>::Value((#lit).into())
                         }
                     }
                 }
@@ -203,13 +206,17 @@ impl SqlExpr {
                         });
                     }
                     quote_spanned! {expr.span()=>
-                        #sql_crate::SqlExpr::Value({#expr}.into())
+                        #sql_crate::SqlExpr::<#driver>::Value(({#expr}).into())
                     }
                 }
             },
             SqlExpr::Parenthesized(where_expr) => {
-                let inside_parsed =
-                    where_expr.into_tokens_with_checks(checks, sql_crate, perform_bool_check);
+                let inside_parsed = where_expr.into_tokens_with_checks(
+                    checks,
+                    sql_crate,
+                    perform_bool_check,
+                    driver,
+                );
                 quote! {
                     #sql_crate::SqlExpr::Parenthesized(Box::new(#inside_parsed))
                 }
@@ -220,7 +227,7 @@ impl SqlExpr {
                     .any(|(op, _)| matches!(op, Operator::And | Operator::Or));
 
                 let first_parsed =
-                    where_expr.into_tokens_with_checks(checks, sql_crate, first_bool_check);
+                    where_expr.into_tokens_with_checks(checks, sql_crate, first_bool_check, driver);
 
                 let next_item_bool = items
                     .iter()
@@ -239,6 +246,7 @@ impl SqlExpr {
                         checks,
                         sql_crate,
                         current_expected_bool,
+                        driver,
                     );
                     let and_or_parsed = match and_or {
                         Operator::And => quote! {(#sql_crate::Operator::And, #inside_parsed)},
@@ -269,74 +277,74 @@ impl SqlExpr {
                 }
             }
             SqlExpr::Not(where_expr) => {
-                let parsed = where_expr.into_tokens_with_checks(checks, sql_crate, true);
+                let parsed = where_expr.into_tokens_with_checks(checks, sql_crate, true, driver);
                 quote! {
                     #sql_crate::SqlExpr::Not(Box::new(#parsed))
                 }
             }
             SqlExpr::IsNull(sql_value) => {
-                let parsed = sql_value.into_tokens_with_checks(checks, sql_crate);
+                let parsed = sql_value.into_tokens_with_checks(checks, sql_crate, driver);
                 quote! {
                     #sql_crate::SqlExpr::IsNull(Box::new(#parsed))
                 }
             }
             SqlExpr::IsNotNull(sql_value) => {
-                let parsed = sql_value.into_tokens_with_checks(checks, sql_crate);
+                let parsed = sql_value.into_tokens_with_checks(checks, sql_crate, driver);
                 quote! {
                     #sql_crate::SqlExpr::IsNotNull(Box::new(#parsed))
                 }
             }
             SqlExpr::Equal(sql_value, sql_value1) => {
-                let parsed = sql_value.into_tokens_with_checks(checks, sql_crate);
-                let parsed1 = sql_value1.into_tokens_with_checks(checks, sql_crate);
+                let parsed = sql_value.into_tokens_with_checks(checks, sql_crate, driver);
+                let parsed1 = sql_value1.into_tokens_with_checks(checks, sql_crate, driver);
                 quote! {
                     #sql_crate::SqlExpr::Eq(Box::new(#parsed), Box::new(#parsed1))
                 }
             }
             SqlExpr::NotEqual(sql_value, sql_value1) => {
-                let parsed = sql_value.into_tokens_with_checks(checks, sql_crate);
-                let parsed1 = sql_value1.into_tokens_with_checks(checks, sql_crate);
+                let parsed = sql_value.into_tokens_with_checks(checks, sql_crate, driver);
+                let parsed1 = sql_value1.into_tokens_with_checks(checks, sql_crate, driver);
                 quote! {
                     #sql_crate::SqlExpr::NotEq(Box::new(#parsed), Box::new(#parsed1))
                 }
             }
             SqlExpr::GreaterThan(sql_value, sql_value1) => {
-                let parsed = sql_value.into_tokens_with_checks(checks, sql_crate);
-                let parsed1 = sql_value1.into_tokens_with_checks(checks, sql_crate);
+                let parsed = sql_value.into_tokens_with_checks(checks, sql_crate, driver);
+                let parsed1 = sql_value1.into_tokens_with_checks(checks, sql_crate, driver);
                 quote! {
                     #sql_crate::SqlExpr::Gt(Box::new(#parsed), Box::new(#parsed1))
                 }
             }
             SqlExpr::GreaterThanOrEqual(sql_value, sql_value1) => {
-                let parsed = sql_value.into_tokens_with_checks(checks, sql_crate);
-                let parsed1 = sql_value1.into_tokens_with_checks(checks, sql_crate);
+                let parsed = sql_value.into_tokens_with_checks(checks, sql_crate, driver);
+                let parsed1 = sql_value1.into_tokens_with_checks(checks, sql_crate, driver);
                 quote! {
                     #sql_crate::SqlExpr::GtEq(Box::new(#parsed), Box::new(#parsed1))
                 }
             }
             SqlExpr::LessThan(sql_value, sql_value1) => {
-                let parsed = sql_value.into_tokens_with_checks(checks, sql_crate);
-                let parsed1 = sql_value1.into_tokens_with_checks(checks, sql_crate);
+                let parsed = sql_value.into_tokens_with_checks(checks, sql_crate, driver);
+                let parsed1 = sql_value1.into_tokens_with_checks(checks, sql_crate, driver);
                 quote! {
                     #sql_crate::SqlExpr::Lt(Box::new(#parsed), Box::new(#parsed1))
                 }
             }
             SqlExpr::LessThanOrEqual(sql_value, sql_value1) => {
-                let parsed = sql_value.into_tokens_with_checks(checks, sql_crate);
-                let parsed1 = sql_value1.into_tokens_with_checks(checks, sql_crate);
+                let parsed = sql_value.into_tokens_with_checks(checks, sql_crate, driver);
+                let parsed1 = sql_value1.into_tokens_with_checks(checks, sql_crate, driver);
                 quote! {
                     #sql_crate::SqlExpr::LtEq(Box::new(#parsed), Box::new(#parsed1))
                 }
             }
             SqlExpr::Like(sql_value, sql_value1) => {
-                let parsed = sql_value.into_tokens_with_checks(checks, sql_crate);
-                let parsed1 = sql_value1.into_tokens_with_checks(checks, sql_crate);
+                let parsed = sql_value.into_tokens_with_checks(checks, sql_crate, driver);
+                let parsed1 = sql_value1.into_tokens_with_checks(checks, sql_crate, driver);
                 quote! {
                     #sql_crate::SqlExpr::Like(Box::new(#parsed), Box::new(#parsed1))
                 }
             }
             SqlExpr::In(sql_value, sql_value_in) => {
-                let parsed = sql_value.into_tokens_with_checks(checks, sql_crate);
+                let parsed = sql_value.into_tokens_with_checks(checks, sql_crate, driver);
 
                 match sql_value_in {
                     SqlValueIn::Single(sql_value) => {
@@ -345,7 +353,7 @@ impl SqlExpr {
                             SqlValue::OutsideVariable(expr) => {
                                 quote_spanned! {expr.span()=>
                                     {
-                                        fn ___collect_iterator<'a,Y:Into<#sql_crate::SqlValueMaybeRef<'a>>,T:Iterator<Item=Y>>(i:T)->Vec<#sql_crate::SqlValueMaybeRef<'a>>{
+                                        fn ___collect_iterator<'a,D:#sql_crate::Driver,Y:Into<D::Value<'a>>,T:Iterator<Item=Y>>(i:T)->Vec<D::Value<'a>>{
                                             let collected=Vec::new();
                                             for item in i{
                                                 collected.push(item.into());
@@ -353,7 +361,7 @@ impl SqlExpr {
                                             collected
                                         }
 
-                                        #sql_crate::SqlExpr::In(Box::new(#parsed),___collect_iterator({#expr}))
+                                        #sql_crate::SqlExpr::<#driver>::In(Box::new(#parsed),___collect_iterator({#expr}))
                                     }
                                 }
                             }
@@ -376,7 +384,8 @@ impl SqlExpr {
                     SqlValueIn::Multiple(sql_values) => {
                         let mut parsed_values = Vec::new();
                         for sql_value in sql_values {
-                            let parsed_value = sql_value.into_tokens_with_checks(checks, sql_crate);
+                            let parsed_value =
+                                sql_value.into_tokens_with_checks(checks, sql_crate, driver);
                             parsed_values.push(parsed_value);
                         }
                         quote! {
@@ -386,9 +395,9 @@ impl SqlExpr {
                 }
             }
             SqlExpr::Between(sql_value, sql_value1, sql_value2) => {
-                let parsed = sql_value.into_tokens_with_checks(checks, sql_crate);
-                let parsed1 = sql_value1.into_tokens_with_checks(checks, sql_crate);
-                let parsed2 = sql_value2.into_tokens_with_checks(checks, sql_crate);
+                let parsed = sql_value.into_tokens_with_checks(checks, sql_crate, driver);
+                let parsed1 = sql_value1.into_tokens_with_checks(checks, sql_crate, driver);
+                let parsed2 = sql_value2.into_tokens_with_checks(checks, sql_crate, driver);
                 quote! {
                     #sql_crate::SqlExpr::Between(Box::new(#parsed), Box::new(#parsed1), Box::new(#parsed2))
                 }
@@ -396,7 +405,7 @@ impl SqlExpr {
         }
     }
 }
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum SqlValue {
     Column(SqlColumn),
     Lit(syn::Lit),
@@ -420,7 +429,8 @@ impl SqlValue {
         self,
         checks: &mut Vec<TokenStream>,
         sql_crate: &TokenStream,
-    ) -> easy_macros::proc_macro2::TokenStream {
+        driver: &TokenStream,
+    ) -> proc_macro2::TokenStream {
         match self {
             SqlValue::Column(sql_column) => {
                 match sql_column {
@@ -438,7 +448,7 @@ impl SqlValue {
                         let ident_str = ident.to_string();
                         quote_spanned! {ident.span()=>
                             #sql_crate::SqlExpr::ColumnFromTable{
-                                table: <#path as #sql_crate::SqlTable>::table_name().to_owned(),
+                                table: <#path as #sql_crate::SqlTable<#driver>>::table_name().to_owned(),
                                 column: #ident_str.to_string(),
                             }
                         }
@@ -459,18 +469,18 @@ impl SqlValue {
             }
             SqlValue::Lit(lit) => {
                 quote_spanned! {lit.span()=>
-                    #sql_crate::SqlExpr::Value(#lit.into())
+                    #sql_crate::SqlExpr::<#driver>::Value(#lit.into())
                 }
             }
             SqlValue::OutsideVariable(expr) => {
                 quote_spanned! {expr.span()=>
-                    #sql_crate::SqlExpr::Value({#expr}.into())
+                    #sql_crate::SqlExpr::<#driver>::Value({#expr}.into())
                 }
             }
         }
     }
 }
-
+#[derive(Debug, Clone)]
 pub enum SqlValueIn {
     Single(SqlValue),
     Multiple(Vec<SqlValue>),

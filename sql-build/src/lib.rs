@@ -441,14 +441,20 @@ fn handle_dir(
 ///
 /// `ignore_list` - A list of regex patterns to ignore. The patterns are used on the file path. Path is ignored if match found.
 ///
-fn build_result(ignore_list: &[regex::Regex]) -> anyhow::Result<()> {
+fn build_result(ignore_list: &[regex::Regex], default_drivers: &[&str]) -> anyhow::Result<()> {
     // Get the current directory
     let current_dir = std::env::current_dir()?;
     let base_path_len_bytes = current_dir.display().to_string().len();
     // Get the src directory
     let src_dir = current_dir.join("src");
 
-    let mut search_data = SearchData::new(CompilationData::load()?);
+    let default_drivers_mapped = default_drivers
+        .iter()
+        .map(|s| s.to_string())
+        .collect::<Vec<_>>();
+
+    let mut search_data =
+        SearchData::new(CompilationData::load(default_drivers_mapped.clone(), true)?);
 
     handle_dir(&src_dir, ignore_list, base_path_len_bytes, &mut search_data)?;
 
@@ -518,8 +524,8 @@ fn build_result(ignore_list: &[regex::Regex]) -> anyhow::Result<()> {
 ///
 /// `ignore_list` - A list of regex patterns to ignore. The patterns are used on the file path. Path is ignored if match found.
 ///
-pub fn build(ignore_list: &[regex::Regex]) {
-    if let Err(err) = build_result(ignore_list) {
+pub fn build(ignore_list: &[regex::Regex], default_drivers: &[&str]) {
+    if let Err(err) = build_result(ignore_list, default_drivers) {
         panic!(
             "Always Context Build Error: {}\r\n\r\nDebug Info:\r\n\r\n{:?}",
             err, err

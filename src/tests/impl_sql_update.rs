@@ -1,6 +1,6 @@
 use easy_macros::macros::always_context;
 
-use crate::SqlUpdate;
+use crate::{SqlUpdate, Sqlite};
 
 struct ExampleTableStruct {
     field0: String,
@@ -17,8 +17,8 @@ struct ExampleStruct {
 }
 
 #[always_context]
-impl SqlUpdate<ExampleTableStruct> for ExampleStruct {
-    fn updates(&mut self) -> anyhow::Result<Vec<(String, crate::SqlExpr<'_>)>> {
+impl SqlUpdate<ExampleTableStruct, Sqlite> for ExampleStruct {
+    fn updates(&mut self) -> anyhow::Result<Vec<(String, crate::SqlExpr<'_, Sqlite>)>> {
         crate::never::never_fn(|| {
             //Check for validity
             let update_instance = crate::never::never_any::<Self>();
@@ -31,21 +31,15 @@ impl SqlUpdate<ExampleTableStruct> for ExampleStruct {
         Ok(vec![
             (
                 "field1".to_string(),
-                crate::SqlExpr::Value(crate::SqlValueMaybeRef::Ref(crate::SqlValueRef::String(
-                    &self.field1,
-                ))),
+                crate::SqlExpr::Value((&self.field1).into()),
             ),
             (
                 "field2".to_string(),
-                crate::SqlExpr::Value(crate::SqlValueMaybeRef::Ref(crate::SqlValueRef::I32(
-                    &self.field2,
-                ))),
+                crate::SqlExpr::Value((&self.field2).into()),
             ),
             (
                 "field3".to_string(),
-                crate::SqlExpr::Value(crate::SqlValueMaybeRef::Ref(crate::SqlValueRef::I64(
-                    &self.field3,
-                ))),
+                crate::SqlExpr::Value((&self.field3).into()),
             ),
         ])
     }
@@ -58,8 +52,8 @@ struct ExampleStruct2 {
 }
 
 #[always_context]
-impl SqlUpdate<ExampleTableStruct> for ExampleStruct2 {
-    fn updates(&mut self) -> anyhow::Result<Vec<(String, crate::SqlExpr<'_>)>> {
+impl SqlUpdate<ExampleTableStruct, Sqlite> for ExampleStruct2 {
+    fn updates(&mut self) -> anyhow::Result<Vec<(String, crate::SqlExpr<'_, Sqlite>)>> {
         //If Option is set to None then ignore
         crate::never::never_fn(|| {
             //Check for validity
@@ -73,25 +67,13 @@ impl SqlUpdate<ExampleTableStruct> for ExampleStruct2 {
         let mut updates = Vec::new();
         updates.push((
             "field1".to_string(),
-            crate::SqlExpr::Value(crate::SqlValueMaybeRef::Ref(crate::SqlValueRef::String(
-                &self.field1,
-            ))),
+            crate::SqlExpr::Value((&self.field1).into()),
         ));
         if let Some(field2) = &self.field2 {
-            updates.push((
-                "field2".to_string(),
-                crate::SqlExpr::Value(crate::SqlValueMaybeRef::Ref(crate::SqlValueRef::I32(
-                    field2,
-                ))),
-            ));
+            updates.push(("field2".to_string(), crate::SqlExpr::Value((field2).into())));
         }
         if let Some(field3) = &self.field3 {
-            updates.push((
-                "field3".to_string(),
-                crate::SqlExpr::Value(crate::SqlValueMaybeRef::Ref(crate::SqlValueRef::I64(
-                    field3,
-                ))),
-            ));
+            updates.push(("field3".to_string(), crate::SqlExpr::Value((field3).into())));
         }
         Ok(updates)
     }

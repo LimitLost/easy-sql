@@ -2,12 +2,11 @@ mod easy_lib {
     pub use crate as sql;
 }
 
+use crate::drivers::sqlite::Database;
 use anyhow::Context;
-use easy_lib::sql::{Database, SqlInsert, SqlOutput, SqlTable, SqlUpdate, sql_where};
+use easy_lib::sql::{SqlInsert, SqlOutput, SqlTable, SqlUpdate, sql_where};
 use easy_macros::macros::always_context;
 use sql_macros::sql_convenience;
-
-use crate::WhereClause;
 
 #[derive(SqlTable, Debug)]
 #[sql(version = 1)]
@@ -140,11 +139,14 @@ async fn test_delete_all_rows() -> anyhow::Result<()> {
         )
         .await?;
     }
-    ExampleTableDelete::delete(&mut conn, None::<(fn(ExampleTableDelete), WhereClause<'_>)>)
-        .await?;
+    ExampleTableDelete::delete(
+        &mut conn,
+        #[context(no)]
+        None,
+    )
+    .await?;
     let rows: Vec<ExampleDeleteInsert> =
-        ExampleTableDelete::select(&mut conn, None::<(fn(ExampleTableDelete), WhereClause<'_>)>)
-            .await?;
+        ExampleTableDelete::select(&mut conn, sql_where!(true)).await?;
     assert_eq!(rows.len(), 0);
     conn.rollback().await?;
     Ok(())

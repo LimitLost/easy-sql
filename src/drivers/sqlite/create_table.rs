@@ -2,18 +2,18 @@ use std::collections::HashMap;
 use std::ops::DerefMut;
 
 use anyhow::Context;
-use async_trait::async_trait;
 use easy_macros::{helpers::context, macros::always_context};
+use sqlx::SqliteConnection;
 
-use crate::RawConnection;
+use super::Sqlite;
 use crate::SetupSql;
 
 use crate::TableField;
 
 #[derive(Debug)]
-pub struct CreateTable {
+pub struct CreateTable<'a> {
     pub table_name: &'static str,
-    pub fields: Vec<TableField>,
+    pub fields: Vec<TableField<'a, Sqlite>>,
 
     pub primary_keys: Vec<&'static str>,
     ///Can only be used when with single primary key
@@ -24,13 +24,12 @@ pub struct CreateTable {
 }
 
 #[always_context]
-#[async_trait]
-impl SetupSql for CreateTable {
+impl<'a> SetupSql<Sqlite> for CreateTable<'a> {
     type Output = ();
 
-    async fn query<'a>(
+    async fn query(
         self,
-        exec: &mut (impl DerefMut<Target = RawConnection> + Send + Sync),
+        exec: &mut (impl DerefMut<Target = SqliteConnection> + Send + Sync),
     ) -> anyhow::Result<Self::Output> {
         let mut table_fields = String::new();
         let mut table_constrains = String::new();
