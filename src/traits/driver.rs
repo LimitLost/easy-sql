@@ -18,6 +18,11 @@ pub trait Driver: Debug + Send + Sync + Sized {
     type InternalDriver: sqlx::Database;
     type Value<'a>: DriverValue<'a, Self::InternalDriver>;
 
+    fn identifier_delimiter() -> &'static str;
+
+    /// index is 0 based
+    fn parameter_placeholder(index: usize) -> String;
+
     async fn table_exists(
         conn: &mut (impl EasyExecutor<Self> + Send + Sync),
         name: &'static str,

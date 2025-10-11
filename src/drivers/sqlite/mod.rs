@@ -30,6 +30,13 @@ type Db = sqlx::Sqlite;
 impl Driver for Sqlite {
     type InternalDriver = Db;
     type Value<'a> = sql_value::SqlValueMaybeRef<'a>;
+    fn identifier_delimiter() -> &'static str {
+        "`"
+    }
+
+    fn parameter_placeholder(index: usize) -> String {
+        format!("?{}", index + 1)
+    }
 
     async fn table_exists(
         conn: &mut (impl EasyExecutor<Self> + Send + Sync),

@@ -71,13 +71,14 @@ impl<'a, D: Driver> SqlExpr<'a, D> {
     ) -> String {
         match self {
             SqlExpr::Column(s) => {
-                format!("`{}`", s)
+                let delimeter = D::identifier_delimiter();
+                format!("{delimeter}{s}{delimeter}")
             }
             SqlExpr::Value(sql_value_maybe_ref) => {
                 let current_value_n = *current_binding_n;
                 *current_binding_n += 1;
                 bindings_list.push(sql_value_maybe_ref);
-                format!("${}", current_value_n)
+                D::parameter_placeholder(current_value_n)
             }
             SqlExpr::Eq(where_expr, where_expr1) => {
                 let left = where_expr.to_query_data(current_binding_n, bindings_list);
@@ -177,7 +178,9 @@ impl<'a, D: Driver> SqlExpr<'a, D> {
                 )
             }
             SqlExpr::ColumnFromTable { table, column } => {
-                format!("{}.{}", table, column)
+                let delimeter = D::identifier_delimiter();
+
+                format!("{delimeter}{table}{delimeter}.{delimeter}{column}{delimeter}")
             }
             SqlExpr::Error => {
                 panic!("Error in SqlExpr")

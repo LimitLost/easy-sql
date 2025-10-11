@@ -8,11 +8,10 @@ use crate::{Driver, SqlExpr};
 
 use super::{QueryData, RequestedColumn, SelectClauses, TableJoin, WhereClause};
 
-fn single_value_str(columns_len: usize, current_value_n: &mut usize) -> String {
+fn single_value_str<D: Driver>(columns_len: usize, current_value_n: &mut usize) -> String {
     let mut single_value_str = String::new();
     for _ in 0..columns_len {
-        single_value_str.push('$');
-        single_value_str.push_str(&current_value_n.to_string());
+        single_value_str.push_str(&D::parameter_placeholder(*current_value_n));
         single_value_str.push(',');
         *current_value_n += 1;
     }
@@ -62,12 +61,12 @@ fn insert_query<'a, D: Driver>(
     returning: Option<&[RequestedColumn]>,
 ) -> anyhow::Result<QueryData<'a, D>> {
     let values_str = {
-        let mut current_value_n = 1;
+        let mut current_value_n = 0;
         let columns_len = columns.len();
         let mut values_str = String::new();
 
         for _ in 0..values.len() {
-            values_str.push_str(&single_value_str(columns_len, &mut current_value_n));
+            values_str.push_str(&single_value_str::<D>(columns_len, &mut current_value_n));
         }
         //Removes last comma
         values_str.pop();
@@ -88,9 +87,11 @@ fn insert_query<'a, D: Driver>(
         String::new()
     };
 
+    let delimeter = D::identifier_delimiter();
+
     let query_str = format!(
-        "INSERT INTO `{table}` (`{}`) VALUES {values_str} {returning}",
-        columns.join("`, `")
+        "INSERT INTO {delimeter}{table}{delimeter} ({delimeter}{}{delimeter}) VALUES {values_str} {returning}",
+        columns.join(&format!("{delimeter}, {delimeter}"))
     );
 
     Ok(QueryData {
@@ -106,13 +107,15 @@ fn update_query<'a, D: Driver>(
     where_: &'a Option<WhereClause<'a, D>>,
     returning: Option<&[RequestedColumn]>,
 ) -> anyhow::Result<QueryData<'a, D>> {
-    let mut current_binding_n = 1;
+    let mut current_binding_n = 0;
     let mut bindings_list = Vec::new();
+
+    let delimeter = D::identifier_delimiter();
 
     let mut set_str = String::new();
     for (column, value) in set {
         let value_parsed = value.to_query_data(&mut current_binding_n, &mut bindings_list);
-        set_str.push_str(&format!("`{}` = {},", column, value_parsed));
+        set_str.push_str(&format!("{delimeter}{column}{delimeter} = {value_parsed},"));
     }
     //Removes last comma
     set_str.pop();
@@ -136,7 +139,8 @@ fn update_query<'a, D: Driver>(
         String::new()
     };
 
-    let query_str = format!("UPDATE `{table}` SET {set_str} {where_str} {returning}");
+    let query_str =
+        format!("UPDATE {delimeter}{table}{delimeter} SET {set_str} {where_str} {returning}");
 
     Ok(QueryData {
         query: query_str,
@@ -150,7 +154,7 @@ fn delete_query<'a, D: Driver>(
     where_: &'a Option<WhereClause<'a, D>>,
     returning: Option<&[RequestedColumn]>,
 ) -> anyhow::Result<QueryData<'a, D>> {
-    let mut current_binding_n = 1;
+    let mut current_binding_n = 0;
     let mut bindings_list = Vec::new();
 
     let where_str = if let Some(w) = where_ {
@@ -172,7 +176,9 @@ fn delete_query<'a, D: Driver>(
         String::new()
     };
 
-    let query_str = format!("DELETE FROM `{table}` {where_str} {returning}",);
+    let delimeter = D::identifier_delimiter();
+
+    let query_str = format!("DELETE FROM {delimeter}{table}{delimeter} {where_str} {returning}");
 
     Ok(QueryData {
         query: query_str,
@@ -189,7 +195,7 @@ fn select_base<'a, D: Driver>(
 ) -> String {
     let distinct = if clauses.distinct { " DISTINCT" } else { "" };
 
-    let mut current_binding_n = 1;
+    let mut current_binding_n = 0;
 
     let joins_str = {
         let mut joins_str = String::new();
@@ -202,8 +208,11 @@ fn select_base<'a, D: Driver>(
 
     let clauses_str = clauses.to_query_data(&mut current_binding_n, bindings_list);
 
-    let query_str =
-        format!("SELECT{distinct} {requested_str} FROM `{table}` {joins_str} {clauses_str}",);
+    let delimeter = D::identifier_delimiter();
+
+    let query_str = format!(
+        "SELECT{distinct} {requested_str} FROM {delimeter}{table}{delimeter} {joins_str} {clauses_str}"
+    );
     query_str
 }
 

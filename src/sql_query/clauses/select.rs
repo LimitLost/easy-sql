@@ -33,9 +33,13 @@ impl<'a, D: Driver> TableJoin<'a, D> {
             JoinType::Right => "RIGHT",
             JoinType::Cross => "CROSS",
         };
-        let mut join_str = format!("{} JOIN `{}`", join_type_str, self.table);
+        let delimeter = D::identifier_delimiter();
+        let mut join_str = format!(
+            "{} JOIN {delimeter}{}{delimeter}",
+            join_type_str, self.table
+        );
         if let Some(alias) = &self.alias {
-            join_str.push_str(&format!(" AS `{}`", alias));
+            join_str.push_str(&format!(" AS {delimeter}{}{delimeter}", alias));
         }
         if let Some(expr) = &self.on {
             join_str.push_str(&format!(
