@@ -104,6 +104,7 @@ fn call_check(item: &mut syn::ExprCall, context_info: &mut SqlData) {
 }
 
 struct SqlMacroInput {
+    driver: Option<syn::Path>,
     table: Option<syn::Type>,
     set_keyword_present: bool,
     leftovers: proc_macro2::TokenStream,
@@ -111,8 +112,16 @@ struct SqlMacroInput {
 
 impl syn::parse::Parse for SqlMacroInput {
     fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
+        let mut driver = None;
         let mut table = None;
         let mut set_keyword_present = false;
+
+        // Check for optional driver specification: <Driver>
+        if input.peek(syn::Token![<]) {
+            input.parse::<syn::Token![<]>()?;
+            driver = Some(input.parse::<syn::Path>()?);
+            input.parse::<syn::Token![>]>()?;
+        }
 
         if input.peek(syn::Token![|]) {
             input.parse::<syn::Token![|]>()?;
@@ -129,6 +138,7 @@ impl syn::parse::Parse for SqlMacroInput {
         let leftovers: proc_macro2::TokenStream = input.parse()?;
 
         Ok(SqlMacroInput {
+            driver,
             table,
             set_keyword_present,
             leftovers,
@@ -158,6 +168,14 @@ fn macro_check(item: &mut syn::Macro, context_info: &mut SqlData) {
                 return;
             }
 
+            let driver = macro_input.driver.as_ref();
+
+            let driver_tokens = if let Some(d) = driver {
+                quote! { <#d> }
+            } else {
+                quote! {}
+            };
+
             let set = if macro_input.set_keyword_present || context_info.update_set_arg {
                 quote! { SET }
             } else {
@@ -166,7 +184,7 @@ fn macro_check(item: &mut syn::Macro, context_info: &mut SqlData) {
             let leftovers = macro_input.leftovers;
 
             item.tokens = quote! {
-                | #table | #set #leftovers
+                #driver_tokens | #table | #set #leftovers
             };
         }
         _ => {}

@@ -2,7 +2,9 @@ use ::{
     quote::quote,
     syn::{self, parse::Parse},
 };
+use anyhow::Context;
 use easy_macros::{helpers::parse_macro_input, macros::always_context};
+use sql_compilation_data::CompilationData;
 
 use crate::{
     sql_crate,
@@ -163,7 +165,36 @@ pub fn sql(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::TokenStr
 
     let mut checks = Vec::new();
     let sql_crate = sql_crate();
-    let driver = quote! {#sql_crate::Sqlite};
+
+    // Get the driver - either explicitly provided or from compilation data
+    let driver = if let Some(explicit_driver) = input.driver {
+        // Use explicitly provided driver
+        quote! {#explicit_driver}
+    } else {
+        // Load compilation data to get default drivers
+        let compilation_data = CompilationData::load(Vec::<String>::new(), false)?;
+
+        // Get the driver from compilation data
+        if compilation_data.default_drivers.is_empty() {
+            anyhow::bail!(
+                "No default drivers provided in the build script. Please configure drivers using sql_build::build() in build.rs, or specify a driver explicitly: sql!(<Driver> |Table| ...)"
+            );
+        } else if compilation_data.default_drivers.len() > 1 {
+            anyhow::bail!(
+                "Multiple drivers are configured in easy_sql.ron: {:?}. The sql! macro requires a single driver. Please configure only one driver in your build.rs, or specify the driver explicitly: sql!(<Driver> |Table| ...)",
+                compilation_data.default_drivers
+            );
+        } else {
+            let driver_str = &compilation_data.default_drivers[0];
+            let driver_path: syn::Path = syn::parse_str(driver_str).with_context(|| {
+                format!(
+                    "easy_sql.ron is corrupted: Invalid driver name `{}`, expected valid Rust identifier",
+                    driver_str
+                )
+            })?;
+            quote! {#driver_path}
+        }
+    };
 
     let result = match mode {
         MacroMode::Expression(expr) => {
