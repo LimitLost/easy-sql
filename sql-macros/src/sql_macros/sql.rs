@@ -2,7 +2,7 @@ use ::{
     quote::quote,
     syn::{self, parse::Parse},
 };
-use easy_macros::macros::always_context;
+use easy_macros::{helpers::parse_macro_input, macros::always_context};
 
 use crate::{
     sql_crate,
@@ -155,8 +155,9 @@ impl Parse for MacroMode {
     }
 }
 
-pub fn sql(item: proc_macro::TokenStream) -> proc_macro::TokenStream {
-    let input = syn::parse_macro_input!(item as WrappedInput<MacroMode>);
+#[always_context]
+pub fn sql(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::TokenStream> {
+    let input = parse_macro_input!(item as WrappedInput<MacroMode>);
     let input_table = input.table;
     let mode = input.input;
 
@@ -332,5 +333,5 @@ pub fn sql(item: proc_macro::TokenStream) -> proc_macro::TokenStream {
 
     // panic!("{}", result);
 
-    result.into()
+    Ok(result.into())
 }

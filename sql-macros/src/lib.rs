@@ -108,15 +108,20 @@ fn easy_macros_helpers_crate() -> proc_macro2::TokenStream {
 /// # Type Safety
 /// All field names are validated at compile-time against the table schema when used with `#[sql_convenience]` or when user add table struct info manually example: `sql!(|Table| id = 1)`.
 #[proc_macro]
-pub fn sql(item: TokenStream) -> TokenStream {
+#[always_context]
+#[anyhow_result]
+pub fn sql(item: TokenStream) -> anyhow::Result<TokenStream> {
     sql_macros::sql(item)
 }
 
+#[always_context]
 /// Debug version of `sql!` that prints the generated code and panics.
 /// Useful for inspecting macro expansion during development.
 #[proc_macro]
-pub fn sql_debug(item: TokenStream) -> TokenStream {
-    let result = sql_macros::sql(item);
+#[anyhow_result]
+#[no_context]
+pub fn sql_debug(item: TokenStream) -> anyhow::Result<TokenStream> {
+    let result = sql_macros::sql(item)?;
     panic!("{}", result);
 }
 
