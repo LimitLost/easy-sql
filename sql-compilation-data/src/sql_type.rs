@@ -146,8 +146,6 @@ impl SqlType {
     #[cfg(feature = "data")]
     #[always_context]
     pub fn from_syn_type(ty: &syn::Type) -> anyhow::Result<(Option<SqlType>, bool)> {
-        use easy_macros::syn;
-
         match ty {
             syn::Type::Path(type_path) => {
                 let mut last_segment = type_path
@@ -231,8 +229,6 @@ impl SqlType {
     #[cfg(feature = "data")]
     ///`sql_type_parent` - Example: `quote::quote! {easy_lib::sql}`
     pub fn to_tokens(&self, sql_type_parent: &TokenStream) -> TokenStream {
-        use easy_macros::quote::quote;
-
         match self {
             SqlType::IpAddr => quote! {
                 #sql_type_parent::SqlType::IpAddr
