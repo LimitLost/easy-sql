@@ -129,7 +129,7 @@ struct ExampleInsert {
     pub field: i64,
 }
 
-use easy_lib::sql::{sql, sql_convenience, sql_set, sql_where};
+use easy_lib::sql::{sql, sql_convenience};
 
 #[tokio::test]
 #[sql_convenience]
@@ -145,32 +145,31 @@ async fn main2() -> anyhow::Result<()> {
     // Inserting data
     // There's also `insert_returning`
     ExampleTableIncrement::insert(&mut conn, &ExampleInsert { field: 5 }).await?;
-    //sql_where! macro uses SQLite syntax
+    //sql! macro uses SQLite syntax
     // There's also `update_returning`
-    ExampleTableIncrement::update(&mut conn, &ExampleInsert { field: 10 }, sql_where!(id = 3))
-        .await?;
+    ExampleTableIncrement::update(&mut conn, &ExampleInsert { field: 10 }, sql!(id = 3)).await?;
 
-    //Use sql_set! macro to write more complex value updates
+    //Use sql! macro to write more complex value updates
     ExampleTableIncrement::update(
         &mut conn,
-        sql_set!(field = field + 5, id = id * 1),
-        sql_where!(id = 3),
+        sql!(field = field + 5, id = id * 1),
+        sql!(id = 3),
     )
     .await?;
 
     // Selecting data
     let example_result_vec: Vec<ExampleInsert> =
-        ExampleTableIncrement::select(&mut conn, sql_where!(id = 2)).await?;
+        ExampleTableIncrement::select(&mut conn, sql!(id = 2)).await?;
     // Get is an alias for select
     let example_result_single: ExampleInsert =
-        ExampleTableIncrement::get(&mut conn, sql_where!(id = 1)).await?;
+        ExampleTableIncrement::get(&mut conn, sql!(id = 1)).await?;
 
     // sql! macro allows to do more complex queries
     let example_result_maybe_single: Option<ExampleInsert> =
         ExampleTableIncrement::select(&mut conn, sql!(WHERE id = 2 ORDER BY id)).await?;
 
     // There's also `delete_returning`
-    ExampleTableIncrement::delete(&mut conn, sql_where!(id = 1)).await?;
+    ExampleTableIncrement::delete(&mut conn, sql!(id = 1)).await?;
 
     // You can also use `conn.rollback().await?` if you want to rollback the transaction
     conn.commit().await?;

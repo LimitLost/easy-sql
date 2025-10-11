@@ -3,7 +3,7 @@ mod easy_lib {
 }
 
 use anyhow::Context;
-use easy_lib::sql::{SqlInsert, SqlOutput, SqlTable, SqlUpdate, sql_where,sqlite::Database};
+use easy_lib::sql::{SqlInsert, SqlOutput, SqlTable, SqlUpdate, sql,sqlite::Database};
 use easy_macros::macros::always_context;
 use lazy_static::lazy_static;
 use sql_macros::sql_convenience;
@@ -57,7 +57,7 @@ async fn test_insert_basic() -> anyhow::Result<()> {
         },
     )
     .await?;
-    let row: ExampleInsert = ExampleTableInsert::get(&mut conn, sql_where!(id = 1)).await?;
+    let row: ExampleInsert = ExampleTableInsert::get(&mut conn, sql!(id = 1)).await?;
     assert_eq!(row.field, 1);
     assert_eq!(row.field_str, "A");
     assert_eq!(row.field_opt, None);
@@ -83,7 +83,7 @@ async fn test_insert_multiple() -> anyhow::Result<()> {
         .await?;
     }
     let rows: Vec<ExampleInsert> =
-        ExampleTableInsert::select(&mut conn, sql_where!(id >= 1)).await?;
+        ExampleTableInsert::select(&mut conn, sql!(id >= 1)).await?;
     assert_eq!(rows.len(), 5);
     conn.rollback().await?;
     Ok(())
@@ -103,7 +103,7 @@ async fn test_insert_default_value() -> anyhow::Result<()> {
         },
     )
     .await?;
-    let row: ExampleInsert = ExampleTableInsert::get(&mut conn, sql_where!(id = 1)).await?;
+    let row: ExampleInsert = ExampleTableInsert::get(&mut conn, sql!(id = 1)).await?;
     assert_eq!(row.field_str, *ALL_CHARACTERS);
     conn.rollback().await?;
     Ok(())
@@ -128,7 +128,7 @@ async fn test_insert_and_rollback() -> anyhow::Result<()> {
     let db2 = Database::setup_for_testing::<ExampleTableInsert>().await?;
     let mut conn2 = db2.transaction().await?;
     let result: Result<ExampleTableInsert, anyhow::Error> =
-        ExampleTableInsert::get(&mut conn2, sql_where!(id = 1)).await;
+        ExampleTableInsert::get(&mut conn2, sql!(id = 1)).await;
     assert!(result.is_err());
     Ok(())
 }
@@ -178,7 +178,7 @@ async fn test_insert_nullable_field() -> anyhow::Result<()> {
         },
     )
     .await?;
-    let row: ExampleInsert = ExampleTableInsert::get(&mut conn, sql_where!(id = 1)).await?;
+    let row: ExampleInsert = ExampleTableInsert::get(&mut conn, sql!(id = 1)).await?;
     assert_eq!(row.field_opt, Some(123));
     conn.rollback().await?;
     Ok(())
@@ -206,10 +206,10 @@ async fn test_insert_and_update() -> anyhow::Result<()> {
             field_str: "B".to_string(),
             field_opt: Some(1),
         },
-        sql_where!(id = 1),
+        sql!(id = 1),
     )
     .await?;
-    let row: ExampleInsert = ExampleTableInsert::get(&mut conn, sql_where!(id = 1)).await?;
+    let row: ExampleInsert = ExampleTableInsert::get(&mut conn, sql!(id = 1)).await?;
     assert_eq!(row.field, 66);
     assert_eq!(row.field_str, "B");
     assert_eq!(row.field_opt, Some(1));
@@ -232,9 +232,9 @@ async fn test_insert_and_delete() -> anyhow::Result<()> {
         },
     )
     .await?;
-    ExampleTableInsert::delete(&mut conn, sql_where!(id = 1)).await?;
+    ExampleTableInsert::delete(&mut conn, sql!(id = 1)).await?;
     let result: Result<ExampleTableInsert, anyhow::Error> =
-        ExampleTableInsert::get(&mut conn, sql_where!(id = 1)).await;
+        ExampleTableInsert::get(&mut conn, sql!(id = 1)).await;
     assert!(result.is_err());
     conn.rollback().await?;
     Ok(())
@@ -255,7 +255,7 @@ async fn test_insert_boundary_values() -> anyhow::Result<()> {
         },
     )
     .await?;
-    let row: ExampleInsert = ExampleTableInsert::get(&mut conn, sql_where!(id = 1)).await?;
+    let row: ExampleInsert = ExampleTableInsert::get(&mut conn, sql!(id = 1)).await?;
     assert_eq!(row.field, i64::MAX);
     assert_eq!(row.field_opt, Some(i32::MAX));
     conn.rollback().await?;
@@ -280,7 +280,7 @@ async fn test_insert_select_where() -> anyhow::Result<()> {
         .await?;
     }
     let rows: Vec<ExampleInsert> =
-        ExampleTableInsert::select(&mut conn, sql_where!(field >= 2)).await?;
+        ExampleTableInsert::select(&mut conn, sql!(field >= 2)).await?;
     assert_eq!(rows.len(), 2);
     conn.rollback().await?;
     Ok(())

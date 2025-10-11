@@ -264,6 +264,7 @@ sql_keyword!(group);
 sql_keyword!(by);
 sql_keyword!(having);
 sql_keyword!(limit);
+sql_keyword!(set);
 
 sql_keyword!(and);
 sql_keyword!(or);

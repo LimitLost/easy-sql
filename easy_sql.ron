@@ -405,6 +405,45 @@ CompilationData(
             },
             latest_version: 1,
         ),
+        "fde82ce3-a36a-41c4-ac58-28ea8e4938b6": TableData(
+            saved_versions: {
+                1: TableDataVersion(
+                    table_name: "test_table_modes",
+                    fields: [
+                        TableField(
+                            name: "id",
+                            ty_to_bytes: false,
+                            sql_type: I32,
+                            default: None,
+                            is_not_null: true,
+                            is_unique: false,
+                        ),
+                        TableField(
+                            name: "field",
+                            ty_to_bytes: false,
+                            sql_type: I64,
+                            default: None,
+                            is_not_null: true,
+                            is_unique: false,
+                        ),
+                        TableField(
+                            name: "name",
+                            ty_to_bytes: false,
+                            sql_type: String,
+                            default: None,
+                            is_not_null: true,
+                            is_unique: false,
+                        ),
+                    ],
+                    primary_keys: [
+                        "id",
+                    ],
+                    auto_increment: false,
+                    foreign_keys: {},
+                ),
+            },
+            latest_version: 1,
+        ),
     },
     default_drivers: [
         "crate::Sqlite",

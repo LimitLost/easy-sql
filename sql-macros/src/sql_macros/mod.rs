@@ -1,11 +1,7 @@
 mod sql;
 pub use sql::*;
-mod sql_where;
-pub use sql_where::*;
 mod table_join;
 pub use table_join::*;
-mod sql_set;
-pub use sql_set::*;
 
 use syn::{self, parse::Parse};
 

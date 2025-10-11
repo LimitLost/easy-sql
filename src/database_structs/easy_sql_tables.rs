@@ -43,7 +43,7 @@ macro_rules! EasySqlTables_update_version {
             &mut EasySqlTableVersion {
                 version: $new_version,
             },
-            sql_where!(table_id = { $table_id }),
+            $crate::sql!(table_id = { $table_id }),
         )
         .await?;
     }};
@@ -61,7 +61,7 @@ macro_rules! EasySqlTables_get_version {
         let version: Option<EasySqlTableVersion> =
             <$crate::EasySqlTables as $crate::SqlTable<$driver>>::select(
                 $conn,
-                sql_where!(|$crate::EasySqlTables| table_id = { $table_id }),
+                $crate::sql!(|$crate::EasySqlTables| table_id = { $table_id }),
             )
             .await?;
         version.map(|v| v.version)

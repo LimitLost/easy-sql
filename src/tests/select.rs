@@ -3,9 +3,9 @@ mod easy_lib {
 }
 
 use anyhow::Context;
-use easy_lib::sql::{SqlInsert, SqlOutput, SqlTable, SqlUpdate, sql_where, sqlite::Database};
+use easy_lib::sql::{SqlInsert, SqlOutput, SqlTable, SqlUpdate, sql, sqlite::Database};
 use easy_macros::macros::always_context;
-use sql_macros::{sql, sql_convenience};
+use sql_macros::sql_convenience;
 
 #[derive(SqlTable, Debug)]
 #[sql(version = 1)]
@@ -43,7 +43,7 @@ async fn test_select_basic() -> anyhow::Result<()> {
     )
     .await?;
     let rows: Vec<ExampleSelectInsert> =
-        ExampleTableSelect::select(&mut conn, sql_where!(id = 1)).await?;
+        ExampleTableSelect::select(&mut conn, sql!(id = 1)).await?;
     assert_eq!(rows.len(), 1);
     assert_eq!(rows[0].field, 1);
     conn.rollback().await?;
@@ -57,7 +57,7 @@ async fn test_select_no_match() -> anyhow::Result<()> {
     let db = Database::setup_for_testing::<ExampleTableSelect>().await?;
     let mut conn = db.transaction().await?;
     let rows: Vec<ExampleSelectInsert> =
-        ExampleTableSelect::select(&mut conn, sql_where!(id = 999)).await?;
+        ExampleTableSelect::select(&mut conn, sql!(id = 999)).await?;
     assert_eq!(rows.len(), 0);
     conn.rollback().await?;
     Ok(())
@@ -81,7 +81,7 @@ async fn test_select_multiple_rows() -> anyhow::Result<()> {
         .await?;
     }
     let rows: Vec<ExampleSelectInsert> =
-        ExampleTableSelect::select(&mut conn, sql_where!(id >= 2 AND id <= 4)).await?;
+        ExampleTableSelect::select(&mut conn, sql!(id >= 2 AND id <= 4)).await?;
     assert_eq!(rows.len(), 3);
     assert_eq!(rows[0].field, 2);
     assert_eq!(rows[2].field, 4);
@@ -105,7 +105,7 @@ async fn test_select_where_field() -> anyhow::Result<()> {
     )
     .await?;
     let rows: Vec<ExampleSelectInsert> =
-        ExampleTableSelect::select(&mut conn, sql_where!(field = 10)).await?;
+        ExampleTableSelect::select(&mut conn, sql!(field = 10)).await?;
     assert_eq!(rows.len(), 1);
     assert_eq!(rows[0].field_str, "X");
     conn.rollback().await?;
@@ -129,8 +129,7 @@ async fn test_select_all_rows() -> anyhow::Result<()> {
         )
         .await?;
     }
-    let rows: Vec<ExampleSelectInsert> =
-        ExampleTableSelect::select(&mut conn, sql_where!(true)).await?;
+    let rows: Vec<ExampleSelectInsert> = ExampleTableSelect::select(&mut conn, sql!(true)).await?;
     assert_eq!(rows.len(), 3);
     conn.rollback().await?;
     Ok(())
@@ -152,7 +151,7 @@ async fn test_select_boundary_values() -> anyhow::Result<()> {
     )
     .await?;
     let rows: Vec<ExampleSelectInsert> =
-        ExampleTableSelect::select(&mut conn, sql_where!(field = { i64::MAX })).await?;
+        ExampleTableSelect::select(&mut conn, sql!(field = { i64::MAX })).await?;
     assert_eq!(rows.len(), 1);
     assert_eq!(rows[0].field_opt, Some(i32::MAX));
     conn.rollback().await?;
@@ -175,7 +174,7 @@ async fn test_select_nullable_field() -> anyhow::Result<()> {
     )
     .await?;
     let rows: Vec<ExampleSelectInsert> =
-        ExampleTableSelect::select(&mut conn, sql_where!(field_opt IS NULL)).await?;
+        ExampleTableSelect::select(&mut conn, sql!(field_opt IS NULL)).await?;
     assert_eq!(rows.len(), 1);
     assert_eq!(rows[0].field, 8);
     conn.rollback().await?;
@@ -204,11 +203,11 @@ async fn test_select_after_update() -> anyhow::Result<()> {
             field_str: "UU".to_string(),
             field_opt: Some(1),
         },
-        sql_where!(id = 1),
+        sql!(id = 1),
     )
     .await?;
     let rows: Vec<ExampleSelectInsert> =
-        ExampleTableSelect::select(&mut conn, sql_where!(field = 99)).await?;
+        ExampleTableSelect::select(&mut conn, sql!(field = 99)).await?;
     assert_eq!(rows.len(), 1);
     assert_eq!(rows[0].field_str, "UU");
     conn.rollback().await?;
@@ -230,9 +229,9 @@ async fn test_select_after_delete() -> anyhow::Result<()> {
         },
     )
     .await?;
-    ExampleTableSelect::delete(&mut conn, sql_where!(id = 1)).await?;
+    ExampleTableSelect::delete(&mut conn, sql!(id = 1)).await?;
     let rows: Vec<ExampleSelectInsert> =
-        ExampleTableSelect::select(&mut conn, sql_where!(id = 1)).await?;
+        ExampleTableSelect::select(&mut conn, sql!(id = 1)).await?;
     assert_eq!(rows.len(), 0);
     conn.rollback().await?;
     Ok(())
@@ -306,8 +305,7 @@ async fn test_get_single_match() -> anyhow::Result<()> {
         },
     )
     .await?;
-    let row: ExampleSelectInsert =
-        ExampleTableSelect::get(&mut conn, sql_where!(field = 20)).await?;
+    let row: ExampleSelectInsert = ExampleTableSelect::get(&mut conn, sql!(field = 20)).await?;
     assert_eq!(row.field_str, "G");
     conn.rollback().await?;
     Ok(())
@@ -320,7 +318,7 @@ async fn test_get_no_match() -> anyhow::Result<()> {
     let db = Database::setup_for_testing::<ExampleTableSelect>().await?;
     let mut conn = db.transaction().await?;
     let result: Result<ExampleSelectInsert, _> =
-        ExampleTableSelect::get(&mut conn, sql_where!(id = 999)).await;
+        ExampleTableSelect::get(&mut conn, sql!(id = 999)).await;
     assert!(result.is_err());
     conn.rollback().await?;
     Ok(())
@@ -344,8 +342,7 @@ async fn test_select_complex_condition() -> anyhow::Result<()> {
         .await?;
     }
     let rows: Vec<ExampleSelectInsert> =
-        ExampleTableSelect::select(&mut conn, sql_where!(field_opt IS NOT NULL AND field >= 2))
-            .await?;
+        ExampleTableSelect::select(&mut conn, sql!(field_opt IS NOT NULL AND field >= 2)).await?;
     assert_eq!(rows.len(), 2);
     assert_eq!(rows[0].field, 2);
     assert_eq!(rows[1].field, 4);

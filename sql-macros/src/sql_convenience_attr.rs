@@ -1,15 +1,18 @@
+use crate::sql_macros_components::sql_keyword;
+
 use ::{
     proc_macro2::TokenStream,
     quote::{ToTokens, quote},
 };
 use easy_macros::{
-    helpers::parse_macro_input,
+    helpers::{parse_macro_input, token_stream_to_consistent_string},
     macros::{all_syntax_cases, always_context},
 };
 
 #[derive(Debug, Default)]
 struct SqlData {
     potential_table: Option<TokenStream>,
+    update_set_arg: bool,
 }
 
 all_syntax_cases! {
@@ -57,22 +60,42 @@ fn table_function_check(fn_path: &syn::Path) -> Option<TokenStream> {
     }
 }
 
+fn is_update_check(fn_path: &syn::Path) -> bool {
+    let last_segment = if let Some(s) = fn_path.segments.last() {
+        s
+    } else {
+        return false;
+    };
+    let last_segment_str = last_segment.ident.to_string();
+
+    match last_segment_str.as_str() {
+        "update" | "update_returning" | "update_returning_lazy" => true,
+        _ => false,
+    }
+}
+
 fn call_check(item: &mut syn::ExprCall, context_info: &mut SqlData) {
     let mut reset_after = false;
+    let mut is_update = false;
     match &*item.func {
         syn::Expr::Path(expr_path) => {
             let before = context_info.potential_table.is_none();
             let potential = table_function_check(&expr_path.path);
             if before && potential.is_some() {
                 context_info.potential_table = potential;
+                is_update = is_update_check(&expr_path.path);
                 reset_after = true;
             }
         }
         _ => {}
     }
 
-    for arg in item.args.iter_mut() {
+    for (i, arg) in item.args.iter_mut().enumerate() {
+        if i == 1 && is_update {
+            context_info.update_set_arg = true;
+        }
         macro_search_expr_handle(arg, context_info);
+        context_info.update_set_arg = false;
     }
 
     if reset_after {
@@ -80,15 +103,76 @@ fn call_check(item: &mut syn::ExprCall, context_info: &mut SqlData) {
     }
 }
 
+struct SqlMacroInput {
+    table: Option<syn::Type>,
+    set_keyword_present: bool,
+    leftovers: proc_macro2::TokenStream,
+}
+
+impl syn::parse::Parse for SqlMacroInput {
+    fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
+        let mut table = None;
+        let mut set_keyword_present = false;
+
+        if input.peek(syn::Token![|]) {
+            input.parse::<syn::Token![|]>()?;
+            let ty: syn::Type = input.parse()?;
+            table = Some(ty);
+            input.parse::<syn::Token![|]>()?;
+        }
+
+        if input.peek(sql_keyword::set) {
+            input.parse::<sql_keyword::set>()?;
+            set_keyword_present = true;
+        }
+
+        let leftovers: proc_macro2::TokenStream = input.parse()?;
+
+        Ok(SqlMacroInput {
+            table,
+            set_keyword_present,
+            leftovers,
+        })
+    }
+}
+
 fn macro_check(item: &mut syn::Macro, context_info: &mut SqlData) {
-    let path = item.path.to_token_stream().to_string();
+    let path = token_stream_to_consistent_string(item.path.to_token_stream());
     match path.as_str() {
-        "sql"
-        | "sql_where"
+        "sql" | "sql_debug" | "easy_lib::sql::sql" | "easy_lib::sql::sql_debug" => {
+            let macro_input: SqlMacroInput = if let Ok(r) = syn::parse2(item.tokens.clone()) {
+                r
+            } else {
+                //Error should be produced by the macro itself
+                return;
+            };
+
+            let table = macro_input
+                .table
+                .as_ref()
+                .map(|t| t.to_token_stream())
+                .or_else(|| context_info.potential_table.clone());
+
+            if table.is_none() {
+                //Error should be produced by the macro itself
+                return;
+            }
+
+            let set = if macro_input.set_keyword_present || context_info.update_set_arg {
+                quote! { SET }
+            } else {
+                quote! {}
+            };
+            let leftovers = macro_input.leftovers;
+
+            item.tokens = quote! {
+                | #table | #set #leftovers
+            };
+        }
+        "sql_where"
         | "sql_where_debug"
         | "sql_set"
         | "sql_set_debug"
-        | "easy_lib::sql::sql"
         | "easy_lib::sql::sql_where"
         | "easy_lib::sql::sql_where_debug"
         | "easy_lib::sql::sql_set"

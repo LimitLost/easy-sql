@@ -13,3 +13,5 @@ mod delete;
 mod insert;
 mod select;
 mod update;
+
+mod sql_macro_modes;

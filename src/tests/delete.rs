@@ -4,7 +4,7 @@ mod easy_lib {
 
 use crate::drivers::sqlite::Database;
 use anyhow::Context;
-use easy_lib::sql::{SqlInsert, SqlOutput, SqlTable, SqlUpdate, sql_where};
+use easy_lib::sql::{SqlInsert, SqlOutput, SqlTable, SqlUpdate, sql};
 use easy_macros::macros::always_context;
 use sql_macros::sql_convenience;
 
@@ -43,9 +43,9 @@ async fn test_delete_basic() -> anyhow::Result<()> {
         },
     )
     .await?;
-    ExampleTableDelete::delete(&mut conn, sql_where!(id = 1)).await?;
+    ExampleTableDelete::delete(&mut conn, sql!(id = 1)).await?;
     let result: Result<ExampleDeleteInsert, _> =
-        ExampleTableDelete::get(&mut conn, sql_where!(id = 1)).await;
+        ExampleTableDelete::get(&mut conn, sql!(id = 1)).await;
     assert!(result.is_err());
     conn.rollback().await?;
     Ok(())
@@ -66,8 +66,8 @@ async fn test_delete_no_match() -> anyhow::Result<()> {
         },
     )
     .await?;
-    ExampleTableDelete::delete(&mut conn, sql_where!(id = 999)).await?;
-    let row: ExampleDeleteInsert = ExampleTableDelete::get(&mut conn, sql_where!(id = 1)).await?;
+    ExampleTableDelete::delete(&mut conn, sql!(id = 999)).await?;
+    let row: ExampleDeleteInsert = ExampleTableDelete::get(&mut conn, sql!(id = 1)).await?;
     assert_eq!(row.field, 2);
     conn.rollback().await?;
     Ok(())
@@ -90,9 +90,9 @@ async fn test_delete_multiple_rows() -> anyhow::Result<()> {
         )
         .await?;
     }
-    ExampleTableDelete::delete(&mut conn, sql_where!(id >= 2)).await?;
+    ExampleTableDelete::delete(&mut conn, sql!(id >= 2)).await?;
     let rows: Vec<ExampleDeleteInsert> =
-        ExampleTableDelete::select(&mut conn, sql_where!(id >= 1)).await?;
+        ExampleTableDelete::select(&mut conn, sql!(id >= 1)).await?;
     assert_eq!(rows.len(), 1);
     assert_eq!(rows[0].field, 1);
     conn.rollback().await?;
@@ -114,9 +114,9 @@ async fn test_delete_where_field() -> anyhow::Result<()> {
         },
     )
     .await?;
-    ExampleTableDelete::delete(&mut conn, sql_where!(field = 10)).await?;
+    ExampleTableDelete::delete(&mut conn, sql!(field = 10)).await?;
     let result: Result<ExampleDeleteInsert, _> =
-        ExampleTableDelete::get(&mut conn, sql_where!(id = 1)).await;
+        ExampleTableDelete::get(&mut conn, sql!(id = 1)).await;
     assert!(result.is_err());
     conn.rollback().await?;
     Ok(())
@@ -145,8 +145,7 @@ async fn test_delete_all_rows() -> anyhow::Result<()> {
         None,
     )
     .await?;
-    let rows: Vec<ExampleDeleteInsert> =
-        ExampleTableDelete::select(&mut conn, sql_where!(true)).await?;
+    let rows: Vec<ExampleDeleteInsert> = ExampleTableDelete::select(&mut conn, sql!(true)).await?;
     assert_eq!(rows.len(), 0);
     conn.rollback().await?;
     Ok(())
@@ -167,12 +166,12 @@ async fn test_delete_and_rollback() -> anyhow::Result<()> {
         },
     )
     .await?;
-    ExampleTableDelete::delete(&mut conn, sql_where!(id = 1)).await?;
+    ExampleTableDelete::delete(&mut conn, sql!(id = 1)).await?;
     conn.rollback().await?;
     let db2 = Database::setup_for_testing::<ExampleTableDelete>().await?;
     let mut conn2 = db2.transaction().await?;
     let result: Result<ExampleDeleteInsert, _> =
-        ExampleTableDelete::get(&mut conn2, sql_where!(id = 1)).await;
+        ExampleTableDelete::get(&mut conn2, sql!(id = 1)).await;
     assert!(result.is_err());
     Ok(())
 }
@@ -192,9 +191,9 @@ async fn test_delete_boundary_values() -> anyhow::Result<()> {
         },
     )
     .await?;
-    ExampleTableDelete::delete(&mut conn, sql_where!(field = { i64::MAX })).await?;
+    ExampleTableDelete::delete(&mut conn, sql!(field = { i64::MAX })).await?;
     let result: Result<ExampleDeleteInsert, _> =
-        ExampleTableDelete::get(&mut conn, sql_where!(id = 1)).await;
+        ExampleTableDelete::get(&mut conn, sql!(id = 1)).await;
     assert!(result.is_err());
     conn.rollback().await?;
     Ok(())
@@ -215,9 +214,9 @@ async fn test_delete_nullable_field() -> anyhow::Result<()> {
         },
     )
     .await?;
-    ExampleTableDelete::delete(&mut conn, sql_where!(field_opt IS NULL)).await?;
+    ExampleTableDelete::delete(&mut conn, sql!(field_opt IS NULL)).await?;
     let result: Result<ExampleDeleteInsert, _> =
-        ExampleTableDelete::get(&mut conn, sql_where!(id = 1)).await;
+        ExampleTableDelete::get(&mut conn, sql!(id = 1)).await;
     assert!(result.is_err());
     conn.rollback().await?;
     Ok(())
@@ -245,12 +244,12 @@ async fn test_delete_after_update() -> anyhow::Result<()> {
             field_str: "UU".to_string(),
             field_opt: Some(1),
         },
-        sql_where!(id = 1),
+        sql!(id = 1),
     )
     .await?;
-    ExampleTableDelete::delete(&mut conn, sql_where!(field = 99)).await?;
+    ExampleTableDelete::delete(&mut conn, sql!(field = 99)).await?;
     let result: Result<ExampleDeleteInsert, _> =
-        ExampleTableDelete::get(&mut conn, sql_where!(id = 1)).await;
+        ExampleTableDelete::get(&mut conn, sql!(id = 1)).await;
     assert!(result.is_err());
     conn.rollback().await?;
     Ok(())
@@ -272,7 +271,7 @@ async fn test_delete_and_reinsert() -> anyhow::Result<()> {
         },
     )
     .await?;
-    ExampleTableDelete::delete(&mut conn, sql_where!(id = 1)).await?;
+    ExampleTableDelete::delete(&mut conn, sql!(id = 1)).await?;
     ExampleTableDelete::insert(
         &mut conn,
         &ExampleTableDelete {
@@ -283,7 +282,7 @@ async fn test_delete_and_reinsert() -> anyhow::Result<()> {
         },
     )
     .await?;
-    let row: ExampleDeleteInsert = ExampleTableDelete::get(&mut conn, sql_where!(id = 2)).await?;
+    let row: ExampleDeleteInsert = ExampleTableDelete::get(&mut conn, sql!(id = 2)).await?;
     assert_eq!(row.field, 11);
     assert_eq!(row.field_str, "RR");
     conn.rollback().await?;
