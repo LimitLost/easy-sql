@@ -3,9 +3,8 @@ use std::collections::HashMap;
 use anyhow::Context;
 use easy_macros::macros::always_context;
 
-mod sql_value;
-pub use sql_value::*;
 mod database_internal_default;
+mod sql_value;
 pub use database_internal_default::*;
 mod database;
 pub use database::*;
@@ -19,7 +18,10 @@ pub use create_table::*;
 mod table_exists;
 pub use table_exists::*;
 
-use crate::{Driver, EasyExecutor, TableField};
+use crate::{
+    Driver, EasyExecutor, TableField,
+    general_value::{SqlValue, SqlValueMaybeRef},
+};
 
 #[derive(Debug)]
 pub struct Sqlite;
@@ -29,7 +31,7 @@ type Db = sqlx::Sqlite;
 #[always_context]
 impl Driver for Sqlite {
     type InternalDriver = Db;
-    type Value<'a> = sql_value::SqlValueMaybeRef<'a>;
+    type Value<'a> = SqlValueMaybeRef<'a>;
     fn identifier_delimiter() -> &'static str {
         "`"
     }

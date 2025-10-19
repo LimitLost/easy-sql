@@ -72,3 +72,4 @@ not_build = [
 postgres = ["sqlx/postgres","not_build"]
 sqlite = ["sqlx/sqlite","not_build"]
 build = ["dep:sql-build"]
+ipnet =["sqlx/ipnet"]
