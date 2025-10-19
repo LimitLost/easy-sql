@@ -7,8 +7,9 @@ mod easy_lib {
     pub use crate as sql;
 }
 
+use super::Database;
 use anyhow::Context;
-use easy_lib::sql::{SqlInsert, SqlOutput, SqlTable, SqlUpdate, sqlite::Database};
+use easy_lib::sql::{SqlInsert, SqlOutput, SqlTable, SqlUpdate};
 use easy_macros::macros::always_context;
 use sql_macros::{sql, sql_convenience};
 

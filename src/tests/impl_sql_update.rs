@@ -1,6 +1,8 @@
 use easy_macros::macros::always_context;
 
-use crate::{SqlUpdate, Sqlite};
+use crate::SqlUpdate;
+
+use super::TestDriver;
 
 struct ExampleTableStruct {
     field0: String,
@@ -17,8 +19,8 @@ struct ExampleStruct {
 }
 
 #[always_context]
-impl SqlUpdate<ExampleTableStruct, Sqlite> for ExampleStruct {
-    fn updates(&mut self) -> anyhow::Result<Vec<(String, crate::SqlExpr<'_, Sqlite>)>> {
+impl SqlUpdate<ExampleTableStruct, TestDriver> for ExampleStruct {
+    fn updates(&mut self) -> anyhow::Result<Vec<(String, crate::SqlExpr<'_, TestDriver>)>> {
         crate::never::never_fn(|| {
             //Check for validity
             let update_instance = crate::never::never_any::<Self>();
@@ -52,8 +54,8 @@ struct ExampleStruct2 {
 }
 
 #[always_context]
-impl SqlUpdate<ExampleTableStruct, Sqlite> for ExampleStruct2 {
-    fn updates(&mut self) -> anyhow::Result<Vec<(String, crate::SqlExpr<'_, Sqlite>)>> {
+impl SqlUpdate<ExampleTableStruct, TestDriver> for ExampleStruct2 {
+    fn updates(&mut self) -> anyhow::Result<Vec<(String, crate::SqlExpr<'_, TestDriver>)>> {
         //If Option is set to None then ignore
         crate::never::never_fn(|| {
             //Check for validity

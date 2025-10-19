@@ -30,7 +30,7 @@ struct ExampleDatabase {
     sub: ExampleSubDatabase,
 }
 
-use easy_lib::sql::sqlite::Database;
+use super::Database;
 
 // Save connection pool in a global variable
 // Use `lazy_static` library and `std::sync::Mutex` to do that

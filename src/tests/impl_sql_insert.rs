@@ -1,9 +1,9 @@
 use anyhow::Context;
 use easy_macros::macros::always_context;
 
-use crate::{
-    Connection, Driver, SqlInsert, SqlTable, Sqlite, TableJoin, sqlite::DatabaseInternalDefault,
-};
+use super::{DatabaseInternalDefault, TestDriver};
+
+use crate::{Connection, Driver, SqlInsert, SqlTable, TableJoin};
 
 struct ExampleTableStruct {
     id: i64,
@@ -23,7 +23,7 @@ struct ExampleStruct {
 }
 
 #[always_context]
-impl SqlInsert<ExampleTableStruct, Sqlite> for ExampleStruct {
+impl SqlInsert<ExampleTableStruct, TestDriver> for ExampleStruct {
     fn insert_columns() -> Vec<String> {
         crate::never::never_fn(|| {
             //Check for validity
@@ -48,7 +48,7 @@ impl SqlInsert<ExampleTableStruct, Sqlite> for ExampleStruct {
         ]
     }
 
-    fn insert_values(&self) -> anyhow::Result<Vec<Vec<<Sqlite as Driver>::Value<'_>>>> {
+    fn insert_values(&self) -> anyhow::Result<Vec<Vec<<TestDriver as Driver>::Value<'_>>>> {
         Ok(vec![vec![
             (&self.field0).into(),
             (&self.field1).into(),
@@ -60,7 +60,7 @@ impl SqlInsert<ExampleTableStruct, Sqlite> for ExampleStruct {
 }
 
 #[always_context]
-impl SqlTable<Sqlite> for ExampleTableStruct {
+impl SqlTable<TestDriver> for ExampleTableStruct {
     fn table_name() -> &'static str {
         "table"
     }
@@ -68,13 +68,13 @@ impl SqlTable<Sqlite> for ExampleTableStruct {
         vec!["id"]
     }
 
-    fn table_joins() -> Vec<TableJoin<'static, Sqlite>> {
+    fn table_joins() -> Vec<TableJoin<'static, TestDriver>> {
         vec![]
     }
 }
 
 #[always_context]
-async fn test(conn: &mut Connection<Sqlite, DatabaseInternalDefault>) -> anyhow::Result<()> {
+async fn test(conn: &mut Connection<TestDriver, DatabaseInternalDefault>) -> anyhow::Result<()> {
     let to_insert = ExampleStruct {
         field0: "value0".to_string(),
         field1: "value1".to_string(),

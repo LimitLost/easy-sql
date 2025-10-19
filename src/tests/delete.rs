@@ -2,7 +2,7 @@ mod easy_lib {
     pub use crate as sql;
 }
 
-use crate::drivers::sqlite::Database;
+use super::Database;
 use anyhow::Context;
 use easy_lib::sql::{SqlInsert, SqlOutput, SqlTable, SqlUpdate, sql};
 use easy_macros::macros::always_context;
