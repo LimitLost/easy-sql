@@ -1,2 +1,3 @@
 target/
 /easy_sql_logs
+.env
