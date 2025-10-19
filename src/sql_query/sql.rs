@@ -77,7 +77,7 @@ fn insert_query<'a, D: Driver>(
     let returning = if let Some(columns) = returning {
         let mut returning_str = "RETURNING ".to_string();
         for column in columns.iter() {
-            returning_str.push_str(&column.to_query_data());
+            returning_str.push_str(&column.to_query_data::<D>());
             returning_str.push(',');
         }
         //Removes last comma
@@ -129,7 +129,7 @@ fn update_query<'a, D: Driver>(
     let returning = if let Some(columns) = returning {
         let mut returning_str = "RETURNING ".to_string();
         for column in columns.iter() {
-            returning_str.push_str(&column.to_query_data());
+            returning_str.push_str(&column.to_query_data::<D>());
             returning_str.push(',');
         }
         //Removes last comma
@@ -166,7 +166,7 @@ fn delete_query<'a, D: Driver>(
     let returning = if let Some(columns) = returning {
         let mut returning_str = "RETURNING ".to_string();
         for column in columns.iter() {
-            returning_str.push_str(&column.to_query_data());
+            returning_str.push_str(&column.to_query_data::<D>());
             returning_str.push(',');
         }
         //Removes last comma
@@ -265,7 +265,7 @@ impl<'a, D: Driver + Debug> Sql<'a, D> {
                 let requested_str = {
                     let mut requested_str = String::new();
                     for column in requested_columns.iter() {
-                        requested_str.push_str(&column.to_query_data());
+                        requested_str.push_str(&column.to_query_data::<D>());
                         requested_str.push(',');
                     }
                     //Removes last comma

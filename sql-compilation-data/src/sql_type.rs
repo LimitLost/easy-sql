@@ -143,6 +143,38 @@ impl SqlType {
         }
     }
 
+    pub fn postgres(&self, is_auto_increment: bool) -> String {
+        match self {
+            SqlType::IpAddr => "inet".to_string(),
+            SqlType::Bool => "boolean".to_string(),
+            SqlType::F32 => "real".to_string(),
+            SqlType::F64 => "double precision".to_string(),
+            SqlType::I8 => "char".to_string(),
+            SqlType::I16 => "smallint".to_string(),
+            SqlType::I32 => if is_auto_increment { "SERIAL".to_string() } else { "integer".to_string() },
+            SqlType::I64 => if is_auto_increment { "BIGSERIAL".to_string() } else { "bigint".to_string() },
+            SqlType::String => "text".to_string(),
+            SqlType::Interval => "interval".to_string(),
+            SqlType::Bytes => "bytea".to_string(),
+            SqlType::List(inner) => format!("{}[]", inner.postgres(false)),
+            SqlType::Array { data_type, size } => format!("{}[{}]", data_type.postgres(false), size),
+            SqlType::NaiveDate => "date".to_string(),
+            SqlType::NaiveDateTime => "timestamp".to_string(),
+            SqlType::NaiveTime => "time".to_string(),
+            SqlType::Uuid => "uuid".to_string(),
+            SqlType::Decimal => "numeric".to_string(),
+            SqlType::BigDecimal => "numeric".to_string(),
+            SqlType::Range(range_type) => match range_type {
+                SqlRangeType::I32 => "int4range".to_string(),
+                SqlRangeType::I64 => "int8range".to_string(),
+                SqlRangeType::NaiveDate => "daterange".to_string(),
+                SqlRangeType::NaiveDateTime => "tsrange".to_string(),
+                SqlRangeType::BigDecimal => "numrange".to_string(),
+                SqlRangeType::Decimal => "numrange".to_string(),
+            },
+        }
+    }
+
     #[cfg(feature = "data")]
     #[always_context]
     pub fn from_syn_type(ty: &syn::Type) -> anyhow::Result<(Option<SqlType>, bool)> {

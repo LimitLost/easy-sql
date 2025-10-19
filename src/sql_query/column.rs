@@ -2,6 +2,8 @@ use easy_macros::macros::always_context;
 
 use sql_compilation_data::SqlType;
 
+use crate::Driver;
+
 pub struct Column {
     pub name: String,
     pub alias: Option<String>,
@@ -16,16 +18,20 @@ pub struct RequestedColumn {
 
 #[always_context]
 impl RequestedColumn {
-    pub fn to_query_data(&self) -> String {
+    pub fn to_query_data<D: Driver>(&self) -> String {
+        let delimiter = D::identifier_delimiter();
         let table_name = if let Some(table) = self.table_name {
-            format!("`{table}`.")
+            format!("{delimiter}{table}{delimiter}.")
         } else {
             String::new()
         };
         if let Some(alias) = &self.alias {
-            format!("{table_name}`{}` AS `{alias}`", self.name)
+            format!(
+                "{table_name}{delimiter}{}{delimiter} AS {delimiter}{alias}{delimiter}",
+                self.name
+            )
         } else {
-            format!("{table_name}`{}`", self.name)
+            format!("{table_name}{delimiter}{}{delimiter}", self.name)
         }
     }
 }

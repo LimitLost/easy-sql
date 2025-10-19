@@ -78,11 +78,11 @@ impl sql_crate::DatabaseSetup<TestDriver> for ExampleTable {
                     name: "id",
                     data_type: sql_crate::SqlType::I64,
                     is_unique: false,
-                    is_not_null: true,
+                    is_not_null: false,
                     default: None,
+                    is_auto_increment: true,
                 }],
                 vec!["id"],
-                true,
                 {
                     vec![(
                         <ExampleReferencedTable as sql_crate::SqlTable<TestDriver>>::table_name(),

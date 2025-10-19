@@ -36,7 +36,6 @@ pub trait Driver: Debug + Send + Sync + Sized {
         table_name: &'static str,
         fields: Vec<TableField<'a, Self>>,
         primary_keys: Vec<&'static str>,
-        auto_increment: bool,
         foreign_keys: HashMap<&'static str, (Vec<&'static str>, Vec<&'static str>, bool)>,
     ) -> anyhow::Result<()>;
 

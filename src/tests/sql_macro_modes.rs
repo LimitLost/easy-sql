@@ -15,9 +15,10 @@ use sql_macros::{sql, sql_convenience};
 
 #[derive(SqlTable, Debug)]
 #[sql(version = 1)]
-#[sql(unique_id = "fde82ce3-a36a-41c4-ac58-28ea8e4938b6")]
+#[sql(unique_id = "5058fa57-75a8-4db5-855b-7dffdb138c76")]
 struct TestTableModes {
     #[sql(primary_key)]
+    #[sql(auto_increment)]
     id: i32,
     field: i64,
     name: String,

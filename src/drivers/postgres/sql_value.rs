@@ -1,3 +1,5 @@
+
+#[cfg(feature = "ipnet")]
 use std::net::IpAddr;
 
 use bigdecimal::BigDecimal;
@@ -26,6 +28,7 @@ impl<'a> Encode<'a, Db> for SqlValueRef<'a> {
         buf: &mut <Db as sqlx::Database>::ArgumentBuffer<'a>,
     ) -> Result<sqlx::encode::IsNull, sqlx::error::BoxDynError> {
         match self {
+            #[cfg(feature = "ipnet")]
             SqlValueRef::IpAddr(v) => <IpAddr as Encode<'a, Db>>::encode_by_ref(v, buf),
             SqlValueRef::Bool(v) => <bool as Encode<'a, Db>>::encode_by_ref(v, buf),
             SqlValueRef::F32(v) => <f32 as Encode<'a, Db>>::encode_by_ref(v, buf),
@@ -62,6 +65,7 @@ impl<'a> Encode<'a, Db> for SqlValueRef<'a> {
 
     fn produces(&self) -> Option<<Db as sqlx::Database>::TypeInfo> {
         Some(match self {
+            #[cfg(feature = "ipnet")]
             SqlValueRef::IpAddr(_) => <Vec<u8> as sqlx::Type<Db>>::type_info(),
             SqlValueRef::Bool(_) => <bool as sqlx::Type<Db>>::type_info(),
             SqlValueRef::F32(_) => <f32 as sqlx::Type<Db>>::type_info(),
@@ -218,6 +222,7 @@ impl<'a> Encode<'a, Db> for SqlValue {
         buf: &mut <Db as sqlx::Database>::ArgumentBuffer<'a>,
     ) -> Result<sqlx::encode::IsNull, sqlx::error::BoxDynError> {
         match self {
+            #[cfg(feature = "ipnet")]
             SqlValue::IpAddr(v) => <IpAddr as Encode<'a, Db>>::encode_by_ref(v, buf),
             SqlValue::Bool(v) => <bool as Encode<'a, Db>>::encode_by_ref(v, buf),
             SqlValue::F32(v) => <f32 as Encode<'a, Db>>::encode_by_ref(v, buf),
@@ -253,6 +258,7 @@ impl<'a> Encode<'a, Db> for SqlValue {
         Self: Sized,
     {
         match self {
+            #[cfg(feature = "ipnet")]
             SqlValue::IpAddr(v) => <IpAddr as Encode<'a, Db>>::encode(v, buf),
             SqlValue::Bool(v) => <bool as Encode<'a, Db>>::encode(v, buf),
             SqlValue::F32(v) => <f32 as Encode<'a, Db>>::encode(v, buf),
@@ -278,6 +284,7 @@ impl<'a> Encode<'a, Db> for SqlValue {
 
     fn produces(&self) -> Option<<Db as sqlx::Database>::TypeInfo> {
         Some(match self {
+            #[cfg(feature = "ipnet")]
             SqlValue::IpAddr(_) => <Vec<u8> as sqlx::Type<Db>>::type_info(),
             SqlValue::Bool(_) => <bool as sqlx::Type<Db>>::type_info(),
             SqlValue::F32(_) => <f32 as sqlx::Type<Db>>::type_info(),
@@ -327,6 +334,7 @@ impl<'a> DriverValue<'a, super::Db> for SqlValueMaybeRef<'a> {
     fn to_default(&self) -> anyhow::Result<String> {
         Ok(match self {
             SqlValueMaybeRef::Ref(v) => match v {
+                #[cfg(feature = "ipnet")]
                 SqlValueRef::IpAddr(ip) => format!("'{}'::inet", escape_sql(&ip.to_string())),
                 SqlValueRef::Bool(b) => b.to_string().to_uppercase(),
                 SqlValueRef::F32(f) => f.to_string(),
@@ -381,6 +389,7 @@ impl<'a> DriverValue<'a, super::Db> for SqlValueMaybeRef<'a> {
                 }
             },
             SqlValueMaybeRef::Value(v) => match v {
+                #[cfg(feature = "ipnet")]
                 SqlValue::IpAddr(ip) => format!("'{}'::inet", escape_sql(&ip.to_string())),
                 SqlValue::Bool(v2) => v2.to_string().to_uppercase(),
                 SqlValue::F32(v2) => v2.to_string(),

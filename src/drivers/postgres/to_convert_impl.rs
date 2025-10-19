@@ -3,13 +3,13 @@ use easy_macros::{helpers::context, macros::always_context};
 use sqlx::{Executor, Row as SqlxRow};
 
 /// Current Driver
-type CDriver = super::Sqlite;
+type CDriver = super::Postgres;
 
 use crate::{
     DriverArguments, InternalDriver, QueryData, Sql, SqlOutput, ToConvert, ToConvertSingle,
 };
 
-type Row = sqlx::sqlite::SqliteRow;
+type Row = sqlx::postgres::PgRow;
 
 #[always_context]
 impl ToConvert<CDriver> for Row {

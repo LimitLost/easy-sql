@@ -16,8 +16,6 @@ pub struct CreateTable<'a> {
     pub fields: Vec<TableField<'a, Postgres>>,
 
     pub primary_keys: Vec<&'static str>,
-    ///Can only be used when with single primary key
-    pub auto_increment: bool,
     ///Key - table name
     ///Value - field names, foreign field names, on delete/update cascade
     pub foreign_keys: HashMap<&'static str, (Vec<&'static str>, Vec<&'static str>, bool)>,
@@ -40,23 +38,12 @@ impl<'a> SetupSql<Postgres> for CreateTable<'a> {
 
         let primary_keys = self.primary_keys;
         //Primary key constraint
-        if self.auto_increment {
-            match primary_keys.first() {
-                Some(primary_key) if primary_keys.len() == 1 => {
-                    // PostgreSQL uses SERIAL/BIGSERIAL for auto-increment, which is handled in field definition
-                    // Just add the PRIMARY KEY constraint
-                    table_constrains.push_str(&format!("PRIMARY KEY (\"{primary_key}\"),"));
-                }
-                _ => anyhow::bail!("Auto increment is only supported for single primary key"),
-            }
-        } else {
-            // Format primary keys with proper quoting
-            let formatted_keys: Vec<String> = primary_keys
-                .iter()
-                .map(|key| format!("\"{}\"", key))
-                .collect();
-            table_constrains.push_str(&format!("PRIMARY KEY ({}),", formatted_keys.join(", ")));
-        }
+        // Format primary keys with proper quoting
+        let formatted_keys: Vec<String> = primary_keys
+            .iter()
+            .map(|key| format!("\"{}\"", key))
+            .collect();
+        table_constrains.push_str(&format!("PRIMARY KEY ({}),", formatted_keys.join(", ")));
 
         //Foreign key constraints
         for (foreign_table, (referenced_fields, foreign_fields, cascade)) in self.foreign_keys {

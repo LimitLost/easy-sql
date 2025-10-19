@@ -172,6 +172,7 @@ where
                         is_unique: false,
                         is_not_null: true,
                         default: None,
+                        is_auto_increment: false,
                     },
                     TableField::<D> {
                         name: "version",
@@ -179,10 +180,10 @@ where
                         is_unique: false,
                         is_not_null: true,
                         default: None,
+                        is_auto_increment: false,
                     },
                 ],
                 vec!["table_id"],
-                false,
                 #[context(no)]
                 Default::default(),
             )

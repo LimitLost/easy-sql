@@ -83,14 +83,13 @@ pub fn sql_table(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::To
     let mut primary_keys = Vec::new();
     let mut foreign_keys = HashMap::new();
 
-    let mut auto_increment = false;
-
     //TODO Primary key types check (compile time in the build script)
     // let mut primary_key_types=Vec::new();
 
     let mut is_unique = Vec::new();
     let mut field_types = Vec::new();
     let mut is_not_null = Vec::new();
+    let mut is_auto_increment_list = Vec::new();
     // First token streamn represents data before the driver
     // Second token stream represents data after the driver
     let mut default_values: Vec<Box<dyn Fn(&TokenStream) -> TokenStream>> = Vec::new();
@@ -98,10 +97,9 @@ pub fn sql_table(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::To
     for field in fields.iter() {
         //Auto Increment Check
         if has_attributes!(field, #[sql(auto_increment)]) {
-            if auto_increment {
-                anyhow::bail!("Auto increment is only supported for single primary key");
-            }
-            auto_increment = true;
+            is_auto_increment_list.push(true);
+        } else {
+            is_auto_increment_list.push(false);
         }
 
         //Foreign Key Check
@@ -234,7 +232,15 @@ pub fn sql_table(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::To
         );
     }
 
-    if primary_keys.len() != 1 && auto_increment {
+    let compilation_data = CompilationData::load(Vec::<String>::new(), false)?;
+
+    let supported_drivers = super::supported_drivers(&item, &compilation_data)?;
+
+    let sqlite = supported_drivers
+        .iter()
+        .any(|d| d.to_token_stream().to_string().ends_with("Sqlite"));
+
+    if sqlite && primary_keys.len() != 1 && is_auto_increment_list.iter().any(|v| *v) {
         anyhow::bail!(
             "Auto increment is only supported for single primary key (Sqlite contrains this limitation)"
         );
@@ -260,10 +266,6 @@ pub fn sql_table(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::To
 
     //Sqlite doesn't support unsigned integers, so we need to do this
     let table_version_i64 = table_version as i64;
-
-    let compilation_data = CompilationData::load(Vec::<String>::new(), false)?;
-
-    let supported_drivers = super::supported_drivers(&item, &compilation_data)?;
 
     let unique_id=get_attributes!(item, #[sql(unique_id = __unknown__)]).into_iter().next().context("Sql build macro is required (reload VS Code or save if unique id is already generated)")?;
     let unique_id: LitStr = syn::parse2(unique_id.clone()).context("Unique id should be string")?;
@@ -368,11 +370,11 @@ pub fn sql_table(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::To
                                 is_unique: #is_unique,
                                 is_not_null: #is_not_null,
                                 default: #default_values,
+                                is_auto_increment: #is_auto_increment_list,
                             },
                             )*
                         ],
                         vec![#(#primary_keys),*],
-                        #auto_increment,
                         {
                             vec![#(#foreign_keys),*]
                             .into_iter()

@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use anyhow::Context;
-use easy_macros::macros::always_context;
+use easy_macros::{helpers::context, macros::always_context};
 
 mod database_internal_default;
 mod sql_value;
@@ -76,5 +76,39 @@ impl Driver for Sqlite {
 
     fn binary_value(bytes: Vec<u8>) -> Self::Value<'static> {
         SqlValueMaybeRef::Value(SqlValue::Bytes(bytes))
+    }
+}
+
+#[always_context]
+impl<'a> TableField<'a, Sqlite> {
+    pub fn definition(self) -> anyhow::Result<String> {
+        let TableField {
+            name,
+            data_type,
+            is_unique,
+            is_not_null,
+            default,
+            is_auto_increment: _, // SQLite handles auto_increment in PRIMARY KEY constraint
+        } = self;
+
+        let date_type_str = data_type.sqlite();
+
+        let unique = if is_unique { "UNIQUE" } else { "" };
+        let not_null = if is_not_null { "NOT NULL" } else { "" };
+        let default = if let Some(default) = default {
+            format!(
+                "DEFAULT {}",
+                default
+                    .to_default()
+                    .with_context(context!("field name: {}", name))?
+            )
+        } else {
+            String::new()
+        };
+
+        Ok(format!(
+            "{} {} {} {} {},",
+            name, date_type_str, unique, not_null, default
+        ))
     }
 }

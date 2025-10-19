@@ -1,4 +1,7 @@
-use std::{net::IpAddr, ops::Bound};
+#[cfg(any(all(feature = "postgres", feature = "ipnet"), feature = "sqlite"))]
+use std::net::IpAddr;
+
+use std::ops::Bound;
 
 use bigdecimal::BigDecimal;
 use chrono::{NaiveDate, NaiveDateTime};
@@ -57,6 +60,7 @@ pub enum SqlValueRef<'a> {
     ///Postgresql: inet
     ///Sqlite: BLOB
     /// TODO Not using ipnet since we are planning to remove this SqlValue types in the future
+    #[cfg(any(all(feature = "postgres", feature = "ipnet"), feature = "sqlite"))]
     IpAddr(&'a IpAddr),
     ///Postgresql: boolean
     ///Sqlite: BOOLEAN
@@ -149,6 +153,7 @@ pub enum SqlValueRef<'a> {
 pub enum SqlValue {
     ///Postgresql: inet
     ///Sqlite: BLOB
+    #[cfg(any(all(feature = "postgres", feature = "ipnet"), feature = "sqlite"))]
     IpAddr(std::net::IpAddr),
     ///Postgresql: boolean
     ///Sqlite: BOOLEAN
@@ -301,12 +306,14 @@ impl<'b> serde::Deserialize<'b> for SqlValueMaybeRef<'_> {
 }
 // IpAddr
 #[always_context]
+#[cfg(feature = "ipnet")]
 impl<'a> From<&'a std::net::IpAddr> for SqlValueMaybeRef<'a> {
     fn from(value: &'a std::net::IpAddr) -> Self {
         Self::Ref(SqlValueRef::IpAddr(value))
     }
 }
 #[always_context]
+#[cfg(feature = "ipnet")]
 impl From<std::net::IpAddr> for SqlValueMaybeRef<'_> {
     fn from(value: std::net::IpAddr) -> Self {
         Self::Value(SqlValue::IpAddr(value))
