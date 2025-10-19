@@ -62,7 +62,6 @@ not_build = [
 "dep:chrono",
 "dep:bincode",
 "dep:serde",
-"dep:async-trait",
 "dep:futures",
 "dep:futures-core",
 "dep:pin-project",
