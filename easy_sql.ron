@@ -1,52 +1,5 @@
 CompilationData(
     tables: {
-        "0d1ac2f1-7129-4f7d-9a94-37c109010b88": TableData(
-            saved_versions: {
-                1: TableDataVersion(
-                    table_name: "example_table_insert",
-                    fields: [
-                        TableField(
-                            name: "id",
-                            ty_to_bytes: false,
-                            sql_type: I32,
-                            default: None,
-                            is_not_null: true,
-                            is_unique: false,
-                        ),
-                        TableField(
-                            name: "field",
-                            ty_to_bytes: false,
-                            sql_type: I64,
-                            default: None,
-                            is_not_null: true,
-                            is_unique: false,
-                        ),
-                        TableField(
-                            name: "field_str",
-                            ty_to_bytes: false,
-                            sql_type: String,
-                            default: Some("ALL_CHARACTERS.clone()"),
-                            is_not_null: true,
-                            is_unique: false,
-                        ),
-                        TableField(
-                            name: "field_opt",
-                            ty_to_bytes: false,
-                            sql_type: I32,
-                            default: None,
-                            is_not_null: false,
-                            is_unique: false,
-                        ),
-                    ],
-                    primary_keys: [
-                        "id",
-                    ],
-                    auto_increment: false,
-                    foreign_keys: {},
-                ),
-            },
-            latest_version: 1,
-        ),
         "21d36640-7002-49d4-b373-3a2d17c61ff1": TableData(
             saved_versions: {
                 1: TableDataVersion(
@@ -124,53 +77,6 @@ CompilationData(
             },
             latest_version: 1,
         ),
-        "42863f79-f35c-4e7f-b4cb-edd6148e1cc8": TableData(
-            saved_versions: {
-                1: TableDataVersion(
-                    table_name: "example_table_delete",
-                    fields: [
-                        TableField(
-                            name: "id",
-                            ty_to_bytes: false,
-                            sql_type: I32,
-                            default: None,
-                            is_not_null: true,
-                            is_unique: false,
-                        ),
-                        TableField(
-                            name: "field",
-                            ty_to_bytes: false,
-                            sql_type: I64,
-                            default: None,
-                            is_not_null: true,
-                            is_unique: false,
-                        ),
-                        TableField(
-                            name: "field_str",
-                            ty_to_bytes: false,
-                            sql_type: String,
-                            default: None,
-                            is_not_null: true,
-                            is_unique: false,
-                        ),
-                        TableField(
-                            name: "field_opt",
-                            ty_to_bytes: false,
-                            sql_type: I32,
-                            default: None,
-                            is_not_null: false,
-                            is_unique: false,
-                        ),
-                    ],
-                    primary_keys: [
-                        "id",
-                    ],
-                    auto_increment: false,
-                    foreign_keys: {},
-                ),
-            },
-            latest_version: 1,
-        ),
         "5058fa57-75a8-4db5-855b-7dffdb138c76": TableData(
             saved_versions: {
                 1: TableDataVersion(
@@ -244,6 +150,37 @@ CompilationData(
                         "id",
                     ],
                     auto_increment: false,
+                    foreign_keys: {},
+                ),
+            },
+            latest_version: 1,
+        ),
+        "7b526dc4-30d4-4a67-8756-945a2f9c0004": TableData(
+            saved_versions: {
+                1: TableDataVersion(
+                    table_name: "example_table_increment",
+                    fields: [
+                        TableField(
+                            name: "id",
+                            ty_to_bytes: false,
+                            sql_type: I32,
+                            default: None,
+                            is_not_null: true,
+                            is_unique: false,
+                        ),
+                        TableField(
+                            name: "field",
+                            ty_to_bytes: false,
+                            sql_type: I64,
+                            default: None,
+                            is_not_null: true,
+                            is_unique: false,
+                        ),
+                    ],
+                    primary_keys: [
+                        "id",
+                    ],
+                    auto_increment: true,
                     foreign_keys: {},
                 ),
             },
@@ -397,7 +334,54 @@ CompilationData(
             },
             latest_version: 1,
         ),
-        "c7d875fd-132a-410a-a361-784460cdb187": TableData(
+        "ce3d4f19-9d47-4fe2-9700-0957df4c04ee": TableData(
+            saved_versions: {
+                1: TableDataVersion(
+                    table_name: "example_table_insert",
+                    fields: [
+                        TableField(
+                            name: "id",
+                            ty_to_bytes: false,
+                            sql_type: I32,
+                            default: None,
+                            is_not_null: true,
+                            is_unique: false,
+                        ),
+                        TableField(
+                            name: "field",
+                            ty_to_bytes: false,
+                            sql_type: I64,
+                            default: None,
+                            is_not_null: true,
+                            is_unique: false,
+                        ),
+                        TableField(
+                            name: "field_str",
+                            ty_to_bytes: false,
+                            sql_type: String,
+                            default: Some("ALL_CHARACTERS.clone()"),
+                            is_not_null: true,
+                            is_unique: false,
+                        ),
+                        TableField(
+                            name: "field_opt",
+                            ty_to_bytes: false,
+                            sql_type: I32,
+                            default: None,
+                            is_not_null: false,
+                            is_unique: false,
+                        ),
+                    ],
+                    primary_keys: [
+                        "id",
+                    ],
+                    auto_increment: true,
+                    foreign_keys: {},
+                ),
+            },
+            latest_version: 1,
+        ),
+        "eee30e8b-ba04-4308-900c-066032ba5671": TableData(
             saved_versions: {
                 1: TableDataVersion(
                     table_name: "example_table_select",
@@ -438,16 +422,16 @@ CompilationData(
                     primary_keys: [
                         "id",
                     ],
-                    auto_increment: false,
+                    auto_increment: true,
                     foreign_keys: {},
                 ),
             },
             latest_version: 1,
         ),
-        "fde82ce3-a36a-41c4-ac58-28ea8e4938b6": TableData(
+        "ff126623-4355-449a-921c-31e65f3449e8": TableData(
             saved_versions: {
                 1: TableDataVersion(
-                    table_name: "test_table_modes",
+                    table_name: "example_table_delete",
                     fields: [
                         TableField(
                             name: "id",
@@ -466,18 +450,26 @@ CompilationData(
                             is_unique: false,
                         ),
                         TableField(
-                            name: "name",
+                            name: "field_str",
                             ty_to_bytes: false,
                             sql_type: String,
                             default: None,
                             is_not_null: true,
                             is_unique: false,
                         ),
+                        TableField(
+                            name: "field_opt",
+                            ty_to_bytes: false,
+                            sql_type: I32,
+                            default: None,
+                            is_not_null: false,
+                            is_unique: false,
+                        ),
                     ],
                     primary_keys: [
                         "id",
                     ],
-                    auto_increment: false,
+                    auto_increment: true,
                     foreign_keys: {},
                 ),
             },
@@ -485,6 +477,6 @@ CompilationData(
         ),
     },
     default_drivers: [
-        "crate::Sqlite",
+        "crate::Postgres",
     ],
 )

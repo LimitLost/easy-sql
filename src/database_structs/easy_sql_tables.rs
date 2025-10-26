@@ -1,9 +1,9 @@
 use std::fmt::Debug;
 
-use crate::{Driver, DriverConnection, SqlOutput};
+use crate::{Driver, DriverConnection, InternalDriver, QueryBuilder, SqlOutput};
 use easy_macros::macros::always_context;
-use sql_compilation_data::SqlType;
 use sql_macros::{SqlInsert, SqlUpdate, sql_convenience};
+use sqlx::TypeInfo;
 
 use crate::{DatabaseSetup, EasyExecutor, SqlTable, TableField, TableJoin};
 
@@ -13,6 +13,7 @@ pub struct EasySqlTables {
     pub table_id: String,
     pub version: i64,
 }
+
 #[macro_export]
 macro_rules! EasySqlTables_create {
     ($driver:path, $conn:expr, $table_id:expr, $version:expr) => {
@@ -144,7 +145,7 @@ where
         vec!["table_id"]
     }
 
-    fn table_joins() -> Vec<TableJoin<'static, D>> {
+    fn table_joins(_builder: &mut QueryBuilder<'_, D>) -> Vec<TableJoin> {
         vec![]
     }
 }
@@ -153,6 +154,8 @@ where
 impl<D: Driver + 'static> DatabaseSetup<D> for EasySqlTables
 where
     DriverConnection<D>: Send + Sync,
+    String: sqlx::Type<InternalDriver<D>>,
+    i64: sqlx::Type<InternalDriver<D>>,
 {
     async fn setup(conn: &mut (impl EasyExecutor<D> + Send + Sync)) -> anyhow::Result<()> {
         use anyhow::Context;
@@ -166,17 +169,21 @@ where
                 conn,
                 table_name,
                 vec![
-                    TableField::<D> {
+                    TableField {
                         name: "table_id",
-                        data_type: SqlType::String,
+                        data_type: <String as sqlx::Type<InternalDriver<D>>>::type_info()
+                            .name()
+                            .to_owned(),
                         is_unique: false,
                         is_not_null: true,
                         default: None,
                         is_auto_increment: false,
                     },
-                    TableField::<D> {
+                    TableField {
                         name: "version",
-                        data_type: SqlType::I64,
+                        data_type: <i64 as sqlx::Type<InternalDriver<D>>>::type_info()
+                            .name()
+                            .to_owned(),
                         is_unique: false,
                         is_not_null: true,
                         default: None,

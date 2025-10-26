@@ -24,7 +24,7 @@ impl Drop for DatabaseInternalDefault {
 impl DatabaseInternal for DatabaseInternalDefault {
     type Driver = super::Sqlite;
 
-    async fn sql_request(&mut self, _sql: &Sql<'_, Self::Driver>) -> anyhow::Result<()> {
+    async fn sql_request(&mut self, _sql: &Sql) -> anyhow::Result<()> {
         //TODO Save it for later in the sqlite database
 
         Ok(())
@@ -34,9 +34,4 @@ impl DatabaseInternal for DatabaseInternalDefault {
         //Every 1? minute send updates to the remote database
         Ok(())
     } */
-    ///Should be used when user wants to exit the program
-    async fn maybe_exit(&mut self) -> anyhow::Result<()> {
-        //TODO Try sending data to server if not sent yet
-        Ok(())
-    }
 }

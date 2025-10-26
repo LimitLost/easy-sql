@@ -10,9 +10,10 @@ use sql_macros::sql_convenience;
 
 #[derive(SqlTable, Debug)]
 #[sql(version = 1)]
-#[sql(unique_id = "42863f79-f35c-4e7f-b4cb-edd6148e1cc8")]
+#[sql(unique_id = "ff126623-4355-449a-921c-31e65f3449e8")]
 struct ExampleTableDelete {
     #[sql(primary_key)]
+    #[sql(auto_increment)]
     id: i32,
     field: i64,
     field_str: String,
@@ -139,12 +140,7 @@ async fn test_delete_all_rows() -> anyhow::Result<()> {
         )
         .await?;
     }
-    ExampleTableDelete::delete(
-        &mut conn,
-        #[context(no)]
-        None,
-    )
-    .await?;
+    ExampleTableDelete::delete(&mut conn, sql!(true)).await?;
     let rows: Vec<ExampleDeleteInsert> = ExampleTableDelete::select(&mut conn, sql!(true)).await?;
     assert_eq!(rows.len(), 0);
     conn.rollback().await?;

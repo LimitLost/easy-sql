@@ -2,6 +2,8 @@ fn main() {
     easy_macros::macros::always_context_build::build(&[regex::Regex::new(r"readme\.rs").unwrap()]);
     sql_build::build(
         &[regex::Regex::new(r"example_all\.rs").unwrap()],
+        #[cfg(not(any(feature = "sqlite", feature = "postgres")))]
+        &[],
         #[cfg(all(feature = "sqlite", not(feature = "postgres")))]
         &["crate::Sqlite"],
         #[cfg(all(feature = "postgres", not(feature = "sqlite")))]

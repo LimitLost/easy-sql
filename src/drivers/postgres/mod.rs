@@ -1,4 +1,3 @@
-mod sql_value;
 mod table_exists;
 pub use table_exists::*;
 mod create_table;
@@ -7,17 +6,16 @@ mod database;
 pub use database::*;
 mod database_internal_default;
 pub use database_internal_default::*;
+
 mod to_convert_impl;
+mod to_default_impl;
 
 use std::collections::HashMap;
 
 use anyhow::Context;
-use easy_macros::{helpers::context, macros::always_context};
+use easy_macros::macros::always_context;
 
-use crate::{
-    Driver, DriverValue, EasyExecutor, TableField,
-    general_value::{SqlValue, SqlValueMaybeRef},
-};
+use crate::{Driver, EasyExecutor, TableField};
 
 #[derive(Debug)]
 pub struct Postgres;
@@ -27,17 +25,12 @@ type Db = sqlx::Postgres;
 #[always_context]
 impl Driver for Postgres {
     type InternalDriver = Db;
-    type Value<'a> = SqlValueMaybeRef<'a>;
     fn identifier_delimiter() -> &'static str {
         "\""
     }
 
     fn parameter_placeholder(index: usize) -> String {
         format!("${}", index + 1)
-    }
-
-    fn binary_value(bytes: Vec<u8>) -> Self::Value<'static> {
-        SqlValueMaybeRef::Value(SqlValue::Bytes(bytes))
     }
 
     async fn table_exists(
@@ -54,10 +47,10 @@ impl Driver for Postgres {
     ///
     /// `foreign_keys` - Value - field names, foreign field names, on delete/update cascade
     #[no_context_inputs]
-    async fn create_table<'a>(
+    async fn create_table(
         conn: &mut (impl EasyExecutor<Self> + Send + Sync),
         table_name: &'static str,
-        fields: Vec<TableField<'a, Self>>,
+        fields: Vec<TableField>,
         primary_keys: Vec<&'static str>,
         foreign_keys: HashMap<&'static str, (Vec<&'static str>, Vec<&'static str>, bool)>,
     ) -> anyhow::Result<()> {
@@ -72,48 +65,48 @@ impl Driver for Postgres {
     }
 }
 
-#[always_context]
-impl<'a> TableField<'a, Postgres> {
-    pub fn definition(self) -> anyhow::Result<String> {
-        use easy_macros::helpers::context;
+pub fn table_field_definition(field: TableField) -> String {
+    let TableField {
+        name,
+        data_type,
+        is_unique,
+        is_not_null,
+        default,
+        is_auto_increment,
+    } = field;
 
-        let TableField {
-            name,
-            data_type,
-            is_unique,
-            is_not_null,
-            default,
-            is_auto_increment,
-        } = self;
-
-        let data_type_str = data_type.postgres(is_auto_increment);
-
-        let unique = if is_unique { "UNIQUE" } else { "" };
-        // SERIAL/BIGSERIAL already implies NOT NULL, so we don't need to add it
-        let not_null = if is_not_null && !is_auto_increment {
-            "NOT NULL"
-        } else {
-            ""
-        };
-        let default = if let Some(default) = default {
-            if is_auto_increment {
-                // SERIAL/BIGSERIAL already has a default sequence, don't override
-                String::new()
-            } else {
-                format!(
-                    "DEFAULT {}",
-                    default
-                        .to_default()
-                        .with_context(context!("field name: {}", name))?
-                )
-            }
-        } else {
+    let unique = if is_unique { "UNIQUE" } else { "" };
+    // SERIAL/BIGSERIAL already implies NOT NULL, so we don't need to add it
+    let not_null = if is_not_null && !is_auto_increment {
+        "NOT NULL"
+    } else {
+        ""
+    };
+    let default = if let Some(default) = default {
+        if is_auto_increment {
+            // SERIAL/BIGSERIAL already has a default sequence, don't override
             String::new()
-        };
+        } else {
+            format!("DEFAULT {}", default)
+        }
+    } else {
+        String::new()
+    };
 
-        Ok(format!(
-            "\"{}\" {} {} {} {},",
-            name, data_type_str, unique, not_null, default
-        ))
-    }
+    // Handle auto-increment types
+    let data_type = if is_auto_increment {
+        match data_type.to_uppercase().as_str() {
+            "SMAILLINT" | "INT2" => "SMALLSERIAL".to_string(),
+            "INTEGER" | "INT" | "INT4" => "SERIAL".to_string(),
+            "BIGINT" | "INT8" => "BIGSERIAL".to_string(),
+            _ => data_type,
+        }
+    } else {
+        data_type
+    };
+
+    format!(
+        "\"{}\" {} {} {} {},",
+        name, data_type, unique, not_null, default
+    )
 }

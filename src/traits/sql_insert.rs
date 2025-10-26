@@ -1,53 +1,127 @@
 use anyhow::Context;
 use easy_macros::macros::always_context;
 
-use crate::Driver;
+use crate::{Driver, DriverArguments, QueryBuilder};
 
 #[always_context]
-pub trait SqlInsert<Table, D: Driver> {
+pub trait SqlInsert<'a, Table, D: Driver> {
     fn insert_columns() -> Vec<String>;
-    fn insert_values(&self) -> anyhow::Result<Vec<Vec<D::Value<'_>>>>;
+    ///Returns number of inserted rows
+    fn insert_values(self, builder: &mut QueryBuilder<'_, D>) -> anyhow::Result<usize>;
+
+    fn insert_values_sqlx(
+        self,
+        args_list: DriverArguments<'a, D>,
+    ) -> anyhow::Result<(DriverArguments<'a, D>, usize)>;
 }
 
 #[always_context]
-impl<Table, T: SqlInsert<Table, D>, D: Driver> SqlInsert<Table, D> for Vec<T> {
+impl<'a, Table, T: SqlInsert<'a, Table, D>, D: Driver> SqlInsert<'a, Table, D> for Vec<T> {
     fn insert_columns() -> Vec<String> {
         T::insert_columns()
     }
 
-    fn insert_values(&self) -> anyhow::Result<Vec<Vec<D::Value<'_>>>> {
-        let mut result = Vec::new();
-        for item in self.iter() {
-            let values = item.insert_values()?;
-            result.extend(values);
+    fn insert_values(self, builder: &mut QueryBuilder<'_, D>) -> anyhow::Result<usize> {
+        let mut item_count = 0;
+        for item in self.into_iter() {
+            item_count += item.insert_values(
+                #[context(no)]
+                builder,
+            )?;
         }
-        Ok(result)
-    }
-}
-
-#[always_context]
-impl<Table, T: SqlInsert<Table, D>, D: Driver> SqlInsert<Table, D> for &T {
-    fn insert_columns() -> Vec<String> {
-        T::insert_columns()
+        Ok(item_count)
     }
 
-    fn insert_values(&self) -> anyhow::Result<Vec<Vec<D::Value<'_>>>> {
-        (**self).insert_values()
-    }
-}
-
-#[always_context]
-impl<Table, T: SqlInsert<Table, D>, D: Driver> SqlInsert<Table, D> for [T] {
-    fn insert_columns() -> Vec<String> {
-        T::insert_columns()
-    }
-
-    fn insert_values(&self) -> anyhow::Result<Vec<Vec<D::Value<'_>>>> {
-        let mut result = Vec::new();
-        for item in self.iter() {
-            let values = item.insert_values()?;
-            result.extend(values);
+    fn insert_values_sqlx(
+        self,
+        args_list: DriverArguments<'a, D>,
+    ) -> anyhow::Result<(DriverArguments<'a, D>, usize)> {
+        let mut args = args_list;
+        let mut item_count = 0;
+        for item in self.into_iter() {
+            let (new_args, new_count) = item.insert_values_sqlx(
+                #[context(no)]
+                args,
+            )?;
+            args = new_args;
+            item_count += new_count;
         }
-        Ok(result)
+        Ok((args, item_count))
+    }
+}
+
+#[always_context]
+impl<'a, Table, T: SqlInsert<'a, Table, D>, D: Driver> SqlInsert<'a, Table, D> for &'a Vec<T>
+where
+    &'a T: SqlInsert<'a, Table, D>,
+{
+    fn insert_columns() -> Vec<String> {
+        T::insert_columns()
+    }
+
+    fn insert_values(self, builder: &mut QueryBuilder<'_, D>) -> anyhow::Result<usize> {
+        let mut item_count = 0;
+        for item in self.iter() {
+            item_count += item.insert_values(
+                #[context(no)]
+                builder,
+            )?;
+        }
+        Ok(item_count)
+    }
+
+    fn insert_values_sqlx(
+        self,
+        args_list: DriverArguments<'a, D>,
+    ) -> anyhow::Result<(DriverArguments<'a, D>, usize)> {
+        let mut args = args_list;
+        let mut item_count = 0;
+        for item in self.into_iter() {
+            let (new_args, new_count) = item.insert_values_sqlx(
+                #[context(no)]
+                args,
+            )?;
+            args = new_args;
+            item_count += new_count;
+        }
+        Ok((args, item_count))
+    }
+}
+
+#[always_context]
+impl<'a, Table, T: SqlInsert<'a, Table, D>, D: Driver> SqlInsert<'a, Table, D> for &'a [T]
+where
+    &'a T: SqlInsert<'a, Table, D>,
+{
+    fn insert_columns() -> Vec<String> {
+        T::insert_columns()
+    }
+
+    fn insert_values(self, builder: &mut QueryBuilder<'_, D>) -> anyhow::Result<usize> {
+        let mut item_count = 0;
+        for item in self.iter() {
+            item_count += item.insert_values(
+                #[context(no)]
+                builder,
+            )?;
+        }
+        Ok(item_count)
+    }
+
+    fn insert_values_sqlx(
+        self,
+        args_list: DriverArguments<'a, D>,
+    ) -> anyhow::Result<(DriverArguments<'a, D>, usize)> {
+        let mut args = args_list;
+        let mut item_count = 0;
+        for item in self.iter() {
+            let (new_args, new_count) = item.insert_values_sqlx(
+                #[context(no)]
+                args,
+            )?;
+            args = new_args;
+            item_count += new_count;
+        }
+        Ok((args, item_count))
     }
 }

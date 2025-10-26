@@ -159,6 +159,7 @@ pub fn table_join(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::T
         .collect::<Vec<_>>();
 
     let mut checks = Vec::new();
+    let mut binds = Vec::new();
 
     let mut not_optional_joined_tables = vec![&main_table_struct];
     let mut optional_joined_tables = Vec::new();
@@ -230,6 +231,7 @@ pub fn table_join(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::T
                     Join::Inner { table, on } => {
                         let on = on.clone().into_tokens_with_checks(
                             &mut checks,
+                            &mut binds,
                             &sql_crate,
                             true,
                             &driver_tokens,
@@ -244,6 +246,7 @@ pub fn table_join(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::T
                     Join::Left { table, on } => {
                         let on = on.clone().into_tokens_with_checks(
                             &mut checks,
+                            &mut binds,
                             &sql_crate,
                             true,
                             &driver_tokens,
@@ -258,6 +261,7 @@ pub fn table_join(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::T
                     Join::Right { table, on } => {
                         let on = on.clone().into_tokens_with_checks(
                             &mut checks,
+                            &mut binds,
                             &sql_crate,
                             true,
                             &driver_tokens,
@@ -304,10 +308,12 @@ pub fn table_join(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::T
                     vec![]
                 }
 
-                fn table_joins() -> Vec<#sql_crate::TableJoin<'static,#driver>> {
+                fn table_joins(__easy_sql_builder: &mut #sql_crate::QueryBuilder<'_, #driver>) -> Vec<#sql_crate::TableJoin> {
                     let _ = |___t___:#item_name|{
                         #(#checks)*
                     };
+
+                    #(#binds)*
 
                     vec![
                         #(#table_joins),*

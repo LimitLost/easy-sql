@@ -6,7 +6,7 @@ use ::{
 };
 use easy_macros::{
     helpers::{TokensBuilder, context, parse_macro_input},
-    macros::{always_context, get_attributes},
+    macros::{always_context, get_attributes, has_attributes},
 };
 use sql_compilation_data::CompilationData;
 
@@ -35,25 +35,38 @@ pub fn sql_insert_base(
     defaults: Vec<syn::Ident>,
 ) -> anyhow::Result<TokenStream> {
     let field_names = fields.iter().map(|field| field.ident.as_ref().unwrap());
-    let field_names_str = field_names.clone().map(|field| field.to_string());
+    let field_names_str = field_names
+        .clone()
+        .map(|field| field.to_string())
+        .collect::<Vec<_>>();
 
     let sql_crate = sql_crate();
 
     let mut insert_values = Vec::new();
+    let mut insert_values_debug = Vec::new();
+    let mut insert_values_debug_ref = Vec::new();
 
     for field in fields.iter() {
+        let bytes = has_attributes!(field, #[sql(bytes)]);
         let field_name = field.ident.as_ref().unwrap();
-        insert_values.push(ty_to_variant(
-            field_name.to_token_stream(),
-            &field.ty,
-            driver,
-            &sql_crate,
-            true,
-        )?);
+        let mapped = ty_to_variant(field_name.to_token_stream(), bytes, &sql_crate)?;
+        let debug_format_str =
+            format!("Binding field `{}` to query failed", field_name.to_string());
+        let debug_format_str_ref = format!(
+            "Failed to add `{}` (= {{:?}}) to the sqlx arguments list",
+            field_name.to_string()
+        );
+        insert_values_debug.push(quote! {
+            .context(#debug_format_str)
+        });
+        insert_values_debug_ref.push(quote! {
+            .with_context(|| format!(#debug_format_str_ref, #mapped))
+        });
+        insert_values.push(mapped);
     }
 
     Ok(quote! {
-        impl #sql_crate::SqlInsert<#table,#driver> for #item_name {
+        impl<'a> #sql_crate::SqlInsert<'a,#table,#driver> for #item_name {
             fn insert_columns() -> Vec<String> {
                 #sql_crate::never::never_fn(|| {
                     //Check for validity
@@ -75,11 +88,76 @@ pub fn sql_insert_base(
                 ]
             }
 
-            fn insert_values(&self) -> ::anyhow::Result<Vec<Vec<<#driver as #sql_crate::Driver>::Value<'_>>>> {
-                Ok(vec![vec![
-                    #(#insert_values),*
-                ]])
+            fn insert_values(
+                self,
+                builder: &mut #sql_crate::QueryBuilder<'_, #driver>,
+            ) -> anyhow::Result<usize>{
+                use #sql_crate::macro_support::Context as _;
+
+                // Fully safe because we pass by value, not by reference
+                unsafe{
+                    #(
+                        builder.bind(#insert_values)#insert_values_debug?;
+                    )*
+                }
+                Ok(1)
             }
+
+            fn insert_values_sqlx(
+                self,
+                mut args_list: #sql_crate::DriverArguments<'a, #driver>,
+            ) -> anyhow::Result<(#sql_crate::DriverArguments<'a, #driver>, usize)> {
+                use #sql_crate::macro_support::Context as _;
+
+                use #sql_crate::macro_support::Arguments;
+                    #(
+                        args_list.add(#insert_values).map_err(anyhow::Error::from_boxed)#insert_values_debug?;
+                    )*
+
+
+                Ok((args_list, 1))
+            }
+        }
+
+        impl<'a> #sql_crate::SqlInsert<'a,#table,#driver> for &'a #item_name{
+            fn insert_columns() -> Vec<String> {
+                // Validity check needs to be done only once
+                vec![
+                    #(
+                        #field_names_str.to_string(),
+                    )*
+                ]
+            }
+
+            fn insert_values(
+                self,
+                builder: &mut #sql_crate::QueryBuilder<'_, #driver>,
+            ) -> anyhow::Result<usize>{
+                use #sql_crate::macro_support::Context as _;
+
+                // Fully safe because we pass by reference, and the reference lives until
+                // the end of the QueryBuilder usage (parent function call)
+                unsafe{
+                    #(
+                        builder.bind(&#insert_values)#insert_values_debug_ref?;
+                    )*
+                }
+                Ok(1)
+            }
+
+            fn insert_values_sqlx(
+                self,
+                mut args_list: #sql_crate::DriverArguments<'a, #driver>,
+            ) -> anyhow::Result<(#sql_crate::DriverArguments<'a, #driver>, usize)> {
+                use #sql_crate::macro_support::Context as _;
+
+                use #sql_crate::macro_support::Arguments;
+                #(
+                    args_list.add(&#insert_values).map_err(anyhow::Error::from_boxed)#insert_values_debug_ref?;
+                )*
+                Ok((args_list, 1))
+            }
+
         }
 
     })

@@ -5,15 +5,15 @@ use anyhow::Context;
 use easy_macros::{helpers::context, macros::always_context};
 use sqlx::SqliteConnection;
 
-use super::Sqlite;
+use super::{Sqlite, table_field_definition};
 use crate::SetupSql;
 
 use crate::TableField;
 
 #[derive(Debug)]
-pub struct CreateTable<'a> {
+pub struct CreateTable {
     pub table_name: &'static str,
-    pub fields: Vec<TableField<'a, Sqlite>>,
+    pub fields: Vec<TableField>,
 
     pub primary_keys: Vec<&'static str>,
     ///Can only be used when with single primary key
@@ -24,7 +24,7 @@ pub struct CreateTable<'a> {
 }
 
 #[always_context]
-impl<'a> SetupSql<Sqlite> for CreateTable<'a> {
+impl SetupSql<Sqlite> for CreateTable {
     type Output = ();
 
     async fn query(
@@ -35,7 +35,7 @@ impl<'a> SetupSql<Sqlite> for CreateTable<'a> {
         let mut table_constrains = String::new();
 
         for field in self.fields.into_iter() {
-            table_fields.push_str(&field.definition()?);
+            table_fields.push_str(&table_field_definition(field));
         }
 
         let primary_keys = self.primary_keys;

@@ -1,10 +1,8 @@
 use std::fmt::{Debug, Display};
 
-use anyhow::Context;
 use easy_macros::macros::always_context;
-use serde::{Deserialize, Serialize};
 
-use crate::{Driver, SqlExpr};
+use crate::{Driver, DriverArguments, QueryBuilder, SqlExpr};
 
 use super::{QueryData, RequestedColumn, SelectClauses, TableJoin, WhereClause};
 
@@ -21,34 +19,33 @@ fn single_value_str<D: Driver>(columns_len: usize, current_value_n: &mut usize) 
 
     single_value_str
 }
-
-#[derive(Debug, Serialize, Deserialize)]
-pub enum Sql<'a, D: Driver> {
+#[derive(Debug)]
+pub enum Sql {
     Select {
         // We don't provide output columns here, they are provided inside of SqlOutput trait
         table: &'static str,
-        joins: Vec<TableJoin<'a, D>>,
-        clauses: SelectClauses<'a, D>,
+        joins: Vec<TableJoin>,
+        clauses: SelectClauses,
     },
     Exists {
         table: &'static str,
-        joins: Vec<TableJoin<'a, D>>,
-        clauses: SelectClauses<'a, D>,
+        joins: Vec<TableJoin>,
+        clauses: SelectClauses,
     },
     Insert {
         table: &'static str,
         columns: Vec<String>,
-        values: Vec<Vec<D::Value<'a>>>,
+        values_count: usize,
     },
     Update {
         table: &'static str,
-        set: Vec<(String, SqlExpr<'a, D>)>,
-        where_: Option<WhereClause<'a, D>>,
+        set: Vec<(String, SqlExpr)>,
+        where_: WhereClause,
         //We don't allow for order by and limit since they are not in Postgres (only Sqlite)
     },
     Delete {
         table: &'static str,
-        where_: Option<WhereClause<'a, D>>,
+        where_: WhereClause,
         //We don't allow for order by and limit since they are not in Postgres (only Sqlite)
     },
 }
@@ -56,16 +53,22 @@ pub enum Sql<'a, D: Driver> {
 #[always_context]
 fn insert_query<'a, D: Driver>(
     table: &'static str,
-    columns: &[String],
-    values: &'a Vec<Vec<D::Value<'a>>>,
-    returning: Option<&[RequestedColumn]>,
-) -> anyhow::Result<QueryData<'a, D>> {
+    columns: Vec<String>,
+    builder: QueryBuilder<'a, D>,
+    values_count: usize,
+    returning: Option<Vec<RequestedColumn>>,
+) -> QueryData<'a, D>
+where
+    DriverArguments<'a, D>: sqlx::IntoArguments<'a, D::InternalDriver>,
+{
+    let args = builder.args();
+
     let values_str = {
         let mut current_value_n = 0;
         let columns_len = columns.len();
         let mut values_str = String::new();
 
-        for _ in 0..values.len() {
+        for _ in 0..values_count {
             values_str.push_str(&single_value_str::<D>(columns_len, &mut current_value_n));
         }
         //Removes last comma
@@ -76,7 +79,7 @@ fn insert_query<'a, D: Driver>(
 
     let returning = if let Some(columns) = returning {
         let mut returning_str = "RETURNING ".to_string();
-        for column in columns.iter() {
+        for column in columns.into_iter() {
             returning_str.push_str(&column.to_query_data::<D>());
             returning_str.push(',');
         }
@@ -94,37 +97,35 @@ fn insert_query<'a, D: Driver>(
         columns.join(&format!("{delimeter}, {delimeter}"))
     );
 
-    Ok(QueryData {
-        query: query_str,
-        bindings: values.iter().flatten().collect(),
-    })
+    QueryData::new(query_str, args)
 }
 
 #[always_context]
 fn update_query<'a, D: Driver>(
     table: &'static str,
-    set: &'a [(String, SqlExpr<'a, D>)],
-    where_: &'a Option<WhereClause<'a, D>>,
-    returning: Option<&[RequestedColumn]>,
-) -> anyhow::Result<QueryData<'a, D>> {
+    set: Vec<(String, SqlExpr)>,
+    where_: WhereClause,
+    returning: Option<Vec<RequestedColumn>>,
+    builder: QueryBuilder<'a, D>,
+) -> QueryData<'a, D>
+where
+    DriverArguments<'a, D>: sqlx::IntoArguments<'a, D::InternalDriver>,
+{
+    let args = builder.args();
+
     let mut current_binding_n = 0;
-    let mut bindings_list = Vec::new();
 
     let delimeter = D::identifier_delimiter();
 
     let mut set_str = String::new();
     for (column, value) in set {
-        let value_parsed = value.to_query_data(&mut current_binding_n, &mut bindings_list);
+        let value_parsed = value.to_query_data::<D>(&mut current_binding_n);
         set_str.push_str(&format!("{delimeter}{column}{delimeter} = {value_parsed},"));
     }
     //Removes last comma
     set_str.pop();
 
-    let where_str = if let Some(w) = where_ {
-        w.to_query_data(&mut current_binding_n, &mut bindings_list)
-    } else {
-        String::new()
-    };
+    let where_str = where_.to_query_data::<D>(&mut current_binding_n);
 
     let returning = if let Some(columns) = returning {
         let mut returning_str = "RETURNING ".to_string();
@@ -142,26 +143,23 @@ fn update_query<'a, D: Driver>(
     let query_str =
         format!("UPDATE {delimeter}{table}{delimeter} SET {set_str} {where_str} {returning}");
 
-    Ok(QueryData {
-        query: query_str,
-        bindings: bindings_list,
-    })
+    QueryData::new(query_str, args)
 }
 
 #[always_context]
 fn delete_query<'a, D: Driver>(
     table: &'static str,
-    where_: &'a Option<WhereClause<'a, D>>,
-    returning: Option<&[RequestedColumn]>,
-) -> anyhow::Result<QueryData<'a, D>> {
+    where_: WhereClause,
+    returning: Option<Vec<RequestedColumn>>,
+    builder: QueryBuilder<'a, D>,
+) -> QueryData<'a, D>
+where
+    DriverArguments<'a, D>: sqlx::IntoArguments<'a, D::InternalDriver>,
+{
     let mut current_binding_n = 0;
-    let mut bindings_list = Vec::new();
+    let args = builder.args();
 
-    let where_str = if let Some(w) = where_ {
-        w.to_query_data(&mut current_binding_n, &mut bindings_list)
-    } else {
-        String::new()
-    };
+    let where_str = where_.to_query_data::<D>(&mut current_binding_n);
 
     let returning = if let Some(columns) = returning {
         let mut returning_str = "RETURNING ".to_string();
@@ -180,17 +178,13 @@ fn delete_query<'a, D: Driver>(
 
     let query_str = format!("DELETE FROM {delimeter}{table}{delimeter} {where_str} {returning}");
 
-    Ok(QueryData {
-        query: query_str,
-        bindings: bindings_list,
-    })
+    QueryData::new(query_str, args)
 }
 
-fn select_base<'a, D: Driver>(
-    joins: &'a [TableJoin<'a, D>],
+fn select_base<D: Driver>(
+    joins: Vec<TableJoin>,
     table: &'static str,
-    clauses: &'a SelectClauses<'a, D>,
-    bindings_list: &mut Vec<&'a D::Value<'a>>,
+    clauses: SelectClauses,
     requested_str: impl Display,
 ) -> String {
     let distinct = if clauses.distinct { " DISTINCT" } else { "" };
@@ -200,13 +194,13 @@ fn select_base<'a, D: Driver>(
     let joins_str = {
         let mut joins_str = String::new();
         for join in joins.iter() {
-            joins_str.push_str(&join.to_query_data(&mut current_binding_n, bindings_list));
+            joins_str.push_str(&join.to_query_data::<D>(&mut current_binding_n));
             joins_str.push(' ');
         }
         joins_str
     };
 
-    let clauses_str = clauses.to_query_data(&mut current_binding_n, bindings_list);
+    let clauses_str = clauses.to_query_data::<D>(&mut current_binding_n);
 
     let delimeter = D::identifier_delimiter();
 
@@ -217,8 +211,14 @@ fn select_base<'a, D: Driver>(
 }
 
 #[always_context]
-impl<'a, D: Driver + Debug> Sql<'a, D> {
-    pub(crate) fn query(&'a self) -> anyhow::Result<QueryData<'a, D>> {
+impl Sql {
+    pub(crate) fn query<'a, D: Driver>(
+        self,
+        builder: QueryBuilder<'a, D>,
+    ) -> anyhow::Result<QueryData<'a, D>>
+    where
+        DriverArguments<'a, D>: sqlx::IntoArguments<'a, D::InternalDriver> + Debug,
+    {
         Ok(match self {
             Sql::Select { .. } => {
                 anyhow::bail!("Select query, but no output expected | self: {:?}", self)
@@ -228,34 +228,30 @@ impl<'a, D: Driver + Debug> Sql<'a, D> {
                 joins,
                 clauses,
             } => {
-                let mut bindings_list = Vec::new();
                 let query_str = format!(
                     "SELECT EXISTS ({})",
-                    select_base::<D>(joins, table, clauses, &mut bindings_list, "1")
+                    select_base::<D>(joins, table, clauses, "1")
                 );
-                QueryData {
-                    query: query_str,
-                    bindings: bindings_list,
-                }
+                QueryData::new(query_str, builder.args())
             }
             Sql::Insert {
                 table,
                 columns,
-                values,
-            } => insert_query(table, columns, values, None::<&[RequestedColumn]>)?,
-            Sql::Update { table, set, where_ } => {
-                update_query(table, set, where_, None::<&[RequestedColumn]>)?
-            }
-            Sql::Delete { table, where_ } => {
-                delete_query(table, where_, None::<&[RequestedColumn]>)?
-            }
+                values_count,
+            } => insert_query(table, columns, builder, values_count, None),
+            Sql::Update { table, set, where_ } => update_query(table, set, where_, None, builder),
+            Sql::Delete { table, where_ } => delete_query(table, where_, None, builder),
         })
     }
 
-    pub fn query_output(
-        &'a self,
+    pub fn query_output<'a, D: Driver>(
+        self,
+        builder: QueryBuilder<'a, D>,
         requested_columns: Vec<RequestedColumn>,
-    ) -> anyhow::Result<QueryData<'a, D>> {
+    ) -> anyhow::Result<QueryData<'a, D>>
+    where
+        DriverArguments<'a, D>: sqlx::IntoArguments<'a, D::InternalDriver> + Debug,
+    {
         Ok(match self {
             Sql::Select {
                 table,
@@ -264,7 +260,7 @@ impl<'a, D: Driver + Debug> Sql<'a, D> {
             } => {
                 let requested_str = {
                     let mut requested_str = String::new();
-                    for column in requested_columns.iter() {
+                    for column in requested_columns.into_iter() {
                         requested_str.push_str(&column.to_query_data::<D>());
                         requested_str.push(',');
                     }
@@ -273,15 +269,9 @@ impl<'a, D: Driver + Debug> Sql<'a, D> {
                     requested_str
                 };
 
-                let mut bindings_list = Vec::new();
+                let query_str = select_base::<D>(joins, table, clauses, requested_str);
 
-                let query_str =
-                    select_base::<D>(joins, table, clauses, &mut bindings_list, requested_str);
-
-                QueryData {
-                    query: query_str,
-                    bindings: bindings_list,
-                }
+                QueryData::new(query_str, builder.args())
             }
             Sql::Exists {
                 table: _,
@@ -296,12 +286,20 @@ impl<'a, D: Driver + Debug> Sql<'a, D> {
             Sql::Insert {
                 table,
                 columns,
-                values,
-            } => insert_query(table, columns, values, Some(&requested_columns))?,
+                values_count,
+            } => insert_query(
+                table,
+                columns,
+                builder,
+                values_count,
+                Some(requested_columns),
+            ),
             Sql::Update { table, set, where_ } => {
-                update_query(table, set, where_, Some(&requested_columns))?
+                update_query(table, set, where_, Some(requested_columns), builder)
             }
-            Sql::Delete { table, where_ } => delete_query(table, where_, Some(&requested_columns))?,
+            Sql::Delete { table, where_ } => {
+                delete_query(table, where_, Some(requested_columns), builder)
+            }
         })
     }
 }

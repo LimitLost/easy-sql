@@ -3,7 +3,6 @@ use std::sync::Arc;
 use anyhow::Context;
 use easy_macros::macros::always_context;
 
-use std::path::Path;
 use tokio::sync::Mutex;
 
 use crate::{Connection, DatabaseInternal, DatabaseSetup, EasySqlTables, Transaction};
@@ -55,13 +54,6 @@ impl<DI: DatabaseInternal<Driver = Postgres> + Send + Sync> Database<DI> {
             connection_pool,
             internal,
         })
-    }
-
-    pub async fn maybe_exit(&self) -> anyhow::Result<()> {
-        let mut internal = self.internal.lock().await;
-        internal.maybe_exit().await?;
-
-        Ok(())
     }
 
     pub async fn conn(&self) -> anyhow::Result<Connection<Postgres, DI>> {

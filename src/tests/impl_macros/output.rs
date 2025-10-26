@@ -1,9 +1,10 @@
 use easy_macros::macros::always_context;
 
-use crate::{DriverRow, QueryData, Sql};
+use crate::{DriverRow, QueryBuilder, QueryData, Sql};
 
 use super::TestDriver;
 
+#[allow(dead_code)]
 struct ExampleTableStruct {
     field0: String,
     field1: String,
@@ -12,6 +13,7 @@ struct ExampleTableStruct {
     field4: i16,
 }
 
+#[allow(dead_code)]
 struct ExampleStruct {
     field1: String,
     field2: i32,
@@ -19,8 +21,12 @@ struct ExampleStruct {
 }
 //Remove in derive
 #[always_context]
-impl crate::SqlOutput<ExampleTableStruct, TestDriver, DriverRow<TestDriver>> for ExampleStruct {
-    fn sql_to_query<'a>(sql: &'a Sql<'a, TestDriver>) -> anyhow::Result<QueryData<'a, TestDriver>> {
+impl crate::SqlOutput<ExampleTableStruct, TestDriver> for ExampleStruct {
+    type DataToConvert = DriverRow<TestDriver>;
+    fn sql_to_query<'a>(
+        sql: Sql,
+        builder: QueryBuilder<'a, TestDriver>,
+    ) -> anyhow::Result<QueryData<'a, TestDriver>> {
         crate::never::never_fn(|| {
             //Check for validity
             let table_instance = crate::never::never_any::<ExampleTableStruct>();
@@ -50,11 +56,15 @@ impl crate::SqlOutput<ExampleTableStruct, TestDriver, DriverRow<TestDriver>> for
             },
         ];
 
-        sql.query_output(requested_columns)
+        sql.query_output(builder, requested_columns)
+    }
+
+    fn select_sqlx(current_query: &mut String) {
+        current_query.push_str("field1, field2, field3");
     }
     //Remove in derive
     #[no_context]
-    fn convert<'r>(data: DriverRow<TestDriver>) -> anyhow::Result<Self> {
+    fn convert(data: DriverRow<TestDriver>) -> anyhow::Result<Self> {
         use anyhow::Context;
         use easy_macros::helpers::context;
 

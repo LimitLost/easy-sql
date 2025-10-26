@@ -1,25 +1,23 @@
 use easy_macros::macros::always_context;
 
-use crate::Driver;
-
 use super::SelectClauses;
 use super::WhereClause;
 
 #[always_context]
-pub trait CanBeSelectClause<'a, D: Driver> {
-    fn into_select_clauses(self) -> SelectClauses<'a, D>;
+pub trait CanBeSelectClause {
+    fn into_select_clauses(self) -> SelectClauses;
 }
 
 #[always_context]
-impl<'a, D: Driver> CanBeSelectClause<'a, D> for SelectClauses<'a, D> {
-    fn into_select_clauses(self) -> SelectClauses<'a, D> {
+impl CanBeSelectClause for SelectClauses {
+    fn into_select_clauses(self) -> SelectClauses {
         self
     }
 }
 
 #[always_context]
-impl<'a, D: Driver> CanBeSelectClause<'a, D> for WhereClause<'a, D> {
-    fn into_select_clauses(self) -> SelectClauses<'a, D> {
+impl CanBeSelectClause for WhereClause {
+    fn into_select_clauses(self) -> SelectClauses {
         SelectClauses {
             distinct: false,
             where_: Some(self),
@@ -31,8 +29,8 @@ impl<'a, D: Driver> CanBeSelectClause<'a, D> for WhereClause<'a, D> {
     }
 }
 #[always_context]
-impl<'a, T: CanBeSelectClause<'a, D>, D: Driver> CanBeSelectClause<'a, D> for Option<T> {
-    fn into_select_clauses(self) -> SelectClauses<'a, D> {
+impl<T: CanBeSelectClause> CanBeSelectClause for Option<T> {
+    fn into_select_clauses(self) -> SelectClauses {
         match self {
             Some(clauses) => clauses.into_select_clauses(),
             None => SelectClauses {

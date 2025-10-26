@@ -19,8 +19,6 @@ use crate::{
     sql_macros_components::joined_field::JoinedField,
 };
 
-use super::ty_enum_value;
-
 mod keywords {
     syn::custom_keyword!(cascade);
 }
@@ -80,158 +78,6 @@ pub fn sql_table(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::To
         table_name = lit_str.value();
     }
 
-    let mut primary_keys = Vec::new();
-    let mut foreign_keys = HashMap::new();
-
-    //TODO Primary key types check (compile time in the build script)
-    // let mut primary_key_types=Vec::new();
-
-    let mut is_unique = Vec::new();
-    let mut field_types = Vec::new();
-    let mut is_not_null = Vec::new();
-    let mut is_auto_increment_list = Vec::new();
-    // First token streamn represents data before the driver
-    // Second token stream represents data after the driver
-    let mut default_values: Vec<Box<dyn Fn(&TokenStream) -> TokenStream>> = Vec::new();
-
-    for field in fields.iter() {
-        //Auto Increment Check
-        if has_attributes!(field, #[sql(auto_increment)]) {
-            is_auto_increment_list.push(true);
-        } else {
-            is_auto_increment_list.push(false);
-        }
-
-        //Foreign Key Check
-        for foreign_key in get_attributes!(field, #[sql(foreign_key = __unknown__)]) {
-            let foreign_key: ForeignKeyParsed = syn::parse2(foreign_key.clone())
-                .context("Expected foreign key to be a table name")?;
-
-            let fields: &mut (Vec<String>, bool) = foreign_keys
-                .entry(foreign_key.table_struct)
-                .or_insert((Default::default(), foreign_key.cascade));
-            fields.0.push(field.ident.as_ref()?.to_string());
-            if foreign_key.cascade {
-                fields.1 = true;
-            }
-        }
-        //Get `Type Enum Variant` and `Is Not Null`
-        let (variant, is_field_not_null) = ty_enum_value(&field.ty, &sql_crate)?;
-        is_not_null.push(is_field_not_null);
-
-        //Primary Key Check
-        if has_attributes!(field, #[sql(primary_key)]) {
-            primary_keys.push(field.ident.as_ref()?.to_string());
-        }
-        //Unique Check
-        is_unique.push(has_attributes!(field, #[sql(unique)]));
-
-        //Binary Check (Binary if field is not supported)
-        let binary_field = if let Some(variant) = variant {
-            //Field is supported
-            field_types.push(variant);
-            false
-        } else {
-            //Field is not supported
-            if has_attributes!(field, #[sql(bytes)]) {
-                field_types.push(quote! {Bytes});
-                true
-            } else {
-                anyhow::bail!(
-                    "Field type {:?} is not supported, use #[sql(bytes)] to convert it into bytes",
-                    field.ty
-                );
-            }
-        };
-
-        //Default Value Check
-        let mut default_value_found = false;
-        for default_value in get_attributes!(field, #[sql(default = __unknown__)]) {
-            let field_name = field.ident.as_ref()?;
-
-            if default_value_found {
-                anyhow::bail!("Only one default value is allowed");
-            }
-            //Every default value should be an expression
-            syn::parse2::<syn::Expr>(default_value.clone())
-                .context("Expected default value to be an expression")?;
-
-            if binary_field {
-                let error_context = format!(
-                    "Converting default value `{}` to bytes for field `{}`, struct name: `{}`, table name: `{}`",
-                    default_value.to_token_stream(),
-                    field_name,
-                    item_name,
-                    table_name
-                );
-
-                let before_lazy_static = quote! {
-                        //Test if default value to_binary will be successful
-                        //Even in release mode, just in case, it's low cost anyway
-                        #sql_crate::to_binary(#default_value).context(#error_context)?;
-                };
-                let after_lazy_static = quote! {
-                            //Check if default value has valid type for the current column
-                            #sql_crate::never::never_fn(||{
-                                let mut table_instance = #sql_crate::never::never_any::<#item_name>();
-                                table_instance.#field_name = #default_value;
-                            });
-
-                            Some(&*DEFAULT_VALUE)
-                };
-
-                let sql_crate = sql_crate.clone();
-
-                //Convert provided default value to bytes
-                default_values.push(Box::new(move |d|{
-                    quote! {
-                        {
-                            #before_lazy_static
-
-                            #sql_crate::lazy_static!{
-                                static ref DEFAULT_VALUE: <#d as #sql_crate::Driver>::Value<'static> = #sql_crate::to_binary(#default_value).unwrap().into();
-                            }
-
-                            #after_lazy_static
-                        }
-                    }}));
-            } else {
-                let after_lazy_static = quote! {
-                            //Check if default value has valid type for the current column
-                            #sql_crate::never::never_fn(||{
-                                let mut table_instance = #sql_crate::never::never_any::<#item_name>();
-                                table_instance.#field_name = #default_value;
-                            });
-
-                            Some(&*DEFAULT_VALUE)
-                };
-
-                let sql_crate = sql_crate.clone();
-
-                default_values.push(Box::new(move|d|quote! {
-                        {
-                            #sql_crate::lazy_static!{
-                                static ref DEFAULT_VALUE: <#d as #sql_crate::Driver>::Value<'static> = (#default_value).into();
-                            }
-
-                            #after_lazy_static
-                        }
-                    }));
-            }
-
-            default_value_found = true;
-        }
-        if !default_value_found {
-            default_values.push(Box::new(|_| quote! {None}));
-        }
-    }
-
-    if primary_keys.is_empty() {
-        anyhow::bail!(
-            "No primary key found, please add #[sql(primary_key)] to one of the fields (Sqlite always has one)"
-        );
-    }
-
     let compilation_data = CompilationData::load(Vec::<String>::new(), false)?;
 
     let supported_drivers = super::supported_drivers(&item, &compilation_data)?;
@@ -239,12 +85,6 @@ pub fn sql_table(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::To
     let sqlite = supported_drivers
         .iter()
         .any(|d| d.to_token_stream().to_string().ends_with("Sqlite"));
-
-    if sqlite && primary_keys.len() != 1 && is_auto_increment_list.iter().any(|v| *v) {
-        anyhow::bail!(
-            "Auto increment is only supported for single primary key (Sqlite contrains this limitation)"
-        );
-    }
 
     let mut table_version = None;
 
@@ -305,6 +145,161 @@ pub fn sql_table(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::To
     for driver in supported_drivers {
         let driver_tokens = driver.to_token_stream();
 
+        let mut primary_keys = Vec::new();
+        let mut foreign_keys = HashMap::new();
+
+        //TODO Primary key types check (compile time in the build script)
+        // let mut primary_key_types=Vec::new();
+
+        let mut is_unique = Vec::new();
+        let mut field_types = Vec::new();
+        let mut is_not_null = Vec::new();
+        let mut is_auto_increment_list = Vec::new();
+        // First token streamn represents data before the driver
+        // Second token stream represents data after the driver
+        let mut default_values: Vec<TokenStream> = Vec::new();
+
+        for field in fields.iter() {
+            let field_type = &field.ty;
+
+            //Auto Increment Check
+            if has_attributes!(field, #[sql(auto_increment)]) {
+                is_auto_increment_list.push(true);
+            } else {
+                is_auto_increment_list.push(false);
+            }
+
+            //Foreign Key Check
+            for foreign_key in get_attributes!(field, #[sql(foreign_key = __unknown__)]) {
+                let foreign_key: ForeignKeyParsed = syn::parse2(foreign_key.clone())
+                    .context("Expected foreign key to be a table name")?;
+
+                let fields: &mut (Vec<String>, bool) = foreign_keys
+                    .entry(foreign_key.table_struct)
+                    .or_insert((Default::default(), foreign_key.cascade));
+                fields.0.push(field.ident.as_ref()?.to_string());
+                if foreign_key.cascade {
+                    fields.1 = true;
+                }
+            }
+            //Get `Is Not Null`
+            let is_field_not_null = match &field_type {
+                syn::Type::Path(type_path) => {
+                    if let Some(last_segment) = type_path.path.segments.last() {
+                        if last_segment.ident == "Option" {
+                            false
+                        } else {
+                            true
+                        }
+                    } else {
+                        true
+                    }
+                }
+                _ => true,
+            };
+            is_not_null.push(is_field_not_null);
+
+            //Primary Key Check
+            if has_attributes!(field, #[sql(primary_key)]) {
+                primary_keys.push(field.ident.as_ref()?.to_string());
+            }
+            //Unique Check
+            is_unique.push(has_attributes!(field, #[sql(unique)]));
+
+            //Binary Check and get field type
+            let binary_field = if has_attributes!(field, #[sql(bytes)]) {
+                field_types.push(quote! {
+                    {
+                        use #sql_crate::macro_support::TypeInfo;
+
+                        <Vec<u8> as #sql_crate::macro_support::Type<#sql_crate::InternalDriver<#driver>>>::type_info().name().to_owned()
+                    }
+                });
+                true
+            } else {
+                field_types.push(quote! {
+                    {
+                        use #sql_crate::macro_support::TypeInfo;
+
+                        <#field_type as #sql_crate::macro_support::Type<#sql_crate::InternalDriver<#driver>>>::type_info().name().to_owned()
+                    }
+                });
+
+                false
+            };
+
+            //Default Value Check
+            let mut default_value_found = false;
+            for default_value in get_attributes!(field, #[sql(default = __unknown__)]) {
+                let field_name = field.ident.as_ref()?;
+
+                if default_value_found {
+                    anyhow::bail!("Only one default value is allowed");
+                }
+                //Every default value should be an expression
+                syn::parse2::<syn::Expr>(default_value.clone())
+                    .context("Expected default value to be an expression")?;
+
+                if binary_field {
+                    let error_context = format!(
+                        "Converting default value `{}` to bytes for field `{}`, struct name: `{}`, table name: `{}`",
+                        default_value.to_token_stream(),
+                        field_name,
+                        item_name,
+                        table_name
+                    );
+
+                    //Convert provided default value to bytes
+                    default_values.push(
+                        quote! {
+                            {
+                                use crate::macro_support::Context as _;
+
+                                //Check if default value has valid type for the current column
+                                let _ = ||{
+                                    let mut table_instance = #sql_crate::never::never_any::<#item_name>();
+                                    table_instance.#field_name = #default_value;
+                                };
+
+                                let default_v = #sql_crate::to_binary(#default_value).context(#error_context)?;
+
+                                Some(#sql_crate::ToDefault::to_default(default_v))
+                            }
+                        });
+                } else {
+                    default_values.push(
+                        quote! {
+                            {
+                                //Check if default value has valid type for the current column
+                                #sql_crate::never::never_fn(||{
+                                    let mut table_instance = #sql_crate::never::never_any::<#item_name>();
+                                    table_instance.#field_name = #default_value;
+                                });
+
+                                Some(#sql_crate::ToDefault::to_default(#default_value))
+                            }
+                        });
+                }
+
+                default_value_found = true;
+            }
+            if !default_value_found {
+                default_values.push(quote! {None});
+            }
+        }
+
+        if primary_keys.is_empty() {
+            anyhow::bail!(
+                "No primary key found, please add #[sql(primary_key)] to one of the fields (Sqlite always has one)"
+            );
+        }
+
+        if sqlite && primary_keys.len() != 1 && is_auto_increment_list.iter().any(|v| *v) {
+            anyhow::bail!(
+                "Auto increment is only supported for single primary key (Sqlite contrains this limitation)"
+            );
+        }
+
         let insert_impl = sql_insert_base(
             item_name,
             &fields,
@@ -312,8 +307,7 @@ pub fn sql_table(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::To
             &driver_tokens,
             vec![] as Vec<syn::Ident>,
         )?;
-        let update_impl =
-            sql_update_base(item_name, &fields, &item_name_tokens, &driver_tokens, true)?;
+        let update_impl = sql_update_base(item_name, &fields, &item_name_tokens, &driver_tokens)?;
         let output_impl = sql_output_base(
             item_name,
             &fields,
@@ -321,9 +315,6 @@ pub fn sql_table(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::To
             &item_name_tokens,
             &driver_tokens,
         )?;
-
-        let default_values: Vec<TokenStream> =
-            default_values.iter().map(|f| f(&driver_tokens)).collect();
 
         // Foreign keys converted
         let foreign_keys = {
@@ -366,7 +357,7 @@ pub fn sql_table(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::To
                             #(
                             #sql_crate::TableField{
                                 name: #field_names_str,
-                                data_type: #sql_crate::SqlType::#field_types,
+                                data_type: #field_types,
                                 is_unique: #is_unique,
                                 is_not_null: #is_not_null,
                                 default: #default_values,
@@ -398,7 +389,7 @@ pub fn sql_table(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::To
                 vec![#(#primary_keys),*]
             }
 
-            fn table_joins() -> Vec<#sql_crate::TableJoin<'static, #driver>> {
+            fn table_joins(_builder: &mut #sql_crate::QueryBuilder<'_, #driver>) -> Vec<#sql_crate::TableJoin> {
                 vec![]
             }
         }

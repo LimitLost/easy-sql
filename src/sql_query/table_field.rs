@@ -1,14 +1,10 @@
-use sql_compilation_data::SqlType;
-
-use crate::Driver;
-
 #[derive(Debug)]
-pub struct TableField<'a, D: Driver> {
+pub struct TableField {
     pub name: &'static str,
-    pub data_type: SqlType,
+    pub data_type: String,
     pub is_unique: bool,
     pub is_not_null: bool,
-    pub default: Option<&'a D::Value<'a>>,
+    pub default: Option<String>,
     pub is_auto_increment: bool,
 }
 

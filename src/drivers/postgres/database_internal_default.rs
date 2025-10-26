@@ -24,12 +24,7 @@ impl Drop for DatabaseInternalDefault {
 impl DatabaseInternal for DatabaseInternalDefault {
     type Driver = super::Postgres;
 
-    async fn sql_request(&mut self, _sql: &Sql<'_, Self::Driver>) -> anyhow::Result<()> {
-        Ok(())
-    }
-    ///Should be used when user wants to exit the program
-    async fn maybe_exit(&mut self) -> anyhow::Result<()> {
-        //TODO Try sending data to server if not sent yet
+    async fn sql_request(&mut self, _sql: &Sql) -> anyhow::Result<()> {
         Ok(())
     }
 }

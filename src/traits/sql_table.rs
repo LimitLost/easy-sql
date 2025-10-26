@@ -1,17 +1,15 @@
 use anyhow::Context;
 use easy_macros::macros::always_context;
+use std::fmt::Debug;
 
 use crate::{
-    CanBeSelectClause, Driver, DriverArguments, DriverConnection, DriverRow, Sql, SqlExpr,
-    TableJoin, WhereClause,
+    CanBeSelectClause, Driver, DriverArguments, DriverConnection, DriverRow, Sql, TableJoin,
+    WhereClause,
     easy_executor::{Break, EasyExecutor},
 };
 
 use super::{SqlInsert, SqlOutput, SqlUpdate, ToConvert};
-
-// THIS SHIT IS UNSTABLE, AAAAAAA
-// pub type Clauses<T,'a> = Option<(fn(T), impl CanBeSelectClause<'a> + Send + Sync);
-// pub type WhereClause<T,'a> = (fn(T), impl CanBeSelectClause<'a> + Send + Sync);
+use crate::QueryBuilder;
 
 #[always_context]
 pub trait SqlTable<D: Driver>: Sized
@@ -21,40 +19,34 @@ where
     fn table_name() -> &'static str;
     fn primary_keys() -> Vec<&'static str>;
 
-    fn table_joins() -> Vec<TableJoin<'static, D>>;
+    fn table_joins(builder: &mut QueryBuilder<'_, D>) -> Vec<TableJoin>;
     /// Use `sql!` or `sql_where!` macros to generate clauses (second argument to this function), or `None` for all rows
-    async fn get<'a, Y: ToConvert<D> + Send + Sync, T: SqlOutput<Self, D, Y>>(
+    async fn get<
+        'a,
+        Y: ToConvert<D> + Send + Sync + 'static,
+        T: SqlOutput<Self, D, DataToConvert = Y>,
+        CO: CanBeSelectClause + Send + Sync,
+    >(
         conn: &mut (impl EasyExecutor<D> + Send + Sync),
-        clauses: Option<(fn(Self), impl CanBeSelectClause<'a, D> + Send + Sync)>,
+        clauses: impl FnOnce(&mut QueryBuilder<'a, D>) -> anyhow::Result<CO>,
     ) -> anyhow::Result<T>
     where
         DriverConnection<D>: Send + Sync,
         for<'b> &'b mut DriverConnection<D>:
             sqlx::Executor<'b, Database = D::InternalDriver> + Send + Sync,
+        for<'b> DriverArguments<'b, D>: Debug,
     {
-        let clauses = clauses.map(|(_, clauses)| clauses);
-        // Static table joins can be safely used for any lifetime 'a
-        // since they only contain static data
-        let joins: Vec<TableJoin<'a, D>> = Self::table_joins()
-            .into_iter()
-            .map(|j| TableJoin {
-                table: j.table,
-                join_type: j.join_type,
-                alias: j.alias,
-                on: j.on.map(|on| unsafe {
-                    // SAFETY: table_joins() returns TableJoin<'static, D> which means
-                    // the SqlExpr inside only references static data. We can safely
-                    // extend its lifetime to 'a since 'static outlives any 'a.
-                    std::mem::transmute::<SqlExpr<'static, D>, SqlExpr<'a, D>>(on)
-                }),
-            })
-            .collect();
+        let mut builder = QueryBuilder::default();
+        let joins: Vec<TableJoin> = Self::table_joins(&mut builder);
+
+        let clauses = clauses(&mut builder)?;
+
         let sql = Sql::Select {
             table: Self::table_name(),
             joins,
             clauses: clauses.into_select_clauses(),
         };
-        conn.query(&sql).await
+        conn.query(sql, builder).await
     }
 
     /// Use `sql!` or `sql_where!` macros to generate clauses (second argument to this function), or `None` for all rows
@@ -66,54 +58,50 @@ where
     /// //Inside of closure
     /// handle.block_on(async { ... } )
     /// ```
-    async fn get_lazy<'a, T: SqlOutput<Self, D, DriverRow<D>>>(
+    async fn get_lazy<
+        'a,
+        T: SqlOutput<Self, D, DataToConvert = DriverRow<D>>,
+        CO: CanBeSelectClause + Send + Sync,
+    >(
         conn: &mut (impl EasyExecutor<D> + Send + Sync),
-        clauses: Option<(fn(Self), impl CanBeSelectClause<'a, D> + Send + Sync)>,
+        clauses: impl FnOnce(&mut QueryBuilder<'a, D>) -> anyhow::Result<CO>,
         perform: impl FnMut(T) -> anyhow::Result<Option<Break>> + Send + Sync,
     ) -> anyhow::Result<()>
     where
         DriverRow<D>: ToConvert<D>,
         for<'b> &'b mut DriverConnection<D>:
             sqlx::Executor<'b, Database = D::InternalDriver> + Send + Sync,
-        for<'b> DriverArguments<'b, D>: sqlx::IntoArguments<'b, D::InternalDriver>,
+        for<'b> DriverArguments<'b, D>: sqlx::IntoArguments<'b, D::InternalDriver> + Debug,
         D: 'a,
     {
-        let clauses = clauses.map(|(_, clauses)| clauses);
-        // Static table joins can be safely used for any lifetime 'a
-        // since they only contain static data
-        let joins: Vec<TableJoin<'a, D>> = Self::table_joins()
-            .into_iter()
-            .map(|j| TableJoin {
-                table: j.table,
-                join_type: j.join_type,
-                alias: j.alias,
-                on: j.on.map(|on| unsafe {
-                    // SAFETY: table_joins() returns TableJoin<'static, D> which means
-                    // the SqlExpr inside only references static data. We can safely
-                    // extend its lifetime to 'a since 'static outlives any 'a.
-                    std::mem::transmute::<SqlExpr<'static, D>, SqlExpr<'a, D>>(on)
-                }),
-            })
-            .collect();
+        let mut builder = QueryBuilder::default();
+        let joins: Vec<TableJoin> = Self::table_joins(&mut builder);
+        let clauses = clauses(&mut builder)?;
         let sql = Sql::Select {
             table: Self::table_name(),
             joins,
             clauses: clauses.into_select_clauses(),
         };
-        conn.fetch_lazy(&sql, perform).await
+        conn.fetch_lazy(sql, builder, perform).await
     }
 
     /// Alias for get
     ///
     /// Use `sql!` or `sql_where!` macros to generate clauses (second argument to this function), or `None` for all rows
-    async fn select<'a, Y: ToConvert<D> + Send + Sync, T: SqlOutput<Self, D, Y>>(
+    async fn select<
+        'a,
+        Y: ToConvert<D> + Send + Sync + 'static,
+        T: SqlOutput<Self, D, DataToConvert = Y>,
+        CO: CanBeSelectClause + Send + Sync,
+    >(
         conn: &mut (impl EasyExecutor<D> + Send + Sync),
-        clauses: Option<(fn(Self), impl CanBeSelectClause<'a, D> + Send + Sync)>,
+        clauses: impl FnOnce(&mut QueryBuilder<'a, D>) -> anyhow::Result<CO>,
     ) -> anyhow::Result<T>
     where
         DriverConnection<D>: Send + Sync,
         for<'b> &'b mut DriverConnection<D>:
             sqlx::Executor<'b, Database = D::InternalDriver> + Send + Sync,
+        for<'b> DriverArguments<'b, D>: Debug,
     {
         Self::get(conn, clauses).await
     }
@@ -128,268 +116,278 @@ where
     /// //Inside of closure
     /// handle.block_on(async { ... } )
     /// ```
-    async fn select_lazy<'a, T: SqlOutput<Self, D, DriverRow<D>>>(
+    async fn select_lazy<
+        'a,
+        T: SqlOutput<Self, D, DataToConvert = DriverRow<D>>,
+        CO: CanBeSelectClause + Send + Sync,
+    >(
         conn: &mut (impl EasyExecutor<D> + Send + Sync),
-        clauses: Option<(fn(Self), impl CanBeSelectClause<'a, D> + Send + Sync)>,
+        clauses: impl FnOnce(&mut QueryBuilder<'a, D>) -> anyhow::Result<CO>,
         perform: impl FnMut(T) -> anyhow::Result<Option<Break>> + Send + Sync,
     ) -> anyhow::Result<()>
     where
         DriverRow<D>: ToConvert<D>,
         for<'b> &'b mut DriverConnection<D>:
             sqlx::Executor<'b, Database = D::InternalDriver> + Send + Sync,
-        for<'b> DriverArguments<'b, D>: sqlx::IntoArguments<'b, D::InternalDriver>,
+        for<'b> DriverArguments<'b, D>: sqlx::IntoArguments<'b, D::InternalDriver> + Debug,
         D: 'a,
     {
         Self::get_lazy(conn, clauses, perform).await
     }
 
     /// Use `sql!` or `sql_where!` macros to generate clauses (second argument to this function), or `None` for all rows
-    async fn exists<'a>(
+    async fn exists<'a, CO: CanBeSelectClause + Send + Sync>(
         conn: &mut (impl EasyExecutor<D> + Send + Sync),
-        clauses: Option<(fn(Self), impl CanBeSelectClause<'a, D> + Send + Sync)>,
+        clauses: impl FnOnce(&mut QueryBuilder<'a, D>) -> anyhow::Result<CO>,
     ) -> anyhow::Result<bool>
     where
         DriverRow<D>: ToConvert<D>,
-        bool: SqlOutput<Self, D, DriverRow<D>>,
+        bool: SqlOutput<Self, D, DataToConvert = DriverRow<D>>,
         DriverConnection<D>: Send + Sync,
         for<'b> &'b mut DriverConnection<D>:
             sqlx::Executor<'b, Database = D::InternalDriver> + Send + Sync,
+        for<'b> DriverArguments<'b, D>: Debug,
     {
-        let clauses = clauses.map(|(_, clauses)| clauses);
+        let mut builder = QueryBuilder::default();
+
+        let joins: Vec<TableJoin> = Self::table_joins(&mut builder);
+
+        let clauses = clauses(&mut builder)?;
 
         let sql = Sql::Exists {
             table: Self::table_name(),
-            joins: vec![],
+            joins,
             clauses: clauses.into_select_clauses(),
         };
-        conn.query::<DriverRow<D>, Self, bool>(&sql).await
+        conn.query::<DriverRow<D>, Self, bool>(sql, builder).await
     }
 
-    async fn insert<'a, I: SqlInsert<Self, D> + Send + Sync>(
+    async fn insert<'a, I: SqlInsert<'a, Self, D> + Send + Sync>(
         conn: &mut (impl EasyExecutor<D> + Send + Sync),
-        to_insert: &'a I,
+        to_insert: I,
     ) -> anyhow::Result<()>
     where
-        (): ToConvert<D> + SqlOutput<Self, D, ()>,
+        (): ToConvert<D> + SqlOutput<Self, D, DataToConvert = ()>,
         DriverConnection<D>: Send + Sync,
         for<'b> &'b mut DriverConnection<D>:
             sqlx::Executor<'b, Database = D::InternalDriver> + Send + Sync,
+        for<'b> DriverArguments<'b, D>: Debug,
     {
+        let mut builder = QueryBuilder::default();
+        let values_count = to_insert.insert_values(&mut builder)?;
+
         let sql = Sql::Insert {
             table: Self::table_name(),
             columns: I::insert_columns(),
-            values: to_insert.insert_values()?,
+            values_count,
         };
 
-        conn.query::<(), Self, ()>(&sql).await
+        conn.query::<(), Self, ()>(sql, builder).await
     }
 
     async fn insert_returning<
         'a,
-        Y: ToConvert<D> + Send + Sync,
-        T: SqlOutput<Self, D, Y>,
-        I: SqlInsert<Self, D> + Send + Sync,
+        Y: ToConvert<D> + Send + Sync + 'static,
+        T: SqlOutput<Self, D, DataToConvert = Y>,
+        I: SqlInsert<'a, Self, D> + Send + Sync,
     >(
         conn: &mut (impl EasyExecutor<D> + Send + Sync),
-        to_insert: &'a I,
+        to_insert: I,
     ) -> anyhow::Result<T>
     where
-        (): ToConvert<D> + SqlOutput<Self, D, ()>,
+        (): ToConvert<D> + SqlOutput<Self, D, DataToConvert = ()>,
         DriverConnection<D>: Send + Sync,
         for<'b> &'b mut DriverConnection<D>:
             sqlx::Executor<'b, Database = D::InternalDriver> + Send + Sync,
+        for<'b> DriverArguments<'b, D>: Debug,
     {
+        let mut builder = QueryBuilder::default();
+        let values_count = to_insert.insert_values(&mut builder)?;
+
         let sql = Sql::Insert {
             table: Self::table_name(),
             columns: I::insert_columns(),
-            values: to_insert.insert_values()?,
+            values_count,
         };
 
-        conn.query(&sql).await
+        conn.query(sql, builder).await
     }
 
     async fn insert_returning_lazy<
         'a,
-        T: SqlOutput<Self, D, DriverRow<D>>,
-        I: SqlInsert<Self, D> + Send + Sync,
+        T: SqlOutput<Self, D, DataToConvert = DriverRow<D>>,
+        I: SqlInsert<'a, Self, D> + Send + Sync,
     >(
         conn: &mut (impl EasyExecutor<D> + Send + Sync),
-        to_insert: &'a I,
+        to_insert: I,
         perform: impl FnMut(T) -> anyhow::Result<Option<Break>> + Send + Sync,
     ) -> anyhow::Result<()>
     where
-        DriverRow<D>: ToConvert<D>,
+        DriverRow<D>: ToConvert<D> + 'static,
         for<'b> &'b mut DriverConnection<D>:
             sqlx::Executor<'b, Database = D::InternalDriver> + Send + Sync,
-        for<'b> DriverArguments<'b, D>: sqlx::IntoArguments<'b, D::InternalDriver>,
+        for<'b> DriverArguments<'b, D>: sqlx::IntoArguments<'b, D::InternalDriver> + Debug,
     {
+        let mut builder = QueryBuilder::default();
+        let values_count = to_insert.insert_values(&mut builder)?;
+
         let sql = Sql::Insert {
             table: Self::table_name(),
             columns: I::insert_columns(),
-            values: to_insert.insert_values()?,
+            values_count,
         };
 
-        conn.fetch_lazy(&sql, perform).await
+        conn.fetch_lazy(sql, builder, perform).await
     }
 
     /// Use `sql_where!` macro to generate the where clause
     async fn delete<'a>(
         conn: &mut (impl EasyExecutor<D> + Send + Sync),
-        where_: Option<(fn(Self), WhereClause<'a, D>)>,
+        where_: impl FnOnce(&mut QueryBuilder<'a, D>) -> anyhow::Result<WhereClause>,
     ) -> anyhow::Result<()>
     where
-        (): ToConvert<D> + SqlOutput<Self, D, ()>,
+        (): ToConvert<D> + SqlOutput<Self, D, DataToConvert = ()>,
         DriverRow<D>: ToConvert<D>,
         for<'b> &'b mut DriverConnection<D>:
             sqlx::Executor<'b, Database = D::InternalDriver> + Send + Sync,
-        for<'b> DriverArguments<'b, D>: sqlx::IntoArguments<'b, D::InternalDriver>,
+        for<'b> DriverArguments<'b, D>: sqlx::IntoArguments<'b, D::InternalDriver> + Debug,
     {
-        let where_ = where_.map(|(_, where_)| where_);
+        let mut builder = QueryBuilder::default();
+        let where_ = where_(&mut builder)?;
         let sql = Sql::Delete {
             table: Self::table_name(),
             where_,
         };
 
-        conn.query::<(), Self, ()>(&sql).await
+        conn.query::<(), Self, ()>(sql, builder).await
     }
     /// Use `sql_where!` macro to generate the where clause
-    async fn delete_returning<'a, Y: ToConvert<D> + Send + Sync, T: SqlOutput<Self, D, Y>>(
+    async fn delete_returning<
+        'a,
+        Y: ToConvert<D> + Send + Sync + 'static,
+        T: SqlOutput<Self, D, DataToConvert = Y>,
+    >(
         conn: &'a mut (impl EasyExecutor<D> + Send + Sync),
-        where_: Option<(fn(Self), WhereClause<'a, D>)>,
+        where_: impl FnOnce(&mut QueryBuilder<'a, D>) -> anyhow::Result<WhereClause>,
     ) -> anyhow::Result<T>
     where
         DriverRow<D>: ToConvert<D>,
         for<'b> &'b mut DriverConnection<D>:
             sqlx::Executor<'b, Database = D::InternalDriver> + Send + Sync,
-        for<'b> DriverArguments<'b, D>: sqlx::IntoArguments<'b, D::InternalDriver>,
+        for<'b> DriverArguments<'b, D>: sqlx::IntoArguments<'b, D::InternalDriver> + Debug,
     {
-        let where_ = where_.map(|(_, where_)| where_);
+        let mut builder = QueryBuilder::default();
+        let where_ = where_(&mut builder)?;
         let sql = Sql::Delete {
             table: Self::table_name(),
             where_,
         };
 
-        conn.query(&sql).await
+        conn.query(sql, builder).await
     }
 
     async fn delete_returning_lazy<
         'a,
         Y: ToConvert<D> + Send + Sync,
-        T: SqlOutput<Self, D, DriverRow<D>>,
+        T: SqlOutput<Self, D, DataToConvert = DriverRow<D>>,
     >(
         conn: &mut (impl EasyExecutor<D> + Send + Sync),
-        where_: Option<WhereClause<'a, D>>,
+        where_: impl FnOnce(&mut QueryBuilder<'a, D>) -> anyhow::Result<WhereClause>,
         perform: impl FnMut(T) -> anyhow::Result<Option<Break>> + Send + Sync,
     ) -> anyhow::Result<()>
     where
-        DriverRow<D>: ToConvert<D>,
+        DriverRow<D>: ToConvert<D> + 'static,
         for<'b> &'b mut DriverConnection<D>:
             sqlx::Executor<'b, Database = D::InternalDriver> + Send + Sync,
-        for<'b> DriverArguments<'b, D>: sqlx::IntoArguments<'b, D::InternalDriver>,
+        for<'b> DriverArguments<'b, D>: sqlx::IntoArguments<'b, D::InternalDriver> + Debug,
     {
+        let mut builder = QueryBuilder::default();
+        let where_ = where_(&mut builder)?;
         let sql = Sql::Delete {
             table: Self::table_name(),
             where_,
         };
-        conn.fetch_lazy(&sql, perform).await
+        conn.fetch_lazy(sql, builder, perform).await
     }
 
     /// Use `sql_where!` macro to generate the `check` and `where` clause
     async fn update<'a>(
         conn: &mut (impl EasyExecutor<D> + Send + Sync),
-        mut update: impl SqlUpdate<Self, D> + Send + Sync + 'a,
-        where_: Option<(fn(Self), WhereClause<'a, D>)>,
+        update: impl SqlUpdate<'a, Self, D> + Send + Sync + 'a,
+        where_: impl Fn(&mut QueryBuilder<'a, D>) -> anyhow::Result<WhereClause>,
     ) -> anyhow::Result<()>
     where
-        (): ToConvert<D> + SqlOutput<Self, D, ()>,
+        (): ToConvert<D> + SqlOutput<Self, D, DataToConvert = ()>,
         DriverRow<D>: ToConvert<D>,
         for<'b> &'b mut DriverConnection<D>:
             sqlx::Executor<'b, Database = D::InternalDriver> + Send + Sync,
-        for<'b> DriverArguments<'b, D>: sqlx::IntoArguments<'b, D::InternalDriver>,
+        for<'b> DriverArguments<'b, D>: sqlx::IntoArguments<'b, D::InternalDriver> + Debug,
+        D: 'a,
     {
-        let where_ = where_.map(|(_, where_)| where_);
-        let set = update
-            .updates()?
-            .into_iter()
-            .map(|(col, expr)| {
-                // SAFETY: The SqlExpr references data that lives for the duration of this function call.
-                // We extend its lifetime to 'a since the SQL execution will complete within this function.
-                let expr = unsafe { std::mem::transmute::<SqlExpr<'_, D>, SqlExpr<'a, D>>(expr) };
-                (col, expr)
-            })
-            .collect();
+        let mut builder = QueryBuilder::default();
+        let set = update.updates(&mut builder)?;
+        let where_ = where_(&mut builder)?;
         let sql = Sql::Update {
             table: Self::table_name(),
             set,
             where_,
         };
 
-        conn.query::<(), Self, ()>(&sql).await
+        conn.query::<(), Self, ()>(sql, builder).await
     }
     /// Use `sql_where!` macro to generate the where clause
-    async fn update_returning<'a, Y: ToConvert<D> + Send + Sync, T: SqlOutput<Self, D, Y>>(
+    async fn update_returning<
+        'a,
+        Y: ToConvert<D> + Send + Sync + 'static,
+        T: SqlOutput<Self, D, DataToConvert = Y>,
+    >(
         conn: &mut (impl EasyExecutor<D> + Send + Sync),
-        update: &'a mut (impl SqlUpdate<Self, D> + Send + Sync),
-        where_: Option<(fn(Self), WhereClause<'a, D>)>,
+        update: impl SqlUpdate<'a, Self, D> + Send + Sync,
+        where_: impl FnOnce(&mut QueryBuilder<'a, D>) -> anyhow::Result<WhereClause>,
     ) -> anyhow::Result<T>
     where
         DriverRow<D>: ToConvert<D>,
         for<'b> &'b mut DriverConnection<D>:
             sqlx::Executor<'b, Database = D::InternalDriver> + Send + Sync,
-        for<'b> DriverArguments<'b, D>: sqlx::IntoArguments<'b, D::InternalDriver>,
+        for<'b> DriverArguments<'b, D>: sqlx::IntoArguments<'b, D::InternalDriver> + Debug,
     {
-        let where_ = where_.map(|(_, where_)| where_);
-        let set = update
-            .updates()?
-            .into_iter()
-            .map(|(col, expr)| {
-                // SAFETY: The SqlExpr references data that lives for the duration of this function call.
-                // We extend its lifetime to 'a since the SQL execution will complete within this function.
-                let expr = unsafe { std::mem::transmute::<SqlExpr<'_, D>, SqlExpr<'a, D>>(expr) };
-                (col, expr)
-            })
-            .collect();
+        let mut builder = QueryBuilder::default();
+        let set = update.updates(&mut builder)?;
+        let where_ = where_(&mut builder)?;
         let sql = Sql::Update {
             table: Self::table_name(),
             set,
             where_,
         };
 
-        conn.query(&sql).await
+        conn.query(sql, builder).await
     }
 
     async fn update_returning_lazy<
         'a,
         Y: ToConvert<D> + Send + Sync,
-        T: SqlOutput<Self, D, DriverRow<D>>,
-        U: SqlUpdate<Self, D> + Send + Sync,
+        T: SqlOutput<Self, D, DataToConvert = DriverRow<D>>,
+        U: SqlUpdate<'a, Self, D> + Send + Sync,
     >(
         conn: &mut (impl EasyExecutor<D> + Send + Sync),
-        update: &'a mut U,
-        where_: Option<WhereClause<'a, D>>,
+        update: U,
+        where_: impl FnOnce(&mut QueryBuilder<'a, D>) -> anyhow::Result<WhereClause>,
         perform: impl FnMut(T) -> anyhow::Result<Option<Break>> + Send + Sync,
     ) -> anyhow::Result<()>
     where
-        DriverRow<D>: ToConvert<D>,
+        DriverRow<D>: ToConvert<D> + 'static,
         for<'b> &'b mut DriverConnection<D>:
             sqlx::Executor<'b, Database = D::InternalDriver> + Send + Sync,
-        for<'b> DriverArguments<'b, D>: sqlx::IntoArguments<'b, D::InternalDriver>,
+        for<'b> DriverArguments<'b, D>: sqlx::IntoArguments<'b, D::InternalDriver> + Debug,
     {
-        let set = update
-            .updates()?
-            .into_iter()
-            .map(|(col, expr)| {
-                // SAFETY: The SqlExpr references data that lives for the duration of this function call.
-                // We extend its lifetime to 'a since the SQL execution will complete within this function.
-                let expr = unsafe { std::mem::transmute::<SqlExpr<'_, D>, SqlExpr<'a, D>>(expr) };
-                (col, expr)
-            })
-            .collect();
+        let mut builder = QueryBuilder::default();
+        let set = update.updates(&mut builder)?;
+        let where_ = where_(&mut builder)?;
         let sql = Sql::Update {
             table: Self::table_name(),
             set,
             where_,
         };
-        conn.fetch_lazy(&sql, perform).await
+        conn.fetch_lazy(sql, builder, perform).await
     }
 }

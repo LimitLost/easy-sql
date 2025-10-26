@@ -7,12 +7,12 @@ use ::{
 
 use easy_macros::{
     helpers::{context, parse_macro_input, TokensBuilder},
-    macros::{always_context, get_attributes},
+    macros::{always_context, get_attributes, has_attributes},
 };
 use sql_compilation_data::CompilationData;
 
 use crate::{
-    easy_lib_crate, sql_crate, sql_derive::{generic_arg_from_path, ty_name_into_data, TyData}, sql_macros_components::joined_field::JoinedField
+    easy_lib_crate, sql_crate,  sql_macros_components::joined_field::JoinedField
 };
 
 #[always_context]
@@ -27,7 +27,7 @@ pub fn sql_output_base(
     let field_names_str = field_names.clone().map(|field| field.to_string());
 
     let joined_field_aliases=(0..joined_fields.len()).into_iter().map(|i|{
-        format!("j___easy_sql_dont_use_this_name__joined_field_{}",i)
+        format!("___easy_sql_joined_field_{}",i)
     }).collect::<Vec<_>>();
 
     let sql_crate = sql_crate();
@@ -147,24 +147,7 @@ pub fn sql_output_base(
             item_name
         );
 
-        let (field_ty_str,generic_arg)=match &field.ty{
-            syn::Type::Path(type_path) => {
-                let last_segment=type_path.path.segments.last().with_context(context!("Field type path is empty | ty: {}", type_path.to_token_stream()))?;
-                let generic_arg=generic_arg_from_path(last_segment);
-
-                (last_segment.ident.to_string(),generic_arg)
-            },
-            syn::Type::Tuple(type_tuple) => {
-                anyhow::bail!("Tuple field types are not supported yet | ty: {}", type_tuple.to_token_stream());
-            },
-            t => {
-                anyhow::bail!("Field type `{}` is not supported", t.to_token_stream());
-            },
-        };
-
-        let ty=ty_name_into_data(&field_ty_str, &generic_arg,true)?;
-
-        if let TyData::Binary=ty{
+        if has_attributes!(field, #[sql(bytes)]){
             let context_str2=format!(
                 "Getting field `{}` with type {} for struct `{}` (Converting from binary)",
                 field.ident.as_ref().unwrap(),
@@ -189,12 +172,56 @@ pub fn sql_output_base(
 
     }
 
-    //TODO Handle joined fields
-    //TODO Isn't todo above done?
+
+    let select_sqlx_str=fields.iter().map(|field|{
+        let field_name=field.ident.as_ref().unwrap();
+        format!("{{delimeter}}{}{{delimeter}}",field_name)
+    }).collect::<Vec<_>>().join(", ");
+
+    let select_sqlx_str_call = if !select_sqlx_str.is_empty() {
+        quote! {
+            current_query.push_str(&format!(
+                #select_sqlx_str
+            ));
+        }
+    } else {
+        quote! {}
+    };
+
+    let select_sqlx_joined = joined_fields.iter().enumerate().map(|(i,joined_field)| {
+        let ref_table = &joined_field.table;
+        let table_field = &joined_field.table_field;
+
+        let comma=if i==0 && select_sqlx_str.is_empty() {
+            ""
+        }else{
+            ", "
+        };
+
+        let alias=format!("___easy_sql_joined_field_{}",i);
+
+        let format_str=format!(
+            "{comma}{{delimeter}}{{}}{{delimeter}}.{{delimeter}}{}{{delimeter}} AS {}",
+            table_field,
+            alias
+        );
+
+        quote! {
+            current_query.push_str(&format!(
+                #format_str,
+                <#ref_table as #sql_crate::SqlTable<#driver>>::table_name(),
+            ));
+        }
+    });
+
+    
+        
 
     Ok(quote! {
-        impl #sql_crate::SqlOutput<#table, #driver, #sql_crate::DriverRow<#driver>> for #item_name {
-            fn sql_to_query<'a>(sql: &'a #sql_crate::Sql<'a, #driver>) -> #easy_lib_crate::anyhow::Result<#sql_crate::QueryData<'a, #driver>> {
+        impl #sql_crate::SqlOutput<#table, #driver> for #item_name {
+            type DataToConvert = #sql_crate::DriverRow<#driver>;
+
+            fn sql_to_query<'a>(sql: #sql_crate::Sql, builder: #sql_crate::QueryBuilder<'a, #driver>) -> #easy_lib_crate::anyhow::Result<#sql_crate::QueryData<'a, #driver>> {
                 #sql_crate::never::never_fn(|| {
                     //Check for validity
                     let table_instance = #sql_crate::never::never_any::<#table>();
@@ -226,8 +253,15 @@ pub fn sql_output_base(
                     )*
                 ];
 
-                sql.query_output(requested_columns)
+                sql.query_output(builder, requested_columns)
             }
+            
+            fn select_sqlx(current_query: &mut String) {
+                let delimeter = <#driver as #sql_crate::Driver>::identifier_delimiter();
+                #select_sqlx_str_call
+                #(#select_sqlx_joined)*
+            }
+
             fn convert(data: #sql_crate::DriverRow<#driver>) -> ::anyhow::Result<Self> {
                 use ::anyhow::Context;
                 use #sql_crate::macro_support::context;

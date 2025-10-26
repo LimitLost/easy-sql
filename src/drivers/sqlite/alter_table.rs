@@ -5,14 +5,15 @@ use anyhow::Context;
 use easy_macros::{helpers::context, macros::always_context};
 use sqlx::SqliteConnection;
 
+use super::table_field_definition;
 use crate::{SetupSql, TableField};
 
-pub enum AlterTableSingle<'a> {
+pub enum AlterTableSingle {
     RenameTable {
         new_table_name: &'static str,
     },
     AddColumn {
-        column: TableField<'a, Sqlite>,
+        column: TableField,
     },
     RenameColumn {
         old_column_name: &'static str,
@@ -20,13 +21,13 @@ pub enum AlterTableSingle<'a> {
     },
 }
 
-pub struct AlterTable<'a> {
+pub struct AlterTable {
     pub table_name: &'static str,
-    pub alters: Vec<AlterTableSingle<'a>>,
+    pub alters: Vec<AlterTableSingle>,
 }
 
 #[always_context]
-impl<'a> SetupSql<Sqlite> for AlterTable<'a> {
+impl SetupSql<Sqlite> for AlterTable {
     type Output = ();
 
     async fn query(
@@ -60,7 +61,7 @@ impl<'a> SetupSql<Sqlite> for AlterTable<'a> {
                     let query = format!(
                         "ALTER TABLE {} ADD COLUMN {}",
                         self.table_name,
-                        column.definition()?
+                        table_field_definition(column)
                     );
 
                     let sqlx_query = sqlx::query(&query);

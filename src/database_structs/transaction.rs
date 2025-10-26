@@ -1,14 +1,18 @@
-use std::sync::Arc;
+use std::{
+    ops::{Deref, DerefMut},
+    sync::Arc,
+};
 
 use anyhow::Context;
 use easy_macros::macros::always_context;
 use futures::StreamExt;
+use sqlx::Database;
 use std::fmt::Debug;
 use tokio::sync::Mutex;
 
 use crate::{
     DatabaseInternal, Driver, DriverArguments, DriverConnection, DriverRow, InternalDriver,
-    SetupSql, Sql, SqlOutput, ToConvert,
+    QueryBuilder, SetupSql, Sql, SqlOutput, ToConvert,
     easy_executor::{Break, EasyExecutor},
 };
 #[derive(Debug)]
@@ -41,63 +45,43 @@ impl<'a, D: Driver, DI: DatabaseInternal<Driver = D>> Transaction<'a, D, DI> {
 impl<'c, DI: DatabaseInternal<Driver = D> + Send + Sync, D: Driver> EasyExecutor<D>
     for Transaction<'c, D, DI>
 {
-    /* async fn query(&mut self, sql: &Sql) -> anyhow::Result<()> {
-           sql.query()?.sqlx().execute(&mut *self.internal).await?;
-
-           //Inform about query DatabaseInternal
-           #[no_context_inputs]
-           self.db_link
-               .lock()
-               .await
-               .sql_request(&mut *self.internal, sql)
-               .await?;
-
-           Ok(())
-       }
-    */
-    async fn query<Y: ToConvert<D> + Send + Sync, T, O: SqlOutput<T, D, Y>>(
+    async fn query<
+        Y: ToConvert<D> + Send + Sync + 'static,
+        T,
+        O: SqlOutput<T, D, DataToConvert = Y>,
+    >(
         &mut self,
-        sql: &Sql<'_, D>,
+        sql: Sql,
+        builder: QueryBuilder<'_, D>,
     ) -> anyhow::Result<O>
     where
         DriverConnection<D>: Send + Sync,
         for<'b> &'b mut DriverConnection<D>:
             sqlx::Executor<'b, Database = InternalDriver<D>> + Send + Sync,
+        for<'b> DriverArguments<'b, D>: Debug,
     {
-        // SAFETY: We need to unify lifetimes for sql_to_query call.
-        // This is safe because we're not extending lifetimes, just unifying them
-        // for the duration of this function call.
-        let sql_unified: &Sql<'_, D> = unsafe { std::mem::transmute(sql) };
-        let query = O::sql_to_query(sql_unified)?;
-        let query_sqlx = query.sqlx();
+        // SAFETY: Compiler thinks that that data inside of the builder could be borrowed forever, entangled with connection
+        // Because of Y::get, see SAFETY below
+        let builder: QueryBuilder<'_, D> = unsafe { std::mem::transmute(builder) };
 
-        /* let conn_ref: &'a mut DriverConnection<CurrentDriver> =
-        unsafe { &mut *(&mut *self.internal as *mut DriverConnection<CurrentDriver>) }; */
+        // TODO Inform QueryListener
+
+        let mut query = O::sql_to_query(
+            #[context(no)]
+            sql,
+            #[context(no)]
+            builder,
+        )?;
+        // SAFETY: We transmute the query to  satisfy compiler thinking that Y::get borrows query_sqlx forever.
+        // This is safe because:
+        // 1. Y: 'static ensures the returned type doesn't contain non-'static references (so it doesn't borrow forever)
+        let query_sqlx = unsafe { query.sqlx() };
 
         #[no_context_inputs]
-        let row = Y::get(&mut *self.internal, query_sqlx)
-            .await
-            .with_context(|| {
-                let query = O::sql_to_query(sql_unified);
-                format!("query: {query:?}")
-            })?;
+        let row = Y::get(&mut *self.internal, query_sqlx).await?;
 
-        //Inform about query DatabaseInternal
         #[no_context_inputs]
-        self.db_link
-            .lock()
-            .await
-            .sql_request(sql)
-            .await
-            .with_context(|| {
-                let query = O::sql_to_query(sql_unified);
-                format!("query: {query:?}")
-            })?;
-        #[no_context_inputs]
-        Ok(O::convert(row).with_context(|| {
-            let query = O::sql_to_query(sql_unified);
-            format!("Converting Row to Value | query: {query:?}")
-        })?)
+        Ok(O::convert(row)?)
     }
 
     async fn query_setup<O: SetupSql<D> + Send + Sync>(
@@ -110,25 +94,6 @@ impl<'c, DI: DatabaseInternal<Driver = D> + Send + Sync, D: Driver> EasyExecutor
         sql.query(&mut self.internal).await
     }
 
-    /* async fn fetch_all<T, O: SqlOutput<T, Row>>(&mut self, sql: &Sql) -> anyhow::Result<Vec<O>> {
-        let rows = sql
-            .query_output(O::requested_columns())?
-            .sqlx()
-            .fetch_all(&mut *self.internal)
-            .await?;
-
-        //Inform about query DatabaseInternal
-        #[no_context_inputs]
-        self.db_link
-            .lock()
-            .await
-            .sql_request(&mut *self.internal, sql)
-            .await?;
-
-        #[no_context_inputs]
-        Ok(<Vec<O> as SqlOutput<T, Vec<Row>>>::convert(rows)?)
-    } */
-
     ///# How to Async inside of closure
     /// (tokio example)
     /// ```rust
@@ -137,56 +102,41 @@ impl<'c, DI: DatabaseInternal<Driver = D> + Send + Sync, D: Driver> EasyExecutor
     /// //Inside of closure
     /// handle.block_on(async { ... } )
     /// ```
-    async fn fetch_lazy<T, O: SqlOutput<T, D, DriverRow<D>>>(
+    async fn fetch_lazy<T, O: SqlOutput<T, D, DataToConvert = DriverRow<D>>>(
         &mut self,
-        sql: &Sql<'_, D>,
+        sql: Sql,
+        builder: QueryBuilder<'_, D>,
         mut perform: impl FnMut(O) -> anyhow::Result<Option<Break>> + Send + Sync,
     ) -> anyhow::Result<()>
     where
-        DriverRow<D>: ToConvert<D>,
+        DriverRow<D>: ToConvert<D> + 'static,
         for<'b> &'b mut DriverConnection<D>:
             sqlx::Executor<'b, Database = InternalDriver<D>> + Send + Sync,
-        for<'b> DriverArguments<'b, D>: sqlx::IntoArguments<'b, InternalDriver<D>>,
+        for<'b> DriverArguments<'b, D>: sqlx::IntoArguments<'b, InternalDriver<D>> + Debug,
     {
-        // SAFETY: We need to unify lifetimes for sql_to_query call.
-        // This is safe because we're not extending lifetimes, just unifying them
-        // for the duration of this function call.
-        let sql_unified: &Sql<'_, D> = unsafe { std::mem::transmute(sql) };
-        let query_output = O::sql_to_query(sql_unified)?;
+        // SAFETY: Compiler thinks that that data inside of the builder could be borrowed forever, entangled with connection
+        // Because of Y::get, see SAFETY below
+        let builder: QueryBuilder<'_, D> = unsafe { std::mem::transmute(builder) };
 
-        // SAFETY: Extending lifetime to 'a for sql_request
-        // This is safe because the connection outlives this function call
-        // let conn_ref: &'a mut DriverConnection<D> =
-        //     unsafe { &mut *(&mut *self.internal as *mut DriverConnection<D>) };
+        // TODO Inform QueryListener
 
-        //Inform about query DatabaseInternal
-        #[no_context_inputs]
-        self.db_link
-            .lock()
-            .await
-            .sql_request(sql)
-            .await
-            .with_context(|| {
-                let query_output = O::sql_to_query(sql_unified);
-                format!("Row fetching | query: {query_output:?}")
-            })?;
+        // sql context to result is added in the SqlTable invocations
+        let mut query_output = O::sql_to_query(
+            #[context(no)]
+            sql,
+            #[context(no)]
+            builder,
+        )?;
 
-        // Create fresh borrow for fetch
-        // let conn_ref2: &'a mut DriverConnection<D> =
-        //     unsafe { &mut *(&mut *self.internal as *mut DriverConnection<D>) };
-
-        let mut rows = query_output.sqlx().fetch(&mut *self.internal);
+        // SAFETY: We transmute the query to  satisfy compiler thinking that Y::get borrows query_sqlx forever.
+        // This is safe because:
+        // 1. DriverRow<D>: 'static ensures the generated Row doesn't contain non-'static references (so it doesn't borrow forever our sqlx query)
+        let mut rows = unsafe { query_output.sqlx() }.fetch(&mut *self.internal);
 
         while let Some(result) = rows.next().await {
-            let row = result.with_context(|| {
-                let query_output = O::sql_to_query(sql_unified);
-                format!("Row fetching | query: {query_output:?}")
-            })?;
+            let row = result.context("Failed to fetch row")?;
             #[no_context_inputs]
-            let output = O::convert(row).with_context(|| {
-                let query_output = O::sql_to_query(sql_unified);
-                format!("Converting Row to Value | query: {query_output:?}")
-            })?;
+            let output = O::convert(row)?;
 
             #[no_context_inputs]
             if let Some(Break) = perform(output)? {
@@ -195,5 +145,22 @@ impl<'c, DI: DatabaseInternal<Driver = D> + Send + Sync, D: Driver> EasyExecutor
         }
 
         Ok(())
+    }
+}
+impl<'c, DI: DatabaseInternal<Driver = D> + Send + Sync, D: Driver> Deref
+    for Transaction<'c, D, DI>
+{
+    type Target = <InternalDriver<D> as Database>::Connection;
+
+    fn deref(&self) -> &Self::Target {
+        &self.internal
+    }
+}
+
+impl<'c, DI: DatabaseInternal<Driver = D> + Send + Sync, D: Driver> DerefMut
+    for Transaction<'c, D, DI>
+{
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.internal
     }
 }

@@ -7,7 +7,7 @@ use easy_lib::sql::{SqlInsert, SqlOutput, SqlTable, SqlUpdate, sql};
 use super::Database;
 use easy_macros::macros::always_context;
 use lazy_static::lazy_static;
-use sql_macros::sql_convenience;
+use sql_macros::{sql_convenience};
 
 lazy_static!{
     static ref ALL_CHARACTERS: String="1234567890abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ!@#$%^&*()_+-=[]{}|;':\",.<>/?`~\\ ".to_string();
@@ -16,9 +16,10 @@ lazy_static!{
 
 #[derive(SqlTable, Debug)]
 #[sql(version = 1)]
-#[sql(unique_id = "0d1ac2f1-7129-4f7d-9a94-37c109010b88")]
+#[sql(unique_id = "ce3d4f19-9d47-4fe2-9700-0957df4c04ee")]
 struct ExampleTableInsert {
     #[sql(primary_key)]
+    #[sql(auto_increment)]
     id: i32,
     field: i64,
     #[sql(default = ALL_CHARACTERS.clone())]

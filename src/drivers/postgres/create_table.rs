@@ -5,15 +5,15 @@ use anyhow::Context;
 use easy_macros::{helpers::context, macros::always_context};
 use sqlx::PgConnection;
 
-use super::Postgres;
+use super::{Postgres, table_field_definition};
 use crate::SetupSql;
 
 use crate::TableField;
 
 #[derive(Debug)]
-pub struct CreateTable<'a> {
+pub struct CreateTable {
     pub table_name: &'static str,
-    pub fields: Vec<TableField<'a, Postgres>>,
+    pub fields: Vec<TableField>,
 
     pub primary_keys: Vec<&'static str>,
     ///Key - table name
@@ -22,7 +22,7 @@ pub struct CreateTable<'a> {
 }
 
 #[always_context]
-impl<'a> SetupSql<Postgres> for CreateTable<'a> {
+impl SetupSql<Postgres> for CreateTable {
     type Output = ();
 
     async fn query(
@@ -33,7 +33,7 @@ impl<'a> SetupSql<Postgres> for CreateTable<'a> {
         let mut table_constrains = String::new();
 
         for field in self.fields.into_iter() {
-            table_fields.push_str(&field.definition()?);
+            table_fields.push_str(&table_field_definition(field));
         }
 
         let primary_keys = self.primary_keys;

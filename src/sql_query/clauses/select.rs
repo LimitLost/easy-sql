@@ -13,20 +13,16 @@ pub enum JoinType {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct TableJoin<'a, D: Driver> {
+pub struct TableJoin {
     pub table: &'static str,
     pub join_type: JoinType,
     pub alias: Option<String>,
-    pub on: Option<SqlExpr<'a, D>>,
+    pub on: Option<SqlExpr>,
 }
 
 #[always_context]
-impl<'a, D: Driver> TableJoin<'a, D> {
-    pub fn to_query_data(
-        &'a self,
-        current_binding_n: &mut usize,
-        bindings_list: &mut Vec<&'a D::Value<'a>>,
-    ) -> String {
+impl TableJoin {
+    pub fn to_query_data<D: Driver>(&self, current_binding_n: &mut usize) -> String {
         let join_type_str = match self.join_type {
             JoinType::Inner => "INNER",
             JoinType::Left => "LEFT",
@@ -44,7 +40,7 @@ impl<'a, D: Driver> TableJoin<'a, D> {
         if let Some(expr) = &self.on {
             join_str.push_str(&format!(
                 " ON {}",
-                expr.to_query_data(current_binding_n, bindings_list)
+                expr.to_query_data::<D>(current_binding_n)
             ));
         }
         join_str
@@ -52,24 +48,20 @@ impl<'a, D: Driver> TableJoin<'a, D> {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct SelectClauses<'a, D: Driver> {
+pub struct SelectClauses {
     pub distinct: bool,
-    pub where_: Option<WhereClause<'a, D>>,
+    pub where_: Option<WhereClause>,
     pub group_by: Option<GroupByClause>,
-    pub having: Option<HavingClause<'a, D>>,
+    pub having: Option<HavingClause>,
     pub order_by: Option<OrderByClause>,
     pub limit: Option<LimitClause>,
 }
 
 #[always_context]
-impl<'a, D: Driver> SelectClauses<'a, D> {
-    pub fn to_query_data(
-        &'a self,
-        current_binding_n: &mut usize,
-        bindings_list: &mut Vec<&'a D::Value<'a>>,
-    ) -> String {
+impl SelectClauses {
+    pub fn to_query_data<D: Driver>(&self, current_binding_n: &mut usize) -> String {
         let where_str = if let Some(w) = &self.where_ {
-            w.to_query_data(current_binding_n, bindings_list)
+            w.to_query_data::<D>(current_binding_n)
         } else {
             String::new()
         };
@@ -80,7 +72,7 @@ impl<'a, D: Driver> SelectClauses<'a, D> {
         };
 
         let having_str = if let Some(h) = &self.having {
-            h.to_query_data(current_binding_n, bindings_list)
+            h.to_query_data::<D>(current_binding_n)
         } else {
             String::new()
         };

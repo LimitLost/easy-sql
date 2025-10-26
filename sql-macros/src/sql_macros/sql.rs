@@ -164,6 +164,7 @@ pub fn sql(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::TokenStr
     let mode = input.input;
 
     let mut checks = Vec::new();
+    let mut binds = Vec::new();
     let sql_crate = sql_crate();
 
     // Get the driver - either explicitly provided or from compilation data
@@ -199,25 +200,40 @@ pub fn sql(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::TokenStr
     let result = match mode {
         MacroMode::Expression(expr) => {
             // Expression mode: just returns a WhereClause (like sql_where!)
-            let conditions_parsed =
-                expr.into_tokens_with_checks(&mut checks, &sql_crate, true, &driver);
 
-            let checks_tokens = if let Some(table_ty) = input_table {
+            let conditions_parsed =
+                expr.into_tokens_with_checks(&mut checks, &mut binds, &sql_crate, true, &driver);
+
+            if let Some(table_ty) = input_table {
+                //Normal Mode
+
                 quote! {
-                    |___t___:#table_ty|{
-                        #(#checks)*
-                    },
+                    {
+                        let _ = |___t___:#table_ty|{
+                            #(#checks)*
+                        };
+                        |__easy_sql_builder: &mut #sql_crate::QueryBuilder<#driver>|{
+                            // Safety: References to Variables created inside of the closure can't escape
+                            // which is the only potentially unsafe situation here.
+                            unsafe{
+                                #(
+                                    #binds
+                                )*
+                            }
+
+                            Ok(#sql_crate::WhereClause{
+                                conditions: #conditions_parsed
+                            })
+                        }
+                    }
                 }
             } else {
-                quote! {}
-            };
-
-            quote! {
-                Some((
-                    #checks_tokens
-                #sql_crate::WhereClause::<#driver>{
-                    conditions: #conditions_parsed
-                }))
+                //Debug info Mode
+                quote! {
+                    #sql_crate::WhereClause{
+                        conditions: #conditions_parsed
+                    }
+                }
             }
         }
         MacroMode::SetClause(set_expr) => {
@@ -225,8 +241,13 @@ pub fn sql(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::TokenStr
             let mut set_updates = Vec::new();
 
             for (column, where_expr) in set_expr.updates {
-                let where_expr_parsed =
-                    where_expr.into_tokens_with_checks(&mut checks, &sql_crate, false, &driver);
+                let where_expr_parsed = where_expr.into_tokens_with_checks(
+                    &mut checks,
+                    &mut binds,
+                    &sql_crate,
+                    false,
+                    &driver,
+                );
                 let column_str = column.to_string();
                 checks.push(quote! {
                     ___t___.#column;
@@ -236,22 +257,32 @@ pub fn sql(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::TokenStr
                 });
             }
 
-            let checks_tokens = if let Some(table_ty) = input_table {
+            if let Some(table_ty) = input_table {
+                // Normal Mode
                 quote! {
-                    let _ = |___t___:#table_ty|{
-                        #(#checks)*
-                    };
+                    {
+                        let _ = |___t___:#table_ty|{
+                            #(#checks)*
+                        };
+                        (
+                            vec![#(#set_updates,)*],
+                            |__easy_sql_builder: &mut #sql_crate::QueryBuilder<#driver>|{
+                                // Safety: References to Variables created inside of the closure can't escape
+                                // which is the only potentially unsafe situation here.
+                                unsafe{
+                                    #(
+                                        #binds
+                                    )*
+                                }
+                                Ok(())
+                            }
+                        )
+                    }
                 }
             } else {
-                quote! {}
-            };
-
-            quote! {
-                {
-                    #checks_tokens
-                    #sql_crate::UpdateSetClause {
-                        updates: vec![#(#set_updates,)*]
-                    }
+                // Debug info Mode
+                quote! {
+                    vec![#(#set_updates,)*]
                 }
             }
         }
@@ -260,33 +291,52 @@ pub fn sql(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::TokenStr
             if input.only_where() {
                 let where_ = input.where_.unwrap().into_tokens_with_checks(
                     &mut checks,
+                    &mut binds,
                     &sql_crate,
                     true,
                     &driver,
                 );
 
-                let checks_tokens = if let Some(table_ty) = input_table {
+                if let Some(table_ty) = input_table {
+                    // Normal Mode
                     quote! {
-                        |___t___:#table_ty|{
-                            #(#checks)*
-                        },
+                        {
+                            let _ = |___t___:#table_ty|{
+                                #(#checks)*
+                            };
+                            |__easy_sql_builder: &mut #sql_crate::QueryBuilder<#driver>|{
+                                // Safety: References to Variables created inside of the closure can't escape
+                                // which is the only potentially unsafe situation here.
+                                unsafe{
+                                    #(
+                                        #binds
+                                    )*
+                                }
+                                Ok(#sql_crate::WhereClause{
+                                    conditions: #where_
+                                })
+                            }
+                        }
                     }
                 } else {
-                    quote! {}
-                };
-
-                quote! {
-                    Some((#checks_tokens
-                    #sql_crate::WhereClause{
-                        conditions: #where_
-                    }))
+                    // Debug info Mode
+                    quote! {
+                        #sql_crate::WhereClause{
+                            conditions: #where_
+                        }
+                    }
                 }
             } else {
                 let where_ = input
                     .where_
                     .map(|w| {
-                        let tokens =
-                            w.into_tokens_with_checks(&mut checks, &sql_crate, true, &driver);
+                        let tokens = w.into_tokens_with_checks(
+                            &mut checks,
+                            &mut binds,
+                            &sql_crate,
+                            true,
+                            &driver,
+                        );
 
                         quote! {Some(#sql_crate::WhereClause{
                             conditions:#tokens
@@ -308,8 +358,13 @@ pub fn sql(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::TokenStr
                 let having = input
                     .having
                     .map(|h| {
-                        let tokens =
-                            h.into_tokens_with_checks(&mut checks, &sql_crate, true, &driver);
+                        let tokens = h.into_tokens_with_checks(
+                            &mut checks,
+                            &mut binds,
+                            &sql_crate,
+                            true,
+                            &driver,
+                        );
 
                         quote! {Some(#sql_crate::HavingClause{conditions: #tokens})}
                     })
@@ -336,27 +391,46 @@ pub fn sql(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::TokenStr
 
                 let distinct = input.distinct;
 
-                let checks_tokens = if let Some(table_ty) = input_table {
+                if let Some(table_ty) = input_table {
+                    // Normal Mode
                     quote! {
-                        |___t___:#table_ty|{
-                            #(#checks)*
-                        },
+                        {
+                            let _ = |___t___:#table_ty|{
+                                #(#checks)*
+                            };
+                            |__easy_sql_builder: &mut #sql_crate::QueryBuilder<#driver>|{
+                                // Safety: References to Variables created inside of the closure can't escape
+                                // which is the only potentially unsafe situation here.
+                                unsafe{
+                                    #(
+                                        #binds
+                                    )*
+                                }
+                                Ok(#sql_crate::SelectClauses {
+                                    distinct: #distinct,
+
+                                    where_: #where_,
+                                    group_by: #group_by,
+                                    having: #having,
+                                    order_by: #order_by,
+                                    limit: #limit,
+                                })
+                            }
+                        }
                     }
                 } else {
-                    quote! {}
-                };
+                    // Debug info Mode
+                    quote! {
+                        #sql_crate::SelectClauses {
+                            distinct: #distinct,
 
-                quote! {
-                    Some((#checks_tokens
-                    #sql_crate::SelectClauses::<#driver> {
-                        distinct: #distinct,
-
-                        where_: #where_,
-                        group_by: #group_by,
-                        having: #having,
-                        order_by: #order_by,
-                        limit: #limit,
-                    }))
+                            where_: #where_,
+                            group_by: #group_by,
+                            having: #having,
+                            order_by: #order_by,
+                            limit: #limit,
+                        }
+                    }
                 }
             }
         }

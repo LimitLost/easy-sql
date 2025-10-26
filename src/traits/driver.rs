@@ -6,17 +6,20 @@ use sqlx::Encode;
 
 use crate::{EasyExecutor, TableField};
 
-pub type DriverRow<D: Driver> = <D::InternalDriver as sqlx::database::Database>::Row;
+pub type DriverRow<D> = <<D as Driver>::InternalDriver as sqlx::database::Database>::Row;
 
-pub type DriverConnection<D: Driver> = <D::InternalDriver as sqlx::database::Database>::Connection;
-pub type DriverArguments<'a, D: Driver> =
-    <D::InternalDriver as sqlx::database::Database>::Arguments<'a>;
-pub type InternalDriver<DI> = <DI as Driver>::InternalDriver;
+pub type DriverConnection<D> =
+    <<D as Driver>::InternalDriver as sqlx::database::Database>::Connection;
+pub type DriverArguments<'a, D> =
+    <<D as Driver>::InternalDriver as sqlx::database::Database>::Arguments<'a>;
+pub type InternalDriver<D> = <D as Driver>::InternalDriver;
+pub type DriverQueryResult<D> =
+    <<D as Driver>::InternalDriver as sqlx::database::Database>::QueryResult;
+pub type DriverTypeInfo<D> = <<D as Driver>::InternalDriver as sqlx::database::Database>::TypeInfo;
 
 #[always_context]
 pub trait Driver: Debug + Send + Sync + Sized {
     type InternalDriver: sqlx::Database;
-    type Value<'a>: DriverValue<'a, Self::InternalDriver>;
 
     fn identifier_delimiter() -> &'static str;
 
@@ -31,15 +34,13 @@ pub trait Driver: Debug + Send + Sync + Sized {
     /// `foreign_keys` - Key - table name
     ///
     /// `foreign_keys` - Value - field names, foreign field names, on delete/update cascade
-    async fn create_table<'a>(
+    async fn create_table(
         conn: &mut (impl EasyExecutor<Self> + Send + Sync),
         table_name: &'static str,
-        fields: Vec<TableField<'a, Self>>,
+        fields: Vec<TableField>,
         primary_keys: Vec<&'static str>,
         foreign_keys: HashMap<&'static str, (Vec<&'static str>, Vec<&'static str>, bool)>,
     ) -> anyhow::Result<()>;
-
-    fn binary_value(bytes: Vec<u8>) -> Self::Value<'static>;
 }
 
 #[always_context]

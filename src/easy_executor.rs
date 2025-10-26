@@ -3,8 +3,8 @@ use std::{fmt::Debug, ops::DerefMut};
 use easy_macros::macros::always_context;
 
 use crate::{
-    Driver, DriverArguments, DriverConnection, DriverRow, SqlOutput, SqlTable, ToConvert,
-    sql_query::Sql,
+    Driver, DriverArguments, DriverConnection, DriverRow, QueryBuilder, SqlOutput, SqlTable,
+    ToConvert, sql_query::Sql,
 };
 
 pub struct Break;
@@ -12,14 +12,20 @@ pub struct Break;
 #[always_context]
 pub trait EasyExecutor<D: Driver>: Debug {
     // async fn query(&mut self, sql: &Sql) -> anyhow::Result<()>;
-    async fn query<Y: ToConvert<D> + Send + Sync, T: SqlTable<D>, O: SqlOutput<T, D, Y>>(
+    async fn query<
+        Y: ToConvert<D> + Send + Sync + 'static,
+        T: SqlTable<D>,
+        O: SqlOutput<T, D, DataToConvert = Y>,
+    >(
         &mut self,
-        sql: &Sql<'_, D>,
+        sql: Sql,
+        builder: QueryBuilder<'_, D>,
     ) -> anyhow::Result<O>
     where
         DriverConnection<D>: Send + Sync,
         for<'b> &'b mut DriverConnection<D>:
-            sqlx::Executor<'b, Database = D::InternalDriver> + Send + Sync;
+            sqlx::Executor<'b, Database = D::InternalDriver> + Send + Sync,
+        for<'b> DriverArguments<'b, D>: Debug;
 
     async fn query_setup<O: SetupSql<D> + Send + Sync>(
         &mut self,
@@ -38,16 +44,17 @@ pub trait EasyExecutor<D: Driver>: Debug {
     /// //Inside of closure
     /// handle.block_on(async { ... } )
     /// ```
-    async fn fetch_lazy<T, O: SqlOutput<T, D, DriverRow<D>>>(
+    async fn fetch_lazy<T, O: SqlOutput<T, D, DataToConvert = DriverRow<D>>>(
         &mut self,
-        sql: &Sql<'_, D>,
+        sql: Sql,
+        builder: QueryBuilder<'_, D>,
         perform: impl FnMut(O) -> anyhow::Result<Option<Break>> + Send + Sync,
     ) -> anyhow::Result<()>
     where
-        DriverRow<D>: ToConvert<D>,
+        DriverRow<D>: ToConvert<D> + 'static,
         for<'b> &'b mut DriverConnection<D>:
             sqlx::Executor<'b, Database = D::InternalDriver> + Send + Sync,
-        for<'b> DriverArguments<'b, D>: sqlx::IntoArguments<'b, D::InternalDriver>;
+        for<'b> DriverArguments<'b, D>: sqlx::IntoArguments<'b, D::InternalDriver> + Debug;
 }
 
 #[always_context]

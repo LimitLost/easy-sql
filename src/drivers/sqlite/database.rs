@@ -78,13 +78,6 @@ impl<DI: DatabaseInternal<Driver = Sqlite> + Send + Sync> Database<DI> {
         })
     }
 
-    pub async fn maybe_exit(&self) -> anyhow::Result<()> {
-        let mut internal = self.internal.lock().await;
-        internal.maybe_exit().await?;
-
-        Ok(())
-    }
-
     pub async fn conn(&self) -> anyhow::Result<Connection<Sqlite, DI>> {
         let conn = self.connection_pool.acquire().await?;
         Ok(Connection::new(conn, self.internal.clone()))

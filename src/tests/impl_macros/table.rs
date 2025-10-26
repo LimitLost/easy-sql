@@ -1,14 +1,15 @@
 use easy_macros::macros::always_context;
 
+#[allow(dead_code)]
 struct DatabaseSetupTest {
     t: ExampleTable,
 }
 
 use super::TestDriver;
-use crate::{self as sql_crate, Driver, EasySqlTables_create};
-use easy_macros as easy_lib_crate;
+use crate::{self as sql_crate, Driver, EasySqlTables_create, InternalDriver, QueryBuilder};
 use easy_macros::helpers as easy_macros_helpers_crate;
 
+#[allow(dead_code)]
 struct ExampleReferencedTable {
     id: i64,
 }
@@ -23,11 +24,12 @@ impl sql_crate::SqlTable<TestDriver> for ExampleReferencedTable {
         vec!["id"]
     }
 
-    fn table_joins() -> Vec<sql_crate::TableJoin<'static, TestDriver>> {
+    fn table_joins(_builder: &mut QueryBuilder<'_, TestDriver>) -> Vec<sql_crate::TableJoin> {
         vec![]
     }
 }
 
+#[allow(dead_code)]
 struct ExampleTable {
     id: i64,
     field0: String,
@@ -47,7 +49,7 @@ impl sql_crate::SqlTable<TestDriver> for ExampleTable {
         vec!["id"]
     }
 
-    fn table_joins() -> Vec<sql_crate::TableJoin<'static, TestDriver>> {
+    fn table_joins(_builder: &mut QueryBuilder<'_, TestDriver>) -> Vec<sql_crate::TableJoin> {
         vec![]
     }
 }
@@ -74,9 +76,13 @@ impl sql_crate::DatabaseSetup<TestDriver> for ExampleTable {
             <TestDriver as Driver>::create_table(
                 conn,
                 "example_table2",
-                vec![sql_crate::TableField::<TestDriver> {
+                vec![sql_crate::TableField {
                     name: "id",
-                    data_type: sql_crate::SqlType::I64,
+                    data_type: {
+                    use crate::macro_support::TypeInfo;
+
+                    <i64 as crate::macro_support::Type<InternalDriver<TestDriver>>>::type_info().name().to_string()
+                },
                     is_unique: false,
                     is_not_null: false,
                     default: None,

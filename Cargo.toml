@@ -8,12 +8,12 @@ license = "Apache-2.0"
 sqlx = {version = "0.8", features = [
   "runtime-tokio",
   "uuid",
-  "sqlite",
-  "postgres",
   "bigdecimal",
   "rust_decimal",
   "chrono",
 ], optional = true}
+pg_escape = {version = "0.1.1", optional = true}
+
 uuid = {version = "*", features = ["serde"], optional = true}
 # Add serde impl to bigdecimal
 bigdecimal = {version = "*", features = ["serde-json"], optional = true}
@@ -69,7 +69,7 @@ not_build = [
 "dep:tokio",
 "dep:sql-compilation-data",
 "dep:sql-macros"]
-postgres = ["sqlx/postgres","not_build"]
+postgres = ["sqlx/postgres","dep:pg_escape","not_build"]
 sqlite = ["sqlx/sqlite","not_build"]
 build = ["dep:sql-build"]
 ipnet =["sqlx/ipnet"]

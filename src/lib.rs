@@ -25,10 +25,6 @@ pub use {
 #[cfg(feature = "not_build")]
 use {easy_macros::macros::always_context, serde::de::DeserializeOwned};
 
-#[cfg(test)]
-#[cfg(feature = "not_build")]
-use lazy_static::lazy_static;
-
 //Used by SqlTable derive macro (default attribute)
 // pub use lazy_static::lazy_static;
 
@@ -65,7 +61,10 @@ pub fn to_binary<T: serde::Serialize>(value: T) -> anyhow::Result<Vec<u8>> {
 
     Ok(result)
 }
-
+#[cfg(feature = "not_build")]
 pub mod macro_support {
+    pub use anyhow::{Context, Result};
     pub use easy_macros::helpers::context;
+    pub use lazy_static::lazy_static;
+    pub use sqlx::{Arguments, Type, TypeInfo};
 }

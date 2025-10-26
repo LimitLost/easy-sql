@@ -4,41 +4,31 @@ use serde::{Deserialize, Serialize};
 use crate::{Driver, SqlExpr};
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct WhereClause<'a, D: Driver> {
-    pub conditions: SqlExpr<'a, D>,
+pub struct WhereClause {
+    pub conditions: SqlExpr,
 }
 
 #[always_context]
-impl<'a, D: Driver> WhereClause<'a, D> {
-    pub fn to_query_data(
-        &'a self,
-        current_binding_n: &mut usize,
-        bindings_list: &mut Vec<&'a D::Value<'a>>,
-    ) -> String {
+impl WhereClause {
+    pub fn to_query_data<D: Driver>(&self, current_binding_n: &mut usize) -> String {
         format!(
             "WHERE {}",
-            self.conditions
-                .to_query_data(current_binding_n, bindings_list)
+            self.conditions.to_query_data::<D>(current_binding_n)
         )
     }
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct HavingClause<'a, D: Driver> {
-    pub conditions: SqlExpr<'a, D>,
+pub struct HavingClause {
+    pub conditions: SqlExpr,
 }
 
 #[always_context]
-impl<'a, D: Driver> HavingClause<'a, D> {
-    pub fn to_query_data(
-        &'a self,
-        current_binding_n: &mut usize,
-        bindings_list: &mut Vec<&'a D::Value<'a>>,
-    ) -> String {
+impl HavingClause {
+    pub fn to_query_data<D: Driver>(&self, current_binding_n: &mut usize) -> String {
         format!(
             "HAVING {}",
-            self.conditions
-                .to_query_data(current_binding_n, bindings_list)
+            self.conditions.to_query_data::<D>(current_binding_n)
         )
     }
 }

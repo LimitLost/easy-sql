@@ -10,7 +10,7 @@ use sql_macros::sql_convenience;
 
 #[derive(SqlTable)]
 #[sql(version = 1)]
-#[sql(unique_id = "21d36640-7002-49d4-b373-3a2d17c61ff1")]
+#[sql(unique_id = "7b526dc4-30d4-4a67-8756-945a2f9c0004")]
 struct ExampleTableIncrement {
     #[sql(primary_key)]
     #[sql(auto_increment)]

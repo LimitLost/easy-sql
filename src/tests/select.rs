@@ -10,9 +10,10 @@ use sql_macros::sql_convenience;
 
 #[derive(SqlTable, Debug)]
 #[sql(version = 1)]
-#[sql(unique_id = "c7d875fd-132a-410a-a361-784460cdb187")]
+#[sql(unique_id = "eee30e8b-ba04-4308-900c-066032ba5671")]
 struct ExampleTableSelect {
     #[sql(primary_key)]
+    #[sql(auto_increment)]
     id: i32,
     field: i64,
     field_str: String,

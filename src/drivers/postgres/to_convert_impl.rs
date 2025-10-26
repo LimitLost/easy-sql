@@ -6,16 +6,17 @@ use sqlx::{Executor, Row as SqlxRow};
 type CDriver = super::Postgres;
 
 use crate::{
-    DriverArguments, InternalDriver, QueryData, Sql, SqlOutput, ToConvert, ToConvertSingle,
+    DriverArguments, InternalDriver, QueryBuilder, QueryData, Sql, SqlOutput, ToConvert,
+    ToConvertSingle,
 };
 
 type Row = sqlx::postgres::PgRow;
 
 #[always_context]
 impl ToConvert<CDriver> for Row {
-    async fn get<'a, 'b>(
+    async fn get<'a>(
         exec: impl Executor<'a, Database = InternalDriver<CDriver>>,
-        query: sqlx::query::Query<'b, InternalDriver<CDriver>, DriverArguments<'b, CDriver>>,
+        query: sqlx::query::Query<'a, InternalDriver<CDriver>, DriverArguments<'a, CDriver>>,
     ) -> anyhow::Result<Self>
     where
         Self: Sized,
@@ -76,13 +77,22 @@ impl ToConvert<CDriver> for Vec<Row> {
 }
 
 #[always_context]
-impl<T, Table> SqlOutput<Table, CDriver, Vec<Row>> for Vec<T>
+impl<T, Table> SqlOutput<Table, CDriver> for Vec<T>
 where
-    T: SqlOutput<Table, CDriver, Row>,
+    T: SqlOutput<Table, CDriver, DataToConvert = Row>,
 {
-    fn sql_to_query<'a>(sql: &'a Sql<'a, CDriver>) -> anyhow::Result<QueryData<'a, CDriver>> {
-        T::sql_to_query(sql)
+    type DataToConvert = Vec<Row>;
+    fn sql_to_query<'a>(
+        sql: Sql,
+        builder: QueryBuilder<'a, CDriver>,
+    ) -> anyhow::Result<QueryData<'a, CDriver>> {
+        T::sql_to_query(sql, builder)
     }
+
+    fn select_sqlx(current_query: &mut String) {
+        T::select_sqlx(current_query);
+    }
+
     fn convert(data: Vec<Row>) -> anyhow::Result<Self> {
         let mut result = Vec::new();
         for r in data.into_iter() {
@@ -94,13 +104,22 @@ where
 }
 
 #[always_context]
-impl<T, Table> SqlOutput<Table, CDriver, Option<Row>> for Option<T>
+impl<T, Table> SqlOutput<Table, CDriver> for Option<T>
 where
-    T: SqlOutput<Table, CDriver, Row>,
+    T: SqlOutput<Table, CDriver, DataToConvert = Row>,
 {
-    fn sql_to_query<'a>(sql: &'a Sql<'a, CDriver>) -> anyhow::Result<QueryData<'a, CDriver>> {
-        T::sql_to_query(sql)
+    type DataToConvert = Option<Row>;
+    fn sql_to_query<'a>(
+        sql: Sql,
+        builder: QueryBuilder<'a, CDriver>,
+    ) -> anyhow::Result<QueryData<'a, CDriver>> {
+        T::sql_to_query(sql, builder)
     }
+
+    fn select_sqlx(current_query: &mut String) {
+        T::select_sqlx(current_query);
+    }
+
     fn convert(data: Option<Row>) -> anyhow::Result<Self> {
         Ok(if let Some(data) = data {
             #[no_context_inputs]
@@ -112,20 +131,40 @@ where
 }
 
 #[always_context]
-impl<Table> SqlOutput<Table, CDriver, ()> for () {
-    fn sql_to_query<'a>(sql: &'a Sql<'a, CDriver>) -> anyhow::Result<QueryData<'a, CDriver>> {
-        sql.query()
+impl<Table> SqlOutput<Table, CDriver> for () {
+    type DataToConvert = ();
+    fn sql_to_query<'a>(
+        sql: Sql,
+        builder: QueryBuilder<'a, CDriver>,
+    ) -> anyhow::Result<QueryData<'a, CDriver>> {
+        sql.query(builder)
     }
+
+    fn select_sqlx(current_query: &mut String) {
+        current_query.push('1');
+    }
+
     fn convert(_data: ()) -> anyhow::Result<Self> {
         Ok(())
     }
 }
 
 #[always_context]
-impl<Table> SqlOutput<Table, CDriver, Row> for bool {
-    fn sql_to_query<'a>(sql: &'a Sql<'a, CDriver>) -> anyhow::Result<QueryData<'a, CDriver>> {
-        sql.query()
+impl<Table> SqlOutput<Table, CDriver> for bool {
+    type DataToConvert = Row;
+    fn sql_to_query<'a>(
+        sql: Sql,
+        builder: QueryBuilder<'a, CDriver>,
+    ) -> anyhow::Result<QueryData<'a, CDriver>> {
+        sql.query(builder)
     }
+
+    fn select_sqlx(_current_query: &mut String) {
+        panic!(
+            "Usage of `bool` type as output of sql_full! macro should be dissallowed by the macro itself. Are you using type to circumvent security checks? ;) If not please report this bug to easy-sql repository."
+        );
+    }
+
     fn convert(data: Row) -> anyhow::Result<Self> {
         Ok(data.get(0))
     }

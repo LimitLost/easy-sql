@@ -8,6 +8,5 @@ use crate::{Driver, Sql};
 pub trait DatabaseInternal: Debug {
     type Driver: Driver;
 
-    async fn sql_request(&mut self, sql: &Sql<'_, Self::Driver>) -> anyhow::Result<()>;
-    async fn maybe_exit(&mut self) -> anyhow::Result<()>;
+    async fn sql_request(&mut self, sql: &Sql) -> anyhow::Result<()>;
 }
