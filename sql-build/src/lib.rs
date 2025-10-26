@@ -107,7 +107,7 @@ fn struct_table_handle(
                 .to_string()
                 .replace(|c: char| c.is_whitespace(), "");
             match path_str.as_str() {
-                "SqlTable" | "easy_lib::sql::SqlTable" => {
+                "SqlTable" | "easy_sql::SqlTable" | "SqlTableDebug" | "easy_sql::SqlTableDebug" => {
                     is_sql_table = true;
                 }
                 _ => {}
