@@ -1,11 +1,11 @@
 use easy_macros::macros::always_context;
 use serde::{Deserialize, Serialize};
 
-use crate::{Driver, SqlExpr};
+use crate::{Driver, Expr};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct WhereClause {
-    pub conditions: SqlExpr,
+    pub conditions: Expr,
 }
 
 #[always_context]
@@ -20,7 +20,7 @@ impl WhereClause {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct HavingClause {
-    pub conditions: SqlExpr,
+    pub conditions: Expr,
 }
 
 #[always_context]

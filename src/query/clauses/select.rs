@@ -1,6 +1,6 @@
 use crate::Driver;
 
-use super::{GroupByClause, HavingClause, LimitClause, OrderByClause, SqlExpr, WhereClause};
+use super::{Expr, GroupByClause, HavingClause, LimitClause, OrderByClause, WhereClause};
 use easy_macros::macros::always_context;
 use serde::{Deserialize, Serialize};
 
@@ -17,7 +17,7 @@ pub struct TableJoin {
     pub table: &'static str,
     pub join_type: JoinType,
     pub alias: Option<String>,
-    pub on: Option<SqlExpr>,
+    pub on: Option<Expr>,
 }
 
 #[always_context]

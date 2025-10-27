@@ -2,7 +2,7 @@ use std::fmt::{Debug, Display};
 
 use easy_macros::macros::always_context;
 
-use crate::{Driver, DriverArguments, QueryBuilder, SqlExpr};
+use crate::{Driver, DriverArguments, QueryBuilder, Expr};
 
 use super::{QueryData, RequestedColumn, SelectClauses, TableJoin, WhereClause};
 
@@ -39,7 +39,7 @@ pub enum Sql {
     },
     Update {
         table: &'static str,
-        set: Vec<(String, SqlExpr)>,
+        set: Vec<(String, Expr)>,
         where_: WhereClause,
         //We don't allow for order by and limit since they are not in Postgres (only Sqlite)
     },
@@ -103,7 +103,7 @@ where
 #[always_context]
 fn update_query<'a, D: Driver>(
     table: &'static str,
-    set: Vec<(String, SqlExpr)>,
+    set: Vec<(String, Expr)>,
     where_: WhereClause,
     returning: Option<Vec<RequestedColumn>>,
     builder: QueryBuilder<'a, D>,

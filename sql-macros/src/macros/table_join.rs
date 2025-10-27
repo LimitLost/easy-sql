@@ -7,7 +7,7 @@ use syn::Path;
 use syn::punctuated::Punctuated;
 use syn::{self, parse::Parse};
 
-use crate::macros_components::expr::SqlExpr;
+use crate::macros_components::expr::Expr;
 use crate::sql_crate;
 
 use crate::macros_components::keyword;
@@ -19,9 +19,9 @@ struct Input {
     joins: Vec<Join>,
 }
 enum Join {
-    Inner { table: syn::Path, on: SqlExpr },
-    Left { table: syn::Path, on: SqlExpr },
-    Right { table: syn::Path, on: SqlExpr },
+    Inner { table: syn::Path, on: Expr },
+    Left { table: syn::Path, on: Expr },
+    Right { table: syn::Path, on: Expr },
     Cross { table: syn::Path },
 }
 
@@ -37,7 +37,7 @@ impl Parse for Join {
 
             input.parse::<keyword::on>()?;
 
-            let on = input.parse::<SqlExpr>()?;
+            let on = input.parse::<Expr>()?;
             Ok(Join::Inner { table, on })
         } else if lookahead.peek(keyword::left) {
             input.parse::<keyword::left>()?;
@@ -47,7 +47,7 @@ impl Parse for Join {
 
             input.parse::<keyword::on>()?;
 
-            let on = input.parse::<SqlExpr>()?;
+            let on = input.parse::<Expr>()?;
             Ok(Join::Left { table, on })
         } else if lookahead.peek(keyword::right) {
             input.parse::<keyword::right>()?;
@@ -57,7 +57,7 @@ impl Parse for Join {
 
             input.parse::<keyword::on>()?;
 
-            let on = input.parse::<SqlExpr>()?;
+            let on = input.parse::<Expr>()?;
             Ok(Join::Right { table, on })
         } else if lookahead.peek(keyword::cross) {
             input.parse::<keyword::cross>()?;

@@ -1,7 +1,7 @@
 use easy_macros::macros::always_context;
 
 use super::{DatabaseInternalDefault, TestDriver};
-use crate::{Connection, QueryBuilder, SqlExpr, Table, TableJoin, never::never_any};
+use crate::{Connection, Expr, QueryBuilder, Table, TableJoin, never::never_any};
 
 #[allow(dead_code)]
 struct ExampleTable {
@@ -63,9 +63,9 @@ async fn _test() -> anyhow::Result<()> {
                 b.bind(&should_fail)?;
             }
             Ok(WhereClause {
-                conditions: SqlExpr::Eq(
-                    Box::new(SqlExpr::Column("id".to_string())),
-                    Box::new(SqlExpr::Value),
+                conditions: Expr::Eq(
+                    Box::new(Expr::Column("id".to_string())),
+                    Box::new(Expr::Value),
                 ),
             })
         },

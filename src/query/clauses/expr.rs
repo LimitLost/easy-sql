@@ -34,76 +34,76 @@ pub enum Operator {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub enum SqlExpr {
+pub enum Expr {
     Error,
     Column(String),
     ColumnFromTable { table: String, column: String },
     Value,
-    Eq(Box<SqlExpr>, Box<SqlExpr>),
-    NotEq(Box<SqlExpr>, Box<SqlExpr>),
-    Gt(Box<SqlExpr>, Box<SqlExpr>),
-    GtEq(Box<SqlExpr>, Box<SqlExpr>),
-    Lt(Box<SqlExpr>, Box<SqlExpr>),
-    LtEq(Box<SqlExpr>, Box<SqlExpr>),
-    Like(Box<SqlExpr>, Box<SqlExpr>),
-    In(Box<SqlExpr>, Vec<SqlExpr>),
-    Between(Box<SqlExpr>, Box<SqlExpr>, Box<SqlExpr>),
-    IsNull(Box<SqlExpr>),
-    IsNotNull(Box<SqlExpr>),
-    OperatorChain(Box<SqlExpr>, Vec<(Operator, SqlExpr)>),
-    Not(Box<SqlExpr>),
-    Parenthesized(Box<SqlExpr>),
+    Eq(Box<Expr>, Box<Expr>),
+    NotEq(Box<Expr>, Box<Expr>),
+    Gt(Box<Expr>, Box<Expr>),
+    GtEq(Box<Expr>, Box<Expr>),
+    Lt(Box<Expr>, Box<Expr>),
+    LtEq(Box<Expr>, Box<Expr>),
+    Like(Box<Expr>, Box<Expr>),
+    In(Box<Expr>, Vec<Expr>),
+    Between(Box<Expr>, Box<Expr>, Box<Expr>),
+    IsNull(Box<Expr>),
+    IsNotNull(Box<Expr>),
+    OperatorChain(Box<Expr>, Vec<(Operator, Expr)>),
+    Not(Box<Expr>),
+    Parenthesized(Box<Expr>),
 }
 
 #[always_context]
-impl SqlExpr {
+impl Expr {
     pub fn to_query_data<D: Driver>(&self, current_binding_n: &mut usize) -> String {
         match self {
-            SqlExpr::Column(s) => {
+            Expr::Column(s) => {
                 let delimeter = D::identifier_delimiter();
                 format!("{delimeter}{s}{delimeter}")
             }
-            SqlExpr::Value => {
+            Expr::Value => {
                 let current_value_n = *current_binding_n;
                 *current_binding_n += 1;
                 D::parameter_placeholder(current_value_n)
             }
-            SqlExpr::Eq(where_expr, where_expr1) => {
+            Expr::Eq(where_expr, where_expr1) => {
                 let left = where_expr.to_query_data::<D>(current_binding_n);
                 let right = where_expr1.to_query_data::<D>(current_binding_n);
                 format!("({} = {})", left, right)
             }
-            SqlExpr::NotEq(where_expr, where_expr1) => {
+            Expr::NotEq(where_expr, where_expr1) => {
                 let left = where_expr.to_query_data::<D>(current_binding_n);
                 let right = where_expr1.to_query_data::<D>(current_binding_n);
                 format!("({} != {})", left, right)
             }
-            SqlExpr::Gt(where_expr, where_expr1) => {
+            Expr::Gt(where_expr, where_expr1) => {
                 let left = where_expr.to_query_data::<D>(current_binding_n);
                 let right = where_expr1.to_query_data::<D>(current_binding_n);
                 format!("({} > {})", left, right)
             }
-            SqlExpr::GtEq(where_expr, where_expr1) => {
+            Expr::GtEq(where_expr, where_expr1) => {
                 let left = where_expr.to_query_data::<D>(current_binding_n);
                 let right = where_expr1.to_query_data::<D>(current_binding_n);
                 format!("({} >= {})", left, right)
             }
-            SqlExpr::Lt(where_expr, where_expr1) => {
+            Expr::Lt(where_expr, where_expr1) => {
                 let left = where_expr.to_query_data::<D>(current_binding_n);
                 let right = where_expr1.to_query_data::<D>(current_binding_n);
                 format!("({} < {})", left, right)
             }
-            SqlExpr::LtEq(where_expr, where_expr1) => {
+            Expr::LtEq(where_expr, where_expr1) => {
                 let left = where_expr.to_query_data::<D>(current_binding_n);
                 let right = where_expr1.to_query_data::<D>(current_binding_n);
                 format!("({} <= {})", left, right)
             }
-            SqlExpr::Like(where_expr, where_expr1) => {
+            Expr::Like(where_expr, where_expr1) => {
                 let left = where_expr.to_query_data::<D>(current_binding_n);
                 let right = where_expr1.to_query_data::<D>(current_binding_n);
                 format!("({} LIKE {})", left, right)
             }
-            SqlExpr::In(where_expr, where_expr1) => {
+            Expr::In(where_expr, where_expr1) => {
                 let left = where_expr.to_query_data::<D>(current_binding_n);
                 let right = where_expr1
                     .iter()
@@ -112,21 +112,21 @@ impl SqlExpr {
                     .join(", ");
                 format!("({} IN ({}))", left, right)
             }
-            SqlExpr::Between(where_expr, where_expr1, where_expr2) => {
+            Expr::Between(where_expr, where_expr1, where_expr2) => {
                 let left = where_expr.to_query_data::<D>(current_binding_n);
                 let middle = where_expr1.to_query_data::<D>(current_binding_n);
                 let right = where_expr2.to_query_data::<D>(current_binding_n);
                 format!("({} BETWEEN {} AND {})", left, middle, right)
             }
-            SqlExpr::IsNull(where_expr) => {
+            Expr::IsNull(where_expr) => {
                 let left = where_expr.to_query_data::<D>(current_binding_n);
                 format!("({} IS NULL)", left)
             }
-            SqlExpr::IsNotNull(where_expr) => {
+            Expr::IsNotNull(where_expr) => {
                 let left = where_expr.to_query_data::<D>(current_binding_n);
                 format!("({} IS NOT NULL)", left)
             }
-            SqlExpr::OperatorChain(first_expr, where_exprs) => {
+            Expr::OperatorChain(first_expr, where_exprs) => {
                 let mut formatted = String::new();
                 formatted.push('(');
 
@@ -155,20 +155,20 @@ impl SqlExpr {
 
                 formatted
             }
-            SqlExpr::Not(where_expr) => {
+            Expr::Not(where_expr) => {
                 let left = where_expr.to_query_data::<D>(current_binding_n);
                 format!("(NOT {})", left)
             }
-            SqlExpr::Parenthesized(where_expr) => {
+            Expr::Parenthesized(where_expr) => {
                 format!("({})", where_expr.to_query_data::<D>(current_binding_n))
             }
-            SqlExpr::ColumnFromTable { table, column } => {
+            Expr::ColumnFromTable { table, column } => {
                 let delimeter = D::identifier_delimiter();
 
                 format!("{delimeter}{table}{delimeter}.{delimeter}{column}{delimeter}")
             }
-            SqlExpr::Error => {
-                panic!("Error in SqlExpr")
+            Expr::Error => {
+                panic!("Error in Expr")
             }
         }
     }

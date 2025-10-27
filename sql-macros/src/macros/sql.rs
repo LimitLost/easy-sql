@@ -8,7 +8,7 @@ use sql_compilation_data::CompilationData;
 
 use crate::{
     macros_components::{
-        column::SqlColumn, expr::SqlExpr, keyword, limit::SqlLimit, order_by::OrderBy, set::SetExpr,
+        column::Column, expr::Expr, keyword, limit::Limit, order_by::OrderBy, set::SetExpr,
     },
     sql_crate,
 };
@@ -21,7 +21,7 @@ use super::WrappedInput;
 /// - SelectClauses: Full SELECT clauses with WHERE, ORDER BY, etc. (original sql! behavior)
 enum MacroMode {
     /// Just a SQL expression (e.g., `id = 5 AND name = "test"`)
-    Expression(SqlExpr),
+    Expression(Expr),
     /// SET clause for UPDATE statements (e.g., `field = value, name = "updated"`)
     SetClause(SetExpr),
     /// Full SELECT clauses (e.g., `WHERE id = 5 ORDER BY name LIMIT 10`)
@@ -30,11 +30,11 @@ enum MacroMode {
 
 struct SelectClauses {
     distinct: bool,
-    where_: Option<SqlExpr>,
+    where_: Option<Expr>,
     order_by: Option<Vec<OrderBy>>,
-    group_by: Option<Vec<SqlColumn>>,
-    having: Option<SqlExpr>,
-    limit: Option<SqlLimit>,
+    group_by: Option<Vec<Column>>,
+    having: Option<Expr>,
+    limit: Option<Limit>,
 }
 
 #[always_context]
@@ -118,7 +118,7 @@ impl Parse for MacroMode {
                     input.parse::<keyword::by>()?;
                     let mut group_by_list = Vec::new();
                     while !input.is_empty() {
-                        let group_by_item: SqlColumn = input.parse()?;
+                        let group_by_item: Column = input.parse()?;
                         group_by_list.push(group_by_item);
                         if input.peek(syn::Token![,]) {
                             input.parse::<syn::Token![,]>()?;

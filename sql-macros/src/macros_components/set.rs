@@ -1,9 +1,9 @@
 use ::syn::{self, parse::Parse};
 
-use super::expr::SqlExpr;
+use super::expr::Expr;
 
 pub struct SetExpr {
-    pub(crate) updates: Vec<(syn::Ident, SqlExpr)>,
+    pub(crate) updates: Vec<(syn::Ident, Expr)>,
 }
 
 impl Parse for SetExpr {
@@ -13,7 +13,7 @@ impl Parse for SetExpr {
         while !input.is_empty() {
             let ident: syn::Ident = input.parse()?;
             input.parse::<syn::Token![=]>()?;
-            let where_expr: SqlExpr = input.parse()?;
+            let where_expr: Expr = input.parse()?;
             if !input.is_empty() {
                 input.parse::<syn::Token![,]>()?;
             }

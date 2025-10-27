@@ -78,7 +78,7 @@ pub fn sql_update_base(
 
     Ok(quote! {
         impl<'a> #sql_crate::Update<'a,#table, #driver> for #item_name {
-            fn updates(self, builder: &mut #sql_crate::QueryBuilder<'_, #driver>) -> ::anyhow::Result<Vec<(String, #sql_crate::SqlExpr)>> {
+            fn updates(self, builder: &mut #sql_crate::QueryBuilder<'_, #driver>) -> ::anyhow::Result<Vec<(String, #sql_crate::Expr)>> {
                 use #sql_crate::macro_support::Context as _;
 
                 #sql_crate::never::never_fn(|| {
@@ -98,7 +98,7 @@ pub fn sql_update_base(
                 Ok(vec![
                     #((
                         #field_names_str.to_string(),
-                        #sql_crate::SqlExpr::Value,
+                        #sql_crate::Expr::Value,
                     ),)*
                 ])
             }
@@ -130,7 +130,7 @@ pub fn sql_update_base(
         }
 
         impl<'a> #sql_crate::Update<'a,#table, #driver> for &'a #item_name {
-            fn updates( self, builder: &mut #sql_crate::QueryBuilder<'_, #driver>) -> ::anyhow::Result<Vec<(String, #sql_crate::SqlExpr)>> {
+            fn updates( self, builder: &mut #sql_crate::QueryBuilder<'_, #driver>) -> ::anyhow::Result<Vec<(String, #sql_crate::Expr)>> {
                 use #sql_crate::macro_support::Context as _;
                 // Validity check needs to be done only once
                 // SAFETY: Fully safe because we pass by reference, and the reference lives until
@@ -143,7 +143,7 @@ pub fn sql_update_base(
                 Ok(vec![
                     #((
                         #field_names_str.to_string(),
-                        #sql_crate::SqlExpr::Value,
+                        #sql_crate::Expr::Value,
                     ),)*
                 ])
             }

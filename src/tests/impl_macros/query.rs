@@ -4,7 +4,7 @@ use anyhow::Context;
 use easy_macros::macros::always_context;
 
 use crate::{
-    Connection, Driver, DriverArguments, DriverRow, Insert, Output, QueryBuilder, SqlExpr, Table,
+    Connection, Driver, DriverArguments, DriverRow, Insert, Output, QueryBuilder, Expr, Table,
     TableJoin, Update, never::never_any,
 };
 
@@ -113,7 +113,7 @@ impl<'a> Update<'a, ExampleTable, TestDriver> for &'a ExampleTable {
     fn updates(
         self,
         builder: &mut QueryBuilder<'_, TestDriver>,
-    ) -> anyhow::Result<Vec<(String, SqlExpr)>> {
+    ) -> anyhow::Result<Vec<(String, Expr)>> {
         unsafe {
             builder.bind(&self.id)?;
             builder.bind(&self.field0)?;
@@ -123,12 +123,12 @@ impl<'a> Update<'a, ExampleTable, TestDriver> for &'a ExampleTable {
             builder.bind(&self.field4)?;
         }
         Ok(vec![
-            ("id".to_string(), crate::SqlExpr::Value),
-            ("field0".to_string(), crate::SqlExpr::Value),
-            ("field1".to_string(), crate::SqlExpr::Value),
-            ("field2".to_string(), crate::SqlExpr::Value),
-            ("field3".to_string(), crate::SqlExpr::Value),
-            ("field4".to_string(), crate::SqlExpr::Value),
+            ("id".to_string(), crate::Expr::Value),
+            ("field0".to_string(), crate::Expr::Value),
+            ("field1".to_string(), crate::Expr::Value),
+            ("field2".to_string(), crate::Expr::Value),
+            ("field3".to_string(), crate::Expr::Value),
+            ("field4".to_string(), crate::Expr::Value),
         ])
     }
 

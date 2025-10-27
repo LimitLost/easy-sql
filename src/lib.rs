@@ -7,7 +7,7 @@ mod easy_executor;
 #[cfg(feature = "not_build")]
 pub mod never;
 #[cfg(feature = "not_build")]
-mod sql_query;
+mod query;
 #[cfg(feature = "not_build")]
 mod traits;
 
@@ -18,8 +18,8 @@ pub use drivers::*;
 
 #[cfg(feature = "not_build")]
 pub use {
-    database_structs::*, easy_executor::*, sql_compilation_data::SqlType, sql_macros::*,
-    sql_query::*, sqlx::Row as SqlxRow, traits::*,
+    database_structs::*, easy_executor::*, query::*, sql_compilation_data::SqlType, sql_macros::*,
+    sqlx::Row as SqlxRow, traits::*,
 };
 
 #[cfg(feature = "not_build")]

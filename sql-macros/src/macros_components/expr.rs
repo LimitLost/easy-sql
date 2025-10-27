@@ -1,6 +1,6 @@
 use crate::macros_components::keyword::DoubleArrow;
 
-use super::{column::SqlColumn, next_clause::next_clause_token};
+use super::{column::Column, next_clause::next_clause_token};
 
 use super::keyword;
 use ::{
@@ -98,26 +98,26 @@ impl Parse for Operator {
 }
 
 #[derive(Debug, Clone)]
-pub enum SqlExpr {
-    Value(SqlValue),
-    Parenthesized(Box<SqlExpr>),
-    OperatorChain(Box<SqlExpr>, Vec<(Operator, SqlExpr)>),
-    Not(Box<SqlExpr>),
-    IsNull(SqlValue),
-    IsNotNull(SqlValue),
-    Equal(SqlValue, SqlValue),
-    NotEqual(SqlValue, SqlValue),
-    GreaterThan(SqlValue, SqlValue),
-    GreaterThanOrEqual(SqlValue, SqlValue),
-    LessThan(SqlValue, SqlValue),
-    LessThanOrEqual(SqlValue, SqlValue),
-    Like(SqlValue, SqlValue),
-    In(SqlValue, SqlValueIn),
-    Between(SqlValue, SqlValue, SqlValue),
+pub enum Expr {
+    Value(Value),
+    Parenthesized(Box<Expr>),
+    OperatorChain(Box<Expr>, Vec<(Operator, Expr)>),
+    Not(Box<Expr>),
+    IsNull(Value),
+    IsNotNull(Value),
+    Equal(Value, Value),
+    NotEqual(Value, Value),
+    GreaterThan(Value, Value),
+    GreaterThanOrEqual(Value, Value),
+    LessThan(Value, Value),
+    LessThanOrEqual(Value, Value),
+    Like(Value, Value),
+    In(Value, ValueIn),
+    Between(Value, Value, Value),
 }
 
 #[always_context]
-impl SqlExpr {
+impl Expr {
     pub fn into_tokens_with_checks(
         self,
         checks: &mut Vec<TokenStream>,
@@ -127,9 +127,9 @@ impl SqlExpr {
         driver: &TokenStream,
     ) -> proc_macro2::TokenStream {
         match self {
-            SqlExpr::Value(sql_value) => match sql_value {
-                SqlValue::Column(sql_column) => match sql_column {
-                    SqlColumn::SpecificTableColumn(path, ident) => {
+            Expr::Value(sql_value) => match sql_value {
+                Value::Column(sql_column) => match sql_column {
+                    Column::SpecificTableColumn(path, ident) => {
                         let bool_check = if perform_bool_check {
                             quote! {
                                 let _ = bool::from(table_instance.#ident);
@@ -149,13 +149,13 @@ impl SqlExpr {
 
                         let ident_str = ident.to_string();
                         quote_spanned! {ident.span()=>
-                            #sql_crate::SqlExpr::ColumnFromTable{
+                            #sql_crate::Expr::ColumnFromTable{
                                 table: <#path as #sql_crate::Table<#driver>>::table_name().to_owned(),
                                 column: #ident_str.to_string(),
                             }
                         }
                     }
-                    SqlColumn::Column(ident) => {
+                    Column::Column(ident) => {
                         if perform_bool_check {
                             checks.push(quote_spanned! {ident.span()=>
                                 {
@@ -166,11 +166,11 @@ impl SqlExpr {
                         let ident_str = ident.to_string();
 
                         quote_spanned! {ident.span()=>
-                            #sql_crate::SqlExpr::Column(#ident_str.to_string())
+                            #sql_crate::Expr::Column(#ident_str.to_string())
                         }
                     }
                 },
-                SqlValue::Lit(lit) => {
+                Value::Lit(lit) => {
                     if perform_bool_check {
                         match lit {
                             syn::Lit::Bool(lit_bool) => {
@@ -182,7 +182,7 @@ impl SqlExpr {
                                 });
 
                                 quote_spanned! {lit_bool.span()=>
-                                    #sql_crate::SqlExpr::Value
+                                    #sql_crate::Expr::Value
                                 }
                             }
                             l => {
@@ -196,7 +196,7 @@ impl SqlExpr {
                                     }
                                 });
                                 quote! {
-                                    #sql_crate::SqlExpr::Error
+                                    #sql_crate::Expr::Error
                                 }
                             }
                         }
@@ -206,11 +206,11 @@ impl SqlExpr {
                         });
 
                         quote_spanned! {lit.span()=>
-                            #sql_crate::SqlExpr::Value
+                            #sql_crate::Expr::Value
                         }
                     }
                 }
-                SqlValue::OutsideVariable(expr) => {
+                Value::OutsideVariable(expr) => {
                     if perform_bool_check {
                         checks.push(quote_spanned! {expr.span()=>
                             {
@@ -227,11 +227,11 @@ impl SqlExpr {
 
                     });
                     quote_spanned! {expr.span()=>
-                        #sql_crate::SqlExpr::Value
+                        #sql_crate::Expr::Value
                     }
                 }
             },
-            SqlExpr::Parenthesized(where_expr) => {
+            Expr::Parenthesized(where_expr) => {
                 let inside_parsed = where_expr.into_tokens_with_checks(
                     checks,
                     binds,
@@ -240,10 +240,10 @@ impl SqlExpr {
                     driver,
                 );
                 quote! {
-                    #sql_crate::SqlExpr::Parenthesized(Box::new(#inside_parsed))
+                    #sql_crate::Expr::Parenthesized(Box::new(#inside_parsed))
                 }
             }
-            SqlExpr::OperatorChain(where_expr, items) => {
+            Expr::OperatorChain(where_expr, items) => {
                 let first_bool_check = items
                     .iter()
                     .any(|(op, _)| matches!(op, Operator::And | Operator::Or));
@@ -301,85 +301,85 @@ impl SqlExpr {
                 }
 
                 quote! {
-                    #sql_crate::SqlExpr::OperatorChain(Box::new(#first_parsed), vec![#(#items_parsed),*])
+                    #sql_crate::Expr::OperatorChain(Box::new(#first_parsed), vec![#(#items_parsed),*])
                 }
             }
-            SqlExpr::Not(where_expr) => {
+            Expr::Not(where_expr) => {
                 let parsed =
                     where_expr.into_tokens_with_checks(checks, binds, sql_crate, true, driver);
                 quote! {
-                    #sql_crate::SqlExpr::Not(Box::new(#parsed))
+                    #sql_crate::Expr::Not(Box::new(#parsed))
                 }
             }
-            SqlExpr::IsNull(sql_value) => {
+            Expr::IsNull(sql_value) => {
                 let parsed = sql_value.into_tokens_with_checks(checks, binds, sql_crate, driver);
                 quote! {
-                    #sql_crate::SqlExpr::IsNull(Box::new(#parsed))
+                    #sql_crate::Expr::IsNull(Box::new(#parsed))
                 }
             }
-            SqlExpr::IsNotNull(sql_value) => {
+            Expr::IsNotNull(sql_value) => {
                 let parsed = sql_value.into_tokens_with_checks(checks, binds, sql_crate, driver);
                 quote! {
-                    #sql_crate::SqlExpr::IsNotNull(Box::new(#parsed))
+                    #sql_crate::Expr::IsNotNull(Box::new(#parsed))
                 }
             }
-            SqlExpr::Equal(sql_value, sql_value1) => {
-                let parsed = sql_value.into_tokens_with_checks(checks, binds, sql_crate, driver);
-                let parsed1 = sql_value1.into_tokens_with_checks(checks, binds, sql_crate, driver);
-                quote! {
-                    #sql_crate::SqlExpr::Eq(Box::new(#parsed), Box::new(#parsed1))
-                }
-            }
-            SqlExpr::NotEqual(sql_value, sql_value1) => {
+            Expr::Equal(sql_value, sql_value1) => {
                 let parsed = sql_value.into_tokens_with_checks(checks, binds, sql_crate, driver);
                 let parsed1 = sql_value1.into_tokens_with_checks(checks, binds, sql_crate, driver);
                 quote! {
-                    #sql_crate::SqlExpr::NotEq(Box::new(#parsed), Box::new(#parsed1))
+                    #sql_crate::Expr::Eq(Box::new(#parsed), Box::new(#parsed1))
                 }
             }
-            SqlExpr::GreaterThan(sql_value, sql_value1) => {
+            Expr::NotEqual(sql_value, sql_value1) => {
                 let parsed = sql_value.into_tokens_with_checks(checks, binds, sql_crate, driver);
                 let parsed1 = sql_value1.into_tokens_with_checks(checks, binds, sql_crate, driver);
                 quote! {
-                    #sql_crate::SqlExpr::Gt(Box::new(#parsed), Box::new(#parsed1))
+                    #sql_crate::Expr::NotEq(Box::new(#parsed), Box::new(#parsed1))
                 }
             }
-            SqlExpr::GreaterThanOrEqual(sql_value, sql_value1) => {
+            Expr::GreaterThan(sql_value, sql_value1) => {
                 let parsed = sql_value.into_tokens_with_checks(checks, binds, sql_crate, driver);
                 let parsed1 = sql_value1.into_tokens_with_checks(checks, binds, sql_crate, driver);
                 quote! {
-                    #sql_crate::SqlExpr::GtEq(Box::new(#parsed), Box::new(#parsed1))
+                    #sql_crate::Expr::Gt(Box::new(#parsed), Box::new(#parsed1))
                 }
             }
-            SqlExpr::LessThan(sql_value, sql_value1) => {
+            Expr::GreaterThanOrEqual(sql_value, sql_value1) => {
                 let parsed = sql_value.into_tokens_with_checks(checks, binds, sql_crate, driver);
                 let parsed1 = sql_value1.into_tokens_with_checks(checks, binds, sql_crate, driver);
                 quote! {
-                    #sql_crate::SqlExpr::Lt(Box::new(#parsed), Box::new(#parsed1))
+                    #sql_crate::Expr::GtEq(Box::new(#parsed), Box::new(#parsed1))
                 }
             }
-            SqlExpr::LessThanOrEqual(sql_value, sql_value1) => {
+            Expr::LessThan(sql_value, sql_value1) => {
                 let parsed = sql_value.into_tokens_with_checks(checks, binds, sql_crate, driver);
                 let parsed1 = sql_value1.into_tokens_with_checks(checks, binds, sql_crate, driver);
                 quote! {
-                    #sql_crate::SqlExpr::LtEq(Box::new(#parsed), Box::new(#parsed1))
+                    #sql_crate::Expr::Lt(Box::new(#parsed), Box::new(#parsed1))
                 }
             }
-            SqlExpr::Like(sql_value, sql_value1) => {
+            Expr::LessThanOrEqual(sql_value, sql_value1) => {
                 let parsed = sql_value.into_tokens_with_checks(checks, binds, sql_crate, driver);
                 let parsed1 = sql_value1.into_tokens_with_checks(checks, binds, sql_crate, driver);
                 quote! {
-                    #sql_crate::SqlExpr::Like(Box::new(#parsed), Box::new(#parsed1))
+                    #sql_crate::Expr::LtEq(Box::new(#parsed), Box::new(#parsed1))
                 }
             }
-            SqlExpr::In(sql_value, sql_value_in) => {
+            Expr::Like(sql_value, sql_value1) => {
+                let parsed = sql_value.into_tokens_with_checks(checks, binds, sql_crate, driver);
+                let parsed1 = sql_value1.into_tokens_with_checks(checks, binds, sql_crate, driver);
+                quote! {
+                    #sql_crate::Expr::Like(Box::new(#parsed), Box::new(#parsed1))
+                }
+            }
+            Expr::In(sql_value, sql_value_in) => {
                 let parsed = sql_value.into_tokens_with_checks(checks, binds, sql_crate, driver);
 
                 match sql_value_in {
-                    SqlValueIn::Single(sql_value) => {
+                    ValueIn::Single(sql_value) => {
                         //Iterator expected
                         match sql_value {
-                            SqlValue::OutsideVariable(expr) => {
+                            Value::OutsideVariable(expr) => {
                                 quote_spanned! {expr.span()=>
                                     {
                                         fn ___collect_iterator<'a,D:#sql_crate::Driver,Y:Into<D::Value<'a>>,T:Iterator<Item=Y>>(i:T)->Vec<D::Value<'a>>{
@@ -390,7 +390,7 @@ impl SqlExpr {
                                             collected
                                         }
 
-                                        #sql_crate::SqlExpr::In(Box::new(#parsed),___collect_iterator({#expr}))
+                                        #sql_crate::Expr::In(Box::new(#parsed),___collect_iterator({#expr}))
                                     }
                                 }
                             }
@@ -405,12 +405,12 @@ impl SqlExpr {
                                 });
 
                                 quote! {
-                                    #sql_crate::SqlExpr::Error
+                                    #sql_crate::Expr::Error
                                 }
                             }
                         }
                     }
-                    SqlValueIn::Multiple(sql_values) => {
+                    ValueIn::Multiple(sql_values) => {
                         let mut parsed_values = Vec::new();
                         for sql_value in sql_values {
                             let parsed_value =
@@ -418,39 +418,39 @@ impl SqlExpr {
                             parsed_values.push(parsed_value);
                         }
                         quote! {
-                            #sql_crate::SqlExpr::In(Box::new(#parsed), vec![#(#parsed_values),*])
+                            #sql_crate::Expr::In(Box::new(#parsed), vec![#(#parsed_values),*])
                         }
                     }
                 }
             }
-            SqlExpr::Between(sql_value, sql_value1, sql_value2) => {
+            Expr::Between(sql_value, sql_value1, sql_value2) => {
                 let parsed = sql_value.into_tokens_with_checks(checks, binds, sql_crate, driver);
                 let parsed1 = sql_value1.into_tokens_with_checks(checks, binds, sql_crate, driver);
                 let parsed2 = sql_value2.into_tokens_with_checks(checks, binds, sql_crate, driver);
                 quote! {
-                    #sql_crate::SqlExpr::Between(Box::new(#parsed), Box::new(#parsed1), Box::new(#parsed2))
+                    #sql_crate::Expr::Between(Box::new(#parsed), Box::new(#parsed1), Box::new(#parsed2))
                 }
             }
         }
     }
 }
 #[derive(Debug, Clone)]
-pub enum SqlValue {
-    Column(SqlColumn),
+pub enum Value {
+    Column(Column),
     Lit(syn::Lit),
     OutsideVariable(syn::Expr),
 }
 
 #[always_context]
-impl SqlValue {
+impl Value {
     fn span(&self) -> proc_macro2::Span {
         match self {
-            SqlValue::Column(sql_column) => match sql_column {
-                SqlColumn::SpecificTableColumn(path, _) => path.span(),
-                SqlColumn::Column(ident) => ident.span(),
+            Value::Column(sql_column) => match sql_column {
+                Column::SpecificTableColumn(path, _) => path.span(),
+                Column::Column(ident) => ident.span(),
             },
-            SqlValue::Lit(lit) => lit.span(),
-            SqlValue::OutsideVariable(expr) => expr.span(),
+            Value::Lit(lit) => lit.span(),
+            Value::OutsideVariable(expr) => expr.span(),
         }
     }
 
@@ -462,9 +462,9 @@ impl SqlValue {
         driver: &TokenStream,
     ) -> proc_macro2::TokenStream {
         match self {
-            SqlValue::Column(sql_column) => {
+            Value::Column(sql_column) => {
                 match sql_column {
-                    SqlColumn::SpecificTableColumn(path, ident) => {
+                    Column::SpecificTableColumn(path, ident) => {
                         checks.push(quote_spanned! {ident.span()=>
                             {
                                 fn has_table<T:#sql_crate::HasTable<#path>>(_test:&T){}
@@ -477,13 +477,13 @@ impl SqlValue {
 
                         let ident_str = ident.to_string();
                         quote_spanned! {ident.span()=>
-                            #sql_crate::SqlExpr::ColumnFromTable{
+                            #sql_crate::Expr::ColumnFromTable{
                                 table: <#path as #sql_crate::Table<#driver>>::table_name().to_owned(),
                                 column: #ident_str.to_string(),
                             }
                         }
                     }
-                    SqlColumn::Column(ident) => {
+                    Column::Column(ident) => {
                         checks.push(quote_spanned! {ident.span()=>
                             {
                                 let _= ___t___.#ident;
@@ -492,12 +492,12 @@ impl SqlValue {
                         let ident_str = ident.to_string();
 
                         quote_spanned! {ident.span()=>
-                            #sql_crate::SqlExpr::Column(#ident_str.to_string())
+                            #sql_crate::Expr::Column(#ident_str.to_string())
                         }
                     }
                 }
             }
-            SqlValue::Lit(lit) => {
+            Value::Lit(lit) => {
                 let debug_str = format!(
                     "Failed to bind `{}` to query",
                     readable_token_stream(&lit.to_token_stream().to_string())
@@ -507,10 +507,10 @@ impl SqlValue {
                 });
 
                 quote_spanned! {lit.span()=>
-                    #sql_crate::SqlExpr::Value
+                    #sql_crate::Expr::Value
                 }
             }
-            SqlValue::OutsideVariable(expr) => {
+            Value::OutsideVariable(expr) => {
                 let debug_str = format!(
                     "Failed to bind `{}` to query",
                     readable_token_stream(&expr.to_token_stream().to_string())
@@ -520,39 +520,39 @@ impl SqlValue {
                 });
 
                 quote_spanned! {expr.span()=>
-                    #sql_crate::SqlExpr::Value
+                    #sql_crate::Expr::Value
                 }
             }
         }
     }
 }
 #[derive(Debug, Clone)]
-pub enum SqlValueIn {
-    Single(SqlValue),
-    Multiple(Vec<SqlValue>),
+pub enum ValueIn {
+    Single(Value),
+    Multiple(Vec<Value>),
 }
 
 #[always_context]
-impl SqlValue {
+impl Value {
     fn lookahead(l: &Lookahead1<'_>) -> bool {
         l.peek(syn::Ident) || l.peek(syn::Lit) || l.peek(syn::token::Brace)
     }
 }
 
 #[always_context]
-impl Parse for SqlValue {
+impl Parse for Value {
     fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
         let lookahead = input.lookahead1();
         if lookahead.peek(syn::Ident) {
-            Ok(SqlValue::Column(input.parse()?))
+            Ok(Value::Column(input.parse()?))
         } else if lookahead.peek(syn::Lit) {
             let lit: syn::Lit = input.parse()?;
-            Ok(SqlValue::Lit(lit))
+            Ok(Value::Lit(lit))
         } else if lookahead.peek(syn::token::Brace) {
             let inside_braces;
             syn::braced!(inside_braces in input);
             let expr: syn::Expr = inside_braces.parse()?;
-            Ok(SqlValue::OutsideVariable(expr))
+            Ok(Value::OutsideVariable(expr))
         } else {
             Err(lookahead.error())
         }
@@ -560,7 +560,7 @@ impl Parse for SqlValue {
 }
 
 #[always_context]
-impl Parse for SqlValueIn {
+impl Parse for ValueIn {
     fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
         let lookahead = input.lookahead1();
         if lookahead.peek(syn::token::Paren) {
@@ -568,7 +568,7 @@ impl Parse for SqlValueIn {
             syn::parenthesized!(inside_paren in input);
             let mut values = Vec::new();
             while !inside_paren.is_empty() {
-                let value = inside_paren.parse::<SqlValue>()?;
+                let value = inside_paren.parse::<Value>()?;
                 values.push(value);
                 if inside_paren.is_empty() {
                     break;
@@ -580,10 +580,10 @@ impl Parse for SqlValueIn {
                     break;
                 }
             }
-            Ok(SqlValueIn::Multiple(values))
-        } else if SqlValue::lookahead(&lookahead) {
-            let value = input.parse::<SqlValue>()?;
-            Ok(SqlValueIn::Single(value))
+            Ok(ValueIn::Multiple(values))
+        } else if Value::lookahead(&lookahead) {
+            let value = input.parse::<Value>()?;
+            Ok(ValueIn::Single(value))
         } else {
             Err(lookahead.error())
         }
@@ -592,11 +592,11 @@ impl Parse for SqlValueIn {
 
 fn continue_parse_value_no_expr(
     input: syn::parse::ParseStream,
-    current_value: SqlValue,
+    current_value: Value,
     lookahead: syn::parse::Lookahead1<'_>,
-) -> syn::Result<SqlExpr> {
+) -> syn::Result<Expr> {
     if input.is_empty() || next_clause_token(&lookahead) {
-        return Ok(SqlExpr::Value(current_value));
+        return Ok(Expr::Value(current_value));
     }
 
     if lookahead.peek(keyword::is) {
@@ -607,56 +607,56 @@ fn continue_parse_value_no_expr(
             let lookahead3 = input.lookahead1();
             if lookahead3.peek(keyword::null) {
                 input.parse::<keyword::null>()?;
-                Ok(SqlExpr::IsNotNull(current_value))
+                Ok(Expr::IsNotNull(current_value))
             } else {
                 Err(lookahead3.error())
             }
         } else if lookahead2.peek(keyword::null) {
             input.parse::<keyword::null>()?;
-            Ok(SqlExpr::IsNull(current_value))
+            Ok(Expr::IsNull(current_value))
         } else {
             Err(lookahead2.error())
         }
     } else if lookahead.peek(syn::Token![=]) {
         input.parse::<syn::Token![=]>()?;
-        let right_value = input.parse::<SqlValue>()?;
-        Ok(SqlExpr::Equal(current_value, right_value))
+        let right_value = input.parse::<Value>()?;
+        Ok(Expr::Equal(current_value, right_value))
     } else if lookahead.peek(syn::Token![!=]) {
         input.parse::<syn::Token![!=]>()?;
-        let right_value = input.parse::<SqlValue>()?;
-        Ok(SqlExpr::NotEqual(current_value, right_value))
+        let right_value = input.parse::<Value>()?;
+        Ok(Expr::NotEqual(current_value, right_value))
     } else if lookahead.peek(syn::Token![>=]) {
         input.parse::<syn::Token![>=]>()?;
-        let right_value = input.parse::<SqlValue>()?;
-        Ok(SqlExpr::GreaterThanOrEqual(current_value, right_value))
+        let right_value = input.parse::<Value>()?;
+        Ok(Expr::GreaterThanOrEqual(current_value, right_value))
     } else if lookahead.peek(syn::Token![>]) {
         input.parse::<syn::Token![>]>()?;
-        let right_value = input.parse::<SqlValue>()?;
-        Ok(SqlExpr::GreaterThan(current_value, right_value))
+        let right_value = input.parse::<Value>()?;
+        Ok(Expr::GreaterThan(current_value, right_value))
     } else if lookahead.peek(syn::Token![<=]) {
         input.parse::<syn::Token![<=]>()?;
-        let right_value = input.parse::<SqlValue>()?;
-        Ok(SqlExpr::LessThanOrEqual(current_value, right_value))
+        let right_value = input.parse::<Value>()?;
+        Ok(Expr::LessThanOrEqual(current_value, right_value))
     } else if lookahead.peek(syn::Token![<]) {
         input.parse::<syn::Token![<]>()?;
-        let right_value = input.parse::<SqlValue>()?;
-        Ok(SqlExpr::LessThan(current_value, right_value))
+        let right_value = input.parse::<Value>()?;
+        Ok(Expr::LessThan(current_value, right_value))
     } else if lookahead.peek(keyword::like) {
         input.parse::<keyword::like>()?;
-        let right_value = input.parse::<SqlValue>()?;
-        Ok(SqlExpr::Like(current_value, right_value))
+        let right_value = input.parse::<Value>()?;
+        Ok(Expr::Like(current_value, right_value))
     } else if lookahead.peek(keyword::in_) {
         input.parse::<keyword::in_>()?;
-        let right_value = input.parse::<SqlValueIn>()?;
-        Ok(SqlExpr::In(current_value, right_value))
+        let right_value = input.parse::<ValueIn>()?;
+        Ok(Expr::In(current_value, right_value))
     } else if lookahead.peek(keyword::between) {
         input.parse::<keyword::between>()?;
-        let middle_value = input.parse::<SqlValue>()?;
+        let middle_value = input.parse::<Value>()?;
         let lookahead2 = input.lookahead1();
         if lookahead2.peek(keyword::and) {
             input.parse::<keyword::and>()?;
-            let right_value = input.parse::<SqlValue>()?;
-            Ok(SqlExpr::Between(current_value, middle_value, right_value))
+            let right_value = input.parse::<Value>()?;
+            Ok(Expr::Between(current_value, middle_value, right_value))
         } else {
             Err(lookahead2.error())
         }
@@ -667,10 +667,10 @@ fn continue_parse_value_no_expr(
 
 fn continue_parse_value_maybe_expr(
     input: syn::parse::ParseStream,
-    current_value: SqlValue,
-) -> syn::Result<SqlExpr> {
+    current_value: Value,
+) -> syn::Result<Expr> {
     if input.is_empty() {
-        return Ok(SqlExpr::Value(current_value));
+        return Ok(Expr::Value(current_value));
     }
 
     let lookahead = input.lookahead1();
@@ -690,28 +690,28 @@ fn continue_parse_value_maybe_expr(
         || lookahead.peek(syn::Token![<<])
         || lookahead.peek(syn::Token![>>])
     {
-        // We handle operators in the SqlExpr::parse method
-        Ok(SqlExpr::Value(current_value))
+        // We handle operators in the Expr::parse method
+        Ok(Expr::Value(current_value))
     } else {
         continue_parse_value_no_expr(input, current_value, lookahead)
     }
 }
 
-fn sub_where_expr(input: syn::parse::ParseStream) -> syn::Result<SqlExpr> {
+fn sub_where_expr(input: syn::parse::ParseStream) -> syn::Result<Expr> {
     let lookahead = input.lookahead1();
 
     if lookahead.peek(keyword::not) {
         input.parse::<keyword::not>()?;
 
         let expr = sub_where_expr(input)?;
-        Ok(SqlExpr::Not(Box::new(expr)))
+        Ok(Expr::Not(Box::new(expr)))
     } else if lookahead.peek(syn::token::Paren) {
         let inside_paren;
         syn::parenthesized!(inside_paren in input);
-        let expr = inside_paren.parse::<SqlExpr>()?;
-        Ok(SqlExpr::Parenthesized(Box::new(expr)))
-    } else if SqlValue::lookahead(&lookahead) {
-        let parsed = input.parse::<SqlValue>()?;
+        let expr = inside_paren.parse::<Expr>()?;
+        Ok(Expr::Parenthesized(Box::new(expr)))
+    } else if Value::lookahead(&lookahead) {
+        let parsed = input.parse::<Value>()?;
 
         Ok(continue_parse_value_maybe_expr(input, parsed)?)
     } else {
@@ -720,7 +720,7 @@ fn sub_where_expr(input: syn::parse::ParseStream) -> syn::Result<SqlExpr> {
 }
 
 #[always_context]
-impl Parse for SqlExpr {
+impl Parse for Expr {
     fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
         let mut first_expr = None;
         let mut next_exprs = vec![];
@@ -756,7 +756,7 @@ impl Parse for SqlExpr {
         if next_exprs.is_empty() {
             Ok(first_expr)
         } else {
-            Ok(SqlExpr::OperatorChain(Box::new(first_expr), next_exprs))
+            Ok(Expr::OperatorChain(Box::new(first_expr), next_exprs))
         }
     }
 }

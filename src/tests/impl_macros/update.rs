@@ -1,7 +1,7 @@
 use anyhow::Context;
 use easy_macros::macros::always_context;
 
-use crate::{Driver, QueryBuilder, SqlExpr, Update};
+use crate::{Driver, Expr, QueryBuilder, Update};
 
 use super::TestDriver;
 #[allow(dead_code)]
@@ -25,7 +25,7 @@ impl<'a> Update<'a, ExampleTableStruct, TestDriver> for ExampleStruct {
     fn updates(
         self,
         builder: &mut QueryBuilder<'_, TestDriver>,
-    ) -> anyhow::Result<Vec<(String, SqlExpr)>> {
+    ) -> anyhow::Result<Vec<(String, Expr)>> {
         crate::never::never_fn(|| {
             //Check for validity
             let update_instance = crate::never::never_any::<Self>();
@@ -44,9 +44,9 @@ impl<'a> Update<'a, ExampleTableStruct, TestDriver> for ExampleStruct {
             builder.bind(self.field3)?;
         }
         Ok(vec![
-            ("field1".to_string(), crate::SqlExpr::Value),
-            ("field2".to_string(), crate::SqlExpr::Value),
-            ("field3".to_string(), crate::SqlExpr::Value),
+            ("field1".to_string(), crate::Expr::Value),
+            ("field2".to_string(), crate::Expr::Value),
+            ("field3".to_string(), crate::Expr::Value),
         ])
     }
 
@@ -94,7 +94,7 @@ impl<'a> Update<'a, ExampleTableStruct, TestDriver> for ExampleStruct2 {
     fn updates(
         self,
         builder: &mut QueryBuilder<'_, TestDriver>,
-    ) -> anyhow::Result<Vec<(String, SqlExpr)>> {
+    ) -> anyhow::Result<Vec<(String, Expr)>> {
         //If Option is set to None then ignore
         crate::never::never_fn(|| {
             //Check for validity
@@ -106,18 +106,18 @@ impl<'a> Update<'a, ExampleTableStruct, TestDriver> for ExampleStruct2 {
             table_instance.field3 = update_instance.field3.unwrap();
         });
         let mut updates = Vec::new();
-        updates.push(("field1".to_string(), crate::SqlExpr::Value));
+        updates.push(("field1".to_string(), crate::Expr::Value));
         // Fully safe because we pass by value, not by reference
         unsafe {
             builder
                 .bind(&self.field1)
                 .context("Binding `field1` failed")?;
             if let Some(field2) = &self.field2 {
-                updates.push(("field2".to_string(), crate::SqlExpr::Value));
+                updates.push(("field2".to_string(), crate::Expr::Value));
                 builder.bind(field2)?;
             }
             if let Some(field3) = &self.field3 {
-                updates.push(("field3".to_string(), crate::SqlExpr::Value));
+                updates.push(("field3".to_string(), crate::Expr::Value));
                 builder.bind(field3)?;
             }
         }

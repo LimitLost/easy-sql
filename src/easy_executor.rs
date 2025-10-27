@@ -4,7 +4,7 @@ use easy_macros::macros::always_context;
 
 use crate::{
     Driver, DriverArguments, DriverConnection, DriverRow, Output, QueryBuilder, Table, ToConvert,
-    sql_query::Sql,
+    query::Sql,
 };
 
 pub struct Break;

@@ -1,5 +1,5 @@
 use super::{
-    column::SqlColumn,
+    column::Column,
     keyword::{self},
 };
 use ::{
@@ -31,7 +31,7 @@ impl Parse for Order {
 }
 
 pub struct OrderBy {
-    pub column: SqlColumn,
+    pub column: Column,
     pub order: Order,
 }
 
@@ -60,7 +60,7 @@ impl OrderBy {
 #[always_context]
 impl Parse for OrderBy {
     fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
-        let column: SqlColumn = input.parse()?;
+        let column: Column = input.parse()?;
         let lookahead = input.lookahead1();
         if lookahead.peek(keyword::asc) || lookahead.peek(keyword::desc) {
             let order: Order = input.parse()?;

@@ -5,20 +5,20 @@ use ::{
 };
 use easy_macros::macros::always_context;
 #[derive(Debug, Clone)]
-pub enum SqlColumn {
+pub enum Column {
     SpecificTableColumn(Punctuated<syn::Ident, Token![::]>, syn::Ident),
     Column(syn::Ident),
 }
 
 #[always_context]
-impl SqlColumn {
+impl Column {
     pub fn into_tokens_with_checks(
         self,
         checks: &mut Vec<TokenStream>,
         sql_crate: &TokenStream,
     ) -> TokenStream {
         match self {
-            SqlColumn::SpecificTableColumn(path, ident) => {
+            Column::SpecificTableColumn(path, ident) => {
                 checks.push(quote_spanned! {path.span()=>
                     fn has_table<T:#sql_crate::HasTable<#path>>(test:&T){}
                     has_table(&___t___);
@@ -33,7 +33,7 @@ impl SqlColumn {
                     format!("{}.{}",<#path as #sql_crate::Table>::table_name(), #ident_str)
                 }
             }
-            SqlColumn::Column(ident) => {
+            Column::Column(ident) => {
                 checks.push(quote! {
                         let _ = ___t___.#ident;
                 });
@@ -46,7 +46,7 @@ impl SqlColumn {
 }
 
 #[always_context]
-impl Parse for SqlColumn {
+impl Parse for Column {
     fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
         let path_or_ident: Punctuated<syn::Ident, Token![::]> =
             Punctuated::parse_separated_nonempty(input)?;
@@ -54,11 +54,11 @@ impl Parse for SqlColumn {
         if lookahead2.peek(syn::Token![.]) {
             input.parse::<syn::Token![.]>()?;
             let ident: syn::Ident = input.parse()?;
-            return Ok(SqlColumn::SpecificTableColumn(path_or_ident, ident));
+            return Ok(Column::SpecificTableColumn(path_or_ident, ident));
         } else if let Some(ident) = path_or_ident.first()
             && path_or_ident.len() == 1
         {
-            return Ok(SqlColumn::Column(ident.clone()));
+            return Ok(Column::Column(ident.clone()));
         } else {
             return Err(input.error("Expected identifier instead of path (or dot after path)"));
         }
