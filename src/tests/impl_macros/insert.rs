@@ -3,7 +3,7 @@ use easy_macros::macros::always_context;
 
 use super::{DatabaseInternalDefault, TestDriver};
 
-use crate::{Connection, DriverArguments, QueryBuilder, SqlInsert, SqlTable, TableJoin};
+use crate::{Connection, DriverArguments, QueryBuilder, Insert, Table, TableJoin};
 #[allow(dead_code)]
 struct ExampleTableStruct {
     id: i64,
@@ -24,7 +24,7 @@ struct ExampleStruct {
 
 #[always_context]
 #[no_context]
-impl<'a> SqlInsert<'a, ExampleTableStruct, TestDriver> for ExampleStruct {
+impl<'a> Insert<'a, ExampleTableStruct, TestDriver> for ExampleStruct {
     fn insert_columns() -> Vec<String> {
         crate::never::never_fn(|| {
             //Check for validity
@@ -80,7 +80,7 @@ impl<'a> SqlInsert<'a, ExampleTableStruct, TestDriver> for ExampleStruct {
 }
 
 #[always_context]
-impl<'a> SqlInsert<'a, ExampleTableStruct, TestDriver> for &'a ExampleStruct {
+impl<'a> Insert<'a, ExampleTableStruct, TestDriver> for &'a ExampleStruct {
     fn insert_columns() -> Vec<String> {
         //Validity check is only done in implementation for owned type
         /* crate::never::never_fn(|| {
@@ -150,7 +150,7 @@ impl<'a> SqlInsert<'a, ExampleTableStruct, TestDriver> for &'a ExampleStruct {
 }
 
 #[always_context]
-impl SqlTable<TestDriver> for ExampleTableStruct {
+impl Table<TestDriver> for ExampleTableStruct {
     fn table_name() -> &'static str {
         "table"
     }

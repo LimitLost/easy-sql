@@ -25,9 +25,6 @@ pub use {
 #[cfg(feature = "not_build")]
 use {easy_macros::macros::always_context, serde::de::DeserializeOwned};
 
-//Used by SqlTable derive macro (default attribute)
-// pub use lazy_static::lazy_static;
-
 #[cfg(feature = "build")]
 pub use sql_build::*;
 

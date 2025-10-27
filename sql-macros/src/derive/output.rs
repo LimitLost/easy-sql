@@ -12,7 +12,7 @@ use easy_macros::{
 use sql_compilation_data::CompilationData;
 
 use crate::{
-    easy_lib_crate, sql_crate,  sql_macros_components::joined_field::JoinedField
+    easy_lib_crate, sql_crate,  macros_components::joined_field::JoinedField
 };
 
 #[always_context]
@@ -209,7 +209,7 @@ pub fn sql_output_base(
         quote! {
             current_query.push_str(&format!(
                 #format_str,
-                <#ref_table as #sql_crate::SqlTable<#driver>>::table_name(),
+                <#ref_table as #sql_crate::Table<#driver>>::table_name(),
             ));
         }
     });
@@ -218,7 +218,7 @@ pub fn sql_output_base(
         
 
     Ok(quote! {
-        impl #sql_crate::SqlOutput<#table, #driver> for #item_name {
+        impl #sql_crate::Output<#table, #driver> for #item_name {
             type DataToConvert = #sql_crate::DriverRow<#driver>;
 
             fn sql_to_query<'a>(sql: #sql_crate::Sql, builder: #sql_crate::QueryBuilder<'a, #driver>) -> #easy_lib_crate::anyhow::Result<#sql_crate::QueryData<'a, #driver>> {
@@ -246,7 +246,7 @@ pub fn sql_output_base(
                     )*
                     #(
                         #sql_crate::RequestedColumn {
-                            table_name: Some(<#joined_checks_table_names as #sql_crate::SqlTable<#driver>>::table_name()),
+                            table_name: Some(<#joined_checks_table_names as #sql_crate::Table<#driver>>::table_name()),
                             name: #joined_checks_column_name_format.to_owned(),
                             alias: Some(#joined_field_aliases.to_owned()),
                         },
@@ -299,7 +299,7 @@ impl Parse for FieldAttribute {
 
 
 #[always_context]
-pub fn sql_output(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::TokenStream> {
+pub fn output(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::TokenStream> {
     let item = parse_macro_input!(item as syn::ItemStruct);
     let item_name = &item.ident;
 

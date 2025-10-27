@@ -8,11 +8,11 @@ use crate::{
     easy_executor::{Break, EasyExecutor},
 };
 
-use super::{SqlInsert, SqlOutput, SqlUpdate, ToConvert};
+use super::{Insert, Output, Update, ToConvert};
 use crate::QueryBuilder;
 
 #[always_context]
-pub trait SqlTable<D: Driver>: Sized
+pub trait Table<D: Driver>: Sized
 where
     DriverConnection<D>: Send + Sync,
 {
@@ -24,7 +24,7 @@ where
     async fn get<
         'a,
         Y: ToConvert<D> + Send + Sync + 'static,
-        T: SqlOutput<Self, D, DataToConvert = Y>,
+        T: Output<Self, D, DataToConvert = Y>,
         CO: CanBeSelectClause + Send + Sync,
     >(
         conn: &mut (impl EasyExecutor<D> + Send + Sync),
@@ -60,7 +60,7 @@ where
     /// ```
     async fn get_lazy<
         'a,
-        T: SqlOutput<Self, D, DataToConvert = DriverRow<D>>,
+        T: Output<Self, D, DataToConvert = DriverRow<D>>,
         CO: CanBeSelectClause + Send + Sync,
     >(
         conn: &mut (impl EasyExecutor<D> + Send + Sync),
@@ -91,7 +91,7 @@ where
     async fn select<
         'a,
         Y: ToConvert<D> + Send + Sync + 'static,
-        T: SqlOutput<Self, D, DataToConvert = Y>,
+        T: Output<Self, D, DataToConvert = Y>,
         CO: CanBeSelectClause + Send + Sync,
     >(
         conn: &mut (impl EasyExecutor<D> + Send + Sync),
@@ -118,7 +118,7 @@ where
     /// ```
     async fn select_lazy<
         'a,
-        T: SqlOutput<Self, D, DataToConvert = DriverRow<D>>,
+        T: Output<Self, D, DataToConvert = DriverRow<D>>,
         CO: CanBeSelectClause + Send + Sync,
     >(
         conn: &mut (impl EasyExecutor<D> + Send + Sync),
@@ -142,7 +142,7 @@ where
     ) -> anyhow::Result<bool>
     where
         DriverRow<D>: ToConvert<D>,
-        bool: SqlOutput<Self, D, DataToConvert = DriverRow<D>>,
+        bool: Output<Self, D, DataToConvert = DriverRow<D>>,
         DriverConnection<D>: Send + Sync,
         for<'b> &'b mut DriverConnection<D>:
             sqlx::Executor<'b, Database = D::InternalDriver> + Send + Sync,
@@ -162,12 +162,12 @@ where
         conn.query::<DriverRow<D>, Self, bool>(sql, builder).await
     }
 
-    async fn insert<'a, I: SqlInsert<'a, Self, D> + Send + Sync>(
+    async fn insert<'a, I: Insert<'a, Self, D> + Send + Sync>(
         conn: &mut (impl EasyExecutor<D> + Send + Sync),
         to_insert: I,
     ) -> anyhow::Result<()>
     where
-        (): ToConvert<D> + SqlOutput<Self, D, DataToConvert = ()>,
+        (): ToConvert<D> + Output<Self, D, DataToConvert = ()>,
         DriverConnection<D>: Send + Sync,
         for<'b> &'b mut DriverConnection<D>:
             sqlx::Executor<'b, Database = D::InternalDriver> + Send + Sync,
@@ -188,14 +188,14 @@ where
     async fn insert_returning<
         'a,
         Y: ToConvert<D> + Send + Sync + 'static,
-        T: SqlOutput<Self, D, DataToConvert = Y>,
-        I: SqlInsert<'a, Self, D> + Send + Sync,
+        T: Output<Self, D, DataToConvert = Y>,
+        I: Insert<'a, Self, D> + Send + Sync,
     >(
         conn: &mut (impl EasyExecutor<D> + Send + Sync),
         to_insert: I,
     ) -> anyhow::Result<T>
     where
-        (): ToConvert<D> + SqlOutput<Self, D, DataToConvert = ()>,
+        (): ToConvert<D> + Output<Self, D, DataToConvert = ()>,
         DriverConnection<D>: Send + Sync,
         for<'b> &'b mut DriverConnection<D>:
             sqlx::Executor<'b, Database = D::InternalDriver> + Send + Sync,
@@ -215,8 +215,8 @@ where
 
     async fn insert_returning_lazy<
         'a,
-        T: SqlOutput<Self, D, DataToConvert = DriverRow<D>>,
-        I: SqlInsert<'a, Self, D> + Send + Sync,
+        T: Output<Self, D, DataToConvert = DriverRow<D>>,
+        I: Insert<'a, Self, D> + Send + Sync,
     >(
         conn: &mut (impl EasyExecutor<D> + Send + Sync),
         to_insert: I,
@@ -246,7 +246,7 @@ where
         where_: impl FnOnce(&mut QueryBuilder<'a, D>) -> anyhow::Result<WhereClause>,
     ) -> anyhow::Result<()>
     where
-        (): ToConvert<D> + SqlOutput<Self, D, DataToConvert = ()>,
+        (): ToConvert<D> + Output<Self, D, DataToConvert = ()>,
         DriverRow<D>: ToConvert<D>,
         for<'b> &'b mut DriverConnection<D>:
             sqlx::Executor<'b, Database = D::InternalDriver> + Send + Sync,
@@ -265,7 +265,7 @@ where
     async fn delete_returning<
         'a,
         Y: ToConvert<D> + Send + Sync + 'static,
-        T: SqlOutput<Self, D, DataToConvert = Y>,
+        T: Output<Self, D, DataToConvert = Y>,
     >(
         conn: &'a mut (impl EasyExecutor<D> + Send + Sync),
         where_: impl FnOnce(&mut QueryBuilder<'a, D>) -> anyhow::Result<WhereClause>,
@@ -289,7 +289,7 @@ where
     async fn delete_returning_lazy<
         'a,
         Y: ToConvert<D> + Send + Sync,
-        T: SqlOutput<Self, D, DataToConvert = DriverRow<D>>,
+        T: Output<Self, D, DataToConvert = DriverRow<D>>,
     >(
         conn: &mut (impl EasyExecutor<D> + Send + Sync),
         where_: impl FnOnce(&mut QueryBuilder<'a, D>) -> anyhow::Result<WhereClause>,
@@ -313,11 +313,11 @@ where
     /// Use `sql_where!` macro to generate the `check` and `where` clause
     async fn update<'a>(
         conn: &mut (impl EasyExecutor<D> + Send + Sync),
-        update: impl SqlUpdate<'a, Self, D> + Send + Sync + 'a,
+        update: impl Update<'a, Self, D> + Send + Sync + 'a,
         where_: impl Fn(&mut QueryBuilder<'a, D>) -> anyhow::Result<WhereClause>,
     ) -> anyhow::Result<()>
     where
-        (): ToConvert<D> + SqlOutput<Self, D, DataToConvert = ()>,
+        (): ToConvert<D> + Output<Self, D, DataToConvert = ()>,
         DriverRow<D>: ToConvert<D>,
         for<'b> &'b mut DriverConnection<D>:
             sqlx::Executor<'b, Database = D::InternalDriver> + Send + Sync,
@@ -339,10 +339,10 @@ where
     async fn update_returning<
         'a,
         Y: ToConvert<D> + Send + Sync + 'static,
-        T: SqlOutput<Self, D, DataToConvert = Y>,
+        T: Output<Self, D, DataToConvert = Y>,
     >(
         conn: &mut (impl EasyExecutor<D> + Send + Sync),
-        update: impl SqlUpdate<'a, Self, D> + Send + Sync,
+        update: impl Update<'a, Self, D> + Send + Sync,
         where_: impl FnOnce(&mut QueryBuilder<'a, D>) -> anyhow::Result<WhereClause>,
     ) -> anyhow::Result<T>
     where
@@ -366,8 +366,8 @@ where
     async fn update_returning_lazy<
         'a,
         Y: ToConvert<D> + Send + Sync,
-        T: SqlOutput<Self, D, DataToConvert = DriverRow<D>>,
-        U: SqlUpdate<'a, Self, D> + Send + Sync,
+        T: Output<Self, D, DataToConvert = DriverRow<D>>,
+        U: Update<'a, Self, D> + Send + Sync,
     >(
         conn: &mut (impl EasyExecutor<D> + Send + Sync),
         update: U,

@@ -4,11 +4,11 @@ mod easy_lib {
 
 use super::Database;
 use anyhow::Context;
-use easy_lib::sql::{SqlInsert, SqlOutput, SqlTable, SqlUpdate, sql};
+use easy_lib::sql::{Insert, Output, Table, Update, sql};
 use easy_macros::macros::always_context;
 use sql_macros::sql_convenience;
 
-#[derive(SqlTable, Debug)]
+#[derive(Table, Debug)]
 #[sql(version = 1)]
 #[sql(unique_id = "ff126623-4355-449a-921c-31e65f3449e8")]
 struct ExampleTableDelete {
@@ -20,7 +20,7 @@ struct ExampleTableDelete {
     field_opt: Option<i32>,
 }
 
-#[derive(SqlInsert, SqlUpdate, SqlOutput, Debug)]
+#[derive(Insert, Update, Output, Debug)]
 #[sql(table = ExampleTableDelete)]
 #[sql(default = id)]
 struct ExampleDeleteInsert {

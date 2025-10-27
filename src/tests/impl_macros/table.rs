@@ -15,7 +15,7 @@ struct ExampleReferencedTable {
 }
 
 #[always_context]
-impl sql_crate::SqlTable<TestDriver> for ExampleReferencedTable {
+impl sql_crate::Table<TestDriver> for ExampleReferencedTable {
     fn table_name() -> &'static str {
         "example_table2"
     }
@@ -40,7 +40,7 @@ struct ExampleTable {
 }
 
 #[always_context]
-impl sql_crate::SqlTable<TestDriver> for ExampleTable {
+impl sql_crate::Table<TestDriver> for ExampleTable {
     fn table_name() -> &'static str {
         "example_table"
     }
@@ -91,10 +91,10 @@ impl sql_crate::DatabaseSetup<TestDriver> for ExampleTable {
                 vec!["id"],
                 {
                     vec![(
-                        <ExampleReferencedTable as sql_crate::SqlTable<TestDriver>>::table_name(),
+                        <ExampleReferencedTable as sql_crate::Table<TestDriver>>::table_name(),
                         (
                             vec!["field3"],
-                            <ExampleReferencedTable as sql_crate::SqlTable<TestDriver>>::primary_keys(),
+                            <ExampleReferencedTable as sql_crate::Table<TestDriver>>::primary_keys(),
                             false,
                         ),
                     )]

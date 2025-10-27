@@ -25,9 +25,9 @@ WARNING: Never gitignore `easy_sql.ron` file, it is used for generating migratio
 - define database structure and a simple table
 
 ```rust
-use easy_lib::sql::{DatabaseSetup, SqlTable};
+use easy_lib::sql::{DatabaseSetup, Table};
 
-#[derive(SqlTable)]
+#[derive(Table)]
 // Needed because of automatic migration generation
 // Update this after you're done with making changes (NOT before)
 #[sql(version = 1)]
@@ -78,7 +78,7 @@ async fn main() -> anyhow::Result<()> {
 - Primary Key Auto Increment
 
 ```rust
-#[derive(SqlTable)]
+#[derive(Table)]
 #[sql(version = 1)]
 struct ExampleTableIncrement {
     // Column name: `id`
@@ -93,7 +93,7 @@ struct ExampleTableIncrement {
 - Multi column primary key
 
 ```rust
-#[derive(SqlTable)]
+#[derive(Table)]
 #[sql(version = 1)]
 struct ExampleTableMultiPrimaryKey {
     #[sql(primary_key)]
@@ -107,7 +107,7 @@ struct ExampleTableMultiPrimaryKey {
 
 ```rust
 
-#[derive(SqlTable)]
+#[derive(Table)]
 #[sql(version = 1)]
 struct ExampleTableWithForeignKey {
     #[sql(primary_key)]
@@ -126,7 +126,7 @@ struct ExampleTableWithForeignKey {
 - Multi column foreign key
 
 ```rust
-#[derive(SqlTable)]
+#[derive(Table)]
 #[sql(version = 1)]
 struct ExampleTableWithMultiForeignKey {
     #[sql(primary_key)]
@@ -143,7 +143,7 @@ struct ExampleTableWithMultiForeignKey {
 - Default value for columns
 
 ```rust
-#[derive(SqlTable)]
+#[derive(Table)]
 #[sql(version = 1)]
 struct ExampleTableDefaultValue {
     #[sql(primary_key)]
@@ -158,7 +158,7 @@ struct ExampleTableDefaultValue {
 - Table Renaming
 
 ```rust
-#[derive(SqlTable)]
+#[derive(Table)]
 #[sql(version = 1)]
 #[sql(table_name = "example_table_renamed_to_something_else")]
 struct ExampleTableRenamed {
@@ -170,15 +170,15 @@ struct ExampleTableRenamed {
 
 ## Table manipulation
 
-- Creating table manipulation structs with `SqlInsert`, `SqlUpdate` and `SqlOutput` derive macros
+- Creating table manipulation structs with `Insert`, `Update` and `Output` derive macros
 
 ```rust
-use easy_lib::sql::{SqlInsert, SqlUpdate, SqlOutput};
+use easy_lib::sql::{Insert, Update, Output};
 
 //Field validity is automatically checked and errors will be shown on compile time if they are not
-#[derive(SqlInsert,SqlUpdate,SqlOutput)]
+#[derive(Insert,Update,Output)]
 #[sql(table = ExampleTableIncrement)]
-// because of `SqlInsert` you need to specify which table columns are default (not specified in the insert statement)
+// because of `Insert` you need to specify which table columns are default (not specified in the insert statement)
 // Multiple column example: #[sql(default = id, field2)]
 #[sql(default = id)]
 struct ExampleInsert{
@@ -250,7 +250,7 @@ table_join!(JoinedExampleTables | ExampleTable LEFT JOIN ExampleTableWithForeign
 - Creating joined table data output
 
 ```rust
-#[derive(SqlOutput)]
+#[derive(Output)]
 #[sql(table = JoinedExampleTables)]
 struct JoinedExampleTableOutput {
     //You need to specify referenced table column

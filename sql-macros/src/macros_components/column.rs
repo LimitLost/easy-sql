@@ -30,7 +30,7 @@ impl SqlColumn {
                 let ident_str = ident.to_string();
 
                 quote_spanned! {path.span()=>
-                    format!("{}.{}",<#path as #sql_crate::SqlTable>::table_name(), #ident_str)
+                    format!("{}.{}",<#path as #sql_crate::Table>::table_name(), #ident_str)
                 }
             }
             SqlColumn::Column(ident) => {

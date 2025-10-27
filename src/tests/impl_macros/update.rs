@@ -1,7 +1,7 @@
 use anyhow::Context;
 use easy_macros::macros::always_context;
 
-use crate::{Driver, QueryBuilder, SqlExpr, SqlUpdate};
+use crate::{Driver, QueryBuilder, SqlExpr, Update};
 
 use super::TestDriver;
 #[allow(dead_code)]
@@ -21,7 +21,7 @@ struct ExampleStruct {
 
 #[always_context]
 #[no_context]
-impl<'a> SqlUpdate<'a, ExampleTableStruct, TestDriver> for ExampleStruct {
+impl<'a> Update<'a, ExampleTableStruct, TestDriver> for ExampleStruct {
     fn updates(
         self,
         builder: &mut QueryBuilder<'_, TestDriver>,
@@ -90,7 +90,7 @@ struct ExampleStruct2 {
 
 #[always_context]
 #[no_context]
-impl<'a> SqlUpdate<'a, ExampleTableStruct, TestDriver> for ExampleStruct2 {
+impl<'a> Update<'a, ExampleTableStruct, TestDriver> for ExampleStruct2 {
     fn updates(
         self,
         builder: &mut QueryBuilder<'_, TestDriver>,

@@ -20,7 +20,7 @@ bigdecimal = {version = "*", features = ["serde-json"], optional = true}
 # Add serde impl to decimal
 rust_decimal = {version = "1.37.1", features = ["serde-str"], optional = true}
 
-# Used in SqlTable derive macro (and tests)
+# Used in Table derive macro (and tests)
 lazy_static = {version="*", optional = true}
 
 easy-macros = {path = "../easy-macros", features = ["general"], optional = true}

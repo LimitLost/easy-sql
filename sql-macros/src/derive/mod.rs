@@ -1,8 +1,8 @@
 mod database_setup;
-mod sql_insert;
-mod sql_output;
-mod sql_table;
-mod sql_update;
+mod insert;
+mod output;
+mod table;
+mod update;
 
 use ::{
     anyhow::{self, Context},
@@ -12,12 +12,12 @@ use ::{
 };
 pub use database_setup::*;
 use easy_macros::macros::{always_context, get_attributes};
+pub use insert::*;
+pub use output::*;
 use sql_compilation_data::CompilationData;
-pub use sql_insert::*;
-pub use sql_output::*;
-pub use sql_table::*;
-pub use sql_update::*;
 use syn::{ItemStruct, Path, punctuated::Punctuated};
+pub use table::*;
+pub use update::*;
 
 #[always_context]
 fn ty_to_variant(

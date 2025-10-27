@@ -1,7 +1,7 @@
 use easy_macros::macros::always_context;
 
 use super::{DatabaseInternalDefault, TestDriver};
-use crate::{Connection, QueryBuilder, SqlExpr, SqlTable, TableJoin, never::never_any};
+use crate::{Connection, QueryBuilder, SqlExpr, Table, TableJoin, never::never_any};
 
 #[allow(dead_code)]
 struct ExampleTable {
@@ -14,7 +14,7 @@ struct ExampleTable {
 }
 
 #[always_context]
-impl SqlTable<TestDriver> for ExampleTable {
+impl Table<TestDriver> for ExampleTable {
     fn table_name() -> &'static str {
         "example_table"
     }
@@ -32,7 +32,7 @@ impl SqlTable<TestDriver> for ExampleTable {
 #[always_context]
 #[no_context]
 async fn _test() -> anyhow::Result<()> {
-    use crate::{SqlTable, WhereClause};
+    use crate::{Table, WhereClause};
 
     let mut fake_conn = never_any::<Connection<TestDriver, DatabaseInternalDefault>>();
 

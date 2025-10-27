@@ -27,7 +27,7 @@ struct SearchData {
     ///Where to add `#[sql_convenience]`
     updates: Vec<LineColumn>,
 
-    //SqlTable handling
+    //Table handling
     created_unique_ids: Vec<(String, LineColumn)>,
     compilation_data: CompilationData,
     found_existing_tables_ids: Vec<String>,
@@ -107,7 +107,7 @@ fn struct_table_handle(
                 .to_string()
                 .replace(|c: char| c.is_whitespace(), "");
             match path_str.as_str() {
-                "SqlTable" | "easy_sql::SqlTable" | "SqlTableDebug" | "easy_sql::SqlTableDebug" => {
+                "Table" | "easy_sql::Table" | "TableDebug" | "easy_sql::TableDebug" => {
                     is_sql_table = true;
                 }
                 _ => {}

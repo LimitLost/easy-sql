@@ -3,8 +3,8 @@ use std::{fmt::Debug, ops::DerefMut};
 use easy_macros::macros::always_context;
 
 use crate::{
-    Driver, DriverArguments, DriverConnection, DriverRow, QueryBuilder, SqlOutput, SqlTable,
-    ToConvert, sql_query::Sql,
+    Driver, DriverArguments, DriverConnection, DriverRow, Output, QueryBuilder, Table, ToConvert,
+    sql_query::Sql,
 };
 
 pub struct Break;
@@ -14,8 +14,8 @@ pub trait EasyExecutor<D: Driver>: Debug {
     // async fn query(&mut self, sql: &Sql) -> anyhow::Result<()>;
     async fn query<
         Y: ToConvert<D> + Send + Sync + 'static,
-        T: SqlTable<D>,
-        O: SqlOutput<T, D, DataToConvert = Y>,
+        T: Table<D>,
+        O: Output<T, D, DataToConvert = Y>,
     >(
         &mut self,
         sql: Sql,
@@ -34,7 +34,7 @@ pub trait EasyExecutor<D: Driver>: Debug {
     where
         DriverConnection<D>: Send + Sync;
 
-    // async fn fetch_all<T, O: SqlOutput<T, Row>>(&mut self, sql: &Sql) -> anyhow::Result<Vec<O>>;
+    // async fn fetch_all<T, O: Output<T, Row>>(&mut self, sql: &Sql) -> anyhow::Result<Vec<O>>;
 
     ///# How to Async inside of closure
     /// (tokio example)
@@ -44,7 +44,7 @@ pub trait EasyExecutor<D: Driver>: Debug {
     /// //Inside of closure
     /// handle.block_on(async { ... } )
     /// ```
-    async fn fetch_lazy<T, O: SqlOutput<T, D, DataToConvert = DriverRow<D>>>(
+    async fn fetch_lazy<T, O: Output<T, D, DataToConvert = DriverRow<D>>>(
         &mut self,
         sql: Sql,
         builder: QueryBuilder<'_, D>,

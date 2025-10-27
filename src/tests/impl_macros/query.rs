@@ -4,8 +4,8 @@ use anyhow::Context;
 use easy_macros::macros::always_context;
 
 use crate::{
-    Connection, Driver, DriverArguments, DriverRow, QueryBuilder, SqlExpr, SqlInsert, SqlOutput,
-    SqlTable, SqlUpdate, TableJoin, never::never_any,
+    Connection, Driver, DriverArguments, DriverRow, Insert, Output, QueryBuilder, SqlExpr, Table,
+    TableJoin, Update, never::never_any,
 };
 
 use super::{DatabaseInternalDefault, TestDriver};
@@ -20,7 +20,7 @@ struct ExampleTable {
 }
 
 #[always_context]
-impl SqlTable<TestDriver> for ExampleTable {
+impl Table<TestDriver> for ExampleTable {
     fn table_name() -> &'static str {
         "example_table"
     }
@@ -36,7 +36,7 @@ impl SqlTable<TestDriver> for ExampleTable {
 
 #[always_context]
 #[no_context]
-impl<'a> SqlInsert<'a, ExampleTable, TestDriver> for ExampleTable {
+impl<'a> Insert<'a, ExampleTable, TestDriver> for ExampleTable {
     fn insert_columns() -> Vec<String> {
         vec![
             "id".into(),
@@ -76,7 +76,7 @@ impl<'a> SqlInsert<'a, ExampleTable, TestDriver> for ExampleTable {
 }
 
 #[always_context]
-impl<'a> SqlInsert<'a, ExampleTable, TestDriver> for &'a ExampleTable {
+impl<'a> Insert<'a, ExampleTable, TestDriver> for &'a ExampleTable {
     fn insert_columns() -> Vec<String> {
         ExampleTable::insert_columns()
     }
@@ -109,7 +109,7 @@ impl<'a> SqlInsert<'a, ExampleTable, TestDriver> for &'a ExampleTable {
 }
 
 #[always_context]
-impl<'a> SqlUpdate<'a, ExampleTable, TestDriver> for &'a ExampleTable {
+impl<'a> Update<'a, ExampleTable, TestDriver> for &'a ExampleTable {
     fn updates(
         self,
         builder: &mut QueryBuilder<'_, TestDriver>,
@@ -205,7 +205,7 @@ struct ExampleOutput {
 }
 
 #[always_context]
-impl SqlOutput<ExampleTable, TestDriver> for ExampleOutput {
+impl Output<ExampleTable, TestDriver> for ExampleOutput {
     type DataToConvert = DriverRow<TestDriver>;
     fn sql_to_query<'a>(
         sql: crate::Sql,
@@ -302,13 +302,12 @@ async fn _test_select() -> anyhow::Result<ExampleOutput> {
                 DriverArguments<'a, TestDriver>,
             >,
         ) -> anyhow::Result<ExampleOutput> {
-            let raw_data =
-                <ExampleOutput as SqlOutput<ExampleTable, TestDriver>>::DataToConvert::get(
-                    exec, query,
-                )
-                .await?;
+            let raw_data = <ExampleOutput as Output<ExampleTable, TestDriver>>::DataToConvert::get(
+                exec, query,
+            )
+            .await?;
 
-            let result = <ExampleOutput as SqlOutput<ExampleTable, TestDriver>>::convert(raw_data)?;
+            let result = <ExampleOutput as Output<ExampleTable, TestDriver>>::convert(raw_data)?;
 
             Ok(result)
         }
@@ -346,7 +345,7 @@ async fn _test_insert() -> anyhow::Result<()> {
         // Imports
         use futures::FutureExt;
 
-        async fn __easy_sql_perform<'a, T: SqlInsert<'a, ExampleTable, TestDriver>>(
+        async fn __easy_sql_perform<'a, T: Insert<'a, ExampleTable, TestDriver>>(
             exec: impl sqlx::Executor<'a, Database = crate::InternalDriver<TestDriver>>,
             to_insert: T,
         ) -> anyhow::Result<crate::DriverQueryResult<TestDriver>> {
@@ -359,7 +358,7 @@ async fn _test_insert() -> anyhow::Result<()> {
             query.push_str(ExampleTable::table_name());
             query.push_str(" (");
 
-            let columns = <ExampleTable as SqlInsert<ExampleTable, TestDriver>>::insert_columns();
+            let columns = <ExampleTable as Insert<ExampleTable, TestDriver>>::insert_columns();
             for (i, col) in columns.iter().enumerate() {
                 if i > 0 {
                     query.push_str(", ");

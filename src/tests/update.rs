@@ -4,11 +4,11 @@ mod easy_lib {
 
 use super::Database;
 use anyhow::Context;
-use easy_lib::sql::{SqlInsert, SqlOutput, SqlTable, SqlUpdate, sql};
+use easy_lib::sql::{Insert, Output, Table, Update, sql};
 use easy_macros::macros::always_context;
 use sql_macros::sql_convenience;
 
-#[derive(SqlTable)]
+#[derive(Table)]
 #[sql(version = 1)]
 #[sql(unique_id = "7b526dc4-30d4-4a67-8756-945a2f9c0004")]
 struct ExampleTableIncrement {
@@ -18,7 +18,7 @@ struct ExampleTableIncrement {
     field: i64,
 }
 
-#[derive(SqlInsert, SqlUpdate, SqlOutput, Debug)]
+#[derive(Insert, Update, Output, Debug)]
 #[sql(table = ExampleTableIncrement)]
 #[sql(default = id)]
 struct ExampleInsert {

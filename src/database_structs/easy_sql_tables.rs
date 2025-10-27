@@ -1,13 +1,13 @@
 use std::fmt::Debug;
 
-use crate::{Driver, DriverConnection, InternalDriver, QueryBuilder, SqlOutput};
+use crate::{Driver, DriverConnection, InternalDriver, Output, QueryBuilder};
 use easy_macros::macros::always_context;
-use sql_macros::{SqlInsert, SqlUpdate, sql_convenience};
+use sql_macros::{Insert, Update, sql_convenience};
 use sqlx::TypeInfo;
 
-use crate::{DatabaseSetup, EasyExecutor, SqlTable, TableField, TableJoin};
+use crate::{DatabaseSetup, EasyExecutor, Table, TableField, TableJoin};
 
-#[derive(SqlInsert, Debug)]
+#[derive(Insert, Debug)]
 #[sql(table = EasySqlTables)]
 pub struct EasySqlTables {
     pub table_id: String,
@@ -21,7 +21,7 @@ macro_rules! EasySqlTables_create {
             table_id: $table_id,
             version: $version,
         };
-        <$crate::EasySqlTables as $crate::SqlTable<$driver>>::insert($conn, &inserted)
+        <$crate::EasySqlTables as $crate::Table<$driver>>::insert($conn, &inserted)
             .await
             .with_context($crate::macro_support::context!(
                 "Failed to create EasySqlTables | inserted: {:?}",
@@ -33,13 +33,13 @@ macro_rules! EasySqlTables_create {
 #[macro_export]
 macro_rules! EasySqlTables_update_version {
     ($driver:path, $conn:expr, $table_id:expr, $new_version:expr) => {{
-        #[derive($crate::SqlUpdate, $crate::SqlOutput, Debug)]
+        #[derive($crate::Update, $crate::Output, Debug)]
         #[sql(table = $crate::EasySqlTables)]
         struct EasySqlTableVersion {
             pub version: i64,
         }
 
-        <$crate::EasySqlTables as $crate::SqlTable<$driver>>::update(
+        <$crate::EasySqlTables as $crate::Table<$driver>>::update(
             $conn,
             &mut EasySqlTableVersion {
                 version: $new_version,
@@ -53,14 +53,14 @@ macro_rules! EasySqlTables_update_version {
 #[macro_export]
 macro_rules! EasySqlTables_get_version {
     ($driver:path, $conn:expr, $table_id:expr) => {{
-        #[derive($crate::SqlUpdate, $crate::SqlOutput, Debug)]
+        #[derive($crate::Update, $crate::Output, Debug)]
         #[sql(table = $crate::EasySqlTables)]
         struct EasySqlTableVersion {
             pub version: i64,
         }
 
         let version: Option<EasySqlTableVersion> =
-            <$crate::EasySqlTables as $crate::SqlTable<$driver>>::select(
+            <$crate::EasySqlTables as $crate::Table<$driver>>::select(
                 $conn,
                 $crate::sql!(|$crate::EasySqlTables| table_id = { $table_id }),
             )
@@ -78,13 +78,13 @@ impl EasySqlTables {
         version: i64,
     ) -> anyhow::Result<()>
     where
-        (): ToConvert<D> + SqlOutput<Self, D, ()>,
+        (): ToConvert<D> + Output<Self, D, ()>,
         DriverConnection<D>: Send + Sync,
         for<'b> &'b mut DriverConnection<D>:
             sqlx::Executor<'b, Database = D::InternalDriver> + Send + Sync,
     {
         let inserted = EasySqlTables { table_id, version };
-        <EasySqlTables as SqlTable<D>>::insert(conn, &inserted).await?;
+        <EasySqlTables as Table<D>>::insert(conn, &inserted).await?;
 
         Ok(())
     } */
@@ -95,7 +95,7 @@ impl EasySqlTables {
         new_version: i64,
     ) -> anyhow::Result<()>
     where
-        (): ToConvert<D> + SqlOutput<Self, D, ()>,
+        (): ToConvert<D> + Output<Self, D, ()>,
         DriverRow<D>: ToConvert<D>,
         DriverConnection<D>: Send + Sync,
         for<'b> &'b mut DriverConnection<D>:
@@ -120,20 +120,20 @@ impl EasySqlTables {
     ) -> anyhow::Result<Option<i64>> {
         #[no_context]
         let version: Option<EasySqlTableVersion> =
-            <EasySqlTables as SqlTable<D>>::select(conn, sql_where!(table_id = { table_id }))
+            <EasySqlTables as Table<D>>::select(conn, sql_where!(table_id = { table_id }))
                 .await?;
         Ok(version.map(|v| v.version))
     }*/
 }
 
-#[derive(SqlUpdate, SqlOutput, Debug)]
+#[derive(Update, Output, Debug)]
 #[sql(table = EasySqlTables)]
 struct EasySqlTableVersion {
     pub version: i64,
 }
 
 #[always_context]
-impl<D: Driver + 'static> SqlTable<D> for EasySqlTables
+impl<D: Driver + 'static> Table<D> for EasySqlTables
 where
     DriverConnection<D>: Send + Sync,
 {
@@ -160,7 +160,7 @@ where
     async fn setup(conn: &mut (impl EasyExecutor<D> + Send + Sync)) -> anyhow::Result<()> {
         use anyhow::Context;
 
-        let table_name = <EasySqlTables as SqlTable<D>>::table_name();
+        let table_name = <EasySqlTables as Table<D>>::table_name();
 
         let table_exists = D::table_exists(conn, table_name).await?;
 

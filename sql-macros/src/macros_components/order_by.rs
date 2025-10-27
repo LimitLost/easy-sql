@@ -1,6 +1,6 @@
 use super::{
-    sql_column::SqlColumn,
-    sql_keyword::{self},
+    column::SqlColumn,
+    keyword::{self},
 };
 use ::{
     proc_macro2::TokenStream,
@@ -18,11 +18,11 @@ pub enum Order {
 impl Parse for Order {
     fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
         let lookahead = input.lookahead1();
-        if lookahead.peek(sql_keyword::asc) {
-            input.parse::<sql_keyword::asc>()?;
+        if lookahead.peek(keyword::asc) {
+            input.parse::<keyword::asc>()?;
             Ok(Order::Asc)
-        } else if lookahead.peek(sql_keyword::desc) {
-            input.parse::<sql_keyword::desc>()?;
+        } else if lookahead.peek(keyword::desc) {
+            input.parse::<keyword::desc>()?;
             Ok(Order::Desc)
         } else {
             Err(lookahead.error())
@@ -62,7 +62,7 @@ impl Parse for OrderBy {
     fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
         let column: SqlColumn = input.parse()?;
         let lookahead = input.lookahead1();
-        if lookahead.peek(sql_keyword::asc) || lookahead.peek(sql_keyword::desc) {
+        if lookahead.peek(keyword::asc) || lookahead.peek(keyword::desc) {
             let order: Order = input.parse()?;
             Ok(OrderBy { column, order })
         } else {

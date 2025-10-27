@@ -1,4 +1,4 @@
-use crate::sql_macros_components::sql_keyword;
+use crate::macros_components::keyword;
 
 use ::{
     proc_macro2::TokenStream,
@@ -130,8 +130,8 @@ impl syn::parse::Parse for SqlMacroInput {
             input.parse::<syn::Token![|]>()?;
         }
 
-        if input.peek(sql_keyword::set) {
-            input.parse::<sql_keyword::set>()?;
+        if input.peek(keyword::set) {
+            input.parse::<keyword::set>()?;
             set_keyword_present = true;
         }
 

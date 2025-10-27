@@ -77,7 +77,7 @@ pub fn sql_update_base(
     let args_len = field_names.len();
 
     Ok(quote! {
-        impl<'a> #sql_crate::SqlUpdate<'a,#table, #driver> for #item_name {
+        impl<'a> #sql_crate::Update<'a,#table, #driver> for #item_name {
             fn updates(self, builder: &mut #sql_crate::QueryBuilder<'_, #driver>) -> ::anyhow::Result<Vec<(String, #sql_crate::SqlExpr)>> {
                 use #sql_crate::macro_support::Context as _;
 
@@ -129,7 +129,7 @@ pub fn sql_update_base(
             }
         }
 
-        impl<'a> #sql_crate::SqlUpdate<'a,#table, #driver> for &'a #item_name {
+        impl<'a> #sql_crate::Update<'a,#table, #driver> for &'a #item_name {
             fn updates( self, builder: &mut #sql_crate::QueryBuilder<'_, #driver>) -> ::anyhow::Result<Vec<(String, #sql_crate::SqlExpr)>> {
                 use #sql_crate::macro_support::Context as _;
                 // Validity check needs to be done only once
@@ -178,7 +178,7 @@ pub fn sql_update_base(
 }
 
 #[always_context]
-pub fn sql_update(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::TokenStream> {
+pub fn update(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::TokenStream> {
     let item = parse_macro_input!(item as syn::ItemStruct);
     let item_name = &item.ident;
 

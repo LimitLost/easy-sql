@@ -2,9 +2,9 @@ mod easy_lib {
     pub use crate as sql;
 }
 
-use easy_lib::sql::{DatabaseSetup, SqlTable};
+use easy_lib::sql::{DatabaseSetup, Table};
 
-#[derive(SqlTable)]
+#[derive(Table)]
 // Needed because of automatic migration generation
 // Update this after you're done with making changes (NOT before)
 #[sql(version = 1)]
@@ -47,7 +47,7 @@ async fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
-#[derive(SqlTable)]
+#[derive(Table)]
 #[sql(version = 1)]
 #[sql(unique_id = "21d36640-7002-49d4-b373-3a2d17c61ff1")]
 struct ExampleTableIncrement {
@@ -59,7 +59,7 @@ struct ExampleTableIncrement {
     field: i64,
 }
 
-#[derive(SqlTable)]
+#[derive(Table)]
 #[sql(version = 1)]
 #[sql(unique_id = "9a5884dd-3f0c-4323-bd5f-07fd1bbb10ed")]
 struct ExampleTableMultiPrimaryKey {
@@ -69,7 +69,7 @@ struct ExampleTableMultiPrimaryKey {
     id2: i64,
 }
 
-#[derive(SqlTable)]
+#[derive(Table)]
 #[sql(version = 1)]
 #[sql(unique_id = "822ee817-0738-441e-b222-29a235fa7be3")]
 struct ExampleTableWithForeignKey {
@@ -84,7 +84,7 @@ struct ExampleTableWithForeignKey {
     value: String,
 }
 
-#[derive(SqlTable)]
+#[derive(Table)]
 #[sql(version = 1)]
 #[sql(unique_id = "2f9ce3ef-1506-4884-985c-6ebfd4a0c54c")]
 struct ExampleTableWithMultiForeignKey {
@@ -98,7 +98,7 @@ struct ExampleTableWithMultiForeignKey {
     example_table_id2: i64,
 }
 
-#[derive(SqlTable)]
+#[derive(Table)]
 #[sql(version = 1)]
 #[sql(unique_id = "5abb2707-0b7c-486c-8ca4-beac5f4af281")]
 struct ExampleTableDefaultValue {
@@ -110,7 +110,7 @@ struct ExampleTableDefaultValue {
     field_str: String,
 }
 
-#[derive(SqlTable)]
+#[derive(Table)]
 #[sql(version = 1)]
 #[sql(table_name = "example_table_renamed_to_something_else")]
 #[sql(unique_id = "9d9e3d2d-f9dc-406c-96ff-e9a33c9da0c1")]
@@ -120,9 +120,9 @@ struct ExampleTableRenamed {
     field: i64,
 }
 
-use easy_lib::sql::{SqlInsert, SqlOutput, SqlUpdate};
+use easy_lib::sql::{Insert, Output, Update};
 
-#[derive(SqlInsert, SqlUpdate, SqlOutput)]
+#[derive(Insert, Update, Output)]
 #[sql(table = ExampleTableIncrement)]
 #[sql(default = id)]
 struct ExampleInsert {
@@ -181,7 +181,7 @@ use sql_macros::table_join_debug;
 
 table_join!(JoinedExampleTables | ExampleTable LEFT JOIN ExampleTableWithForeignKey ON ExampleTable.id = ExampleTableWithForeignKey.example_table_id);
 
-#[derive(SqlOutput)]
+#[derive(Output)]
 #[sql(table = JoinedExampleTables)]
 struct JoinedExampleTableOutput {
     //You need to specify referenced table column

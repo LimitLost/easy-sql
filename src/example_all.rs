@@ -29,9 +29,9 @@ enum ExampleEnum {
     C,
 }
 
-//Implements also SqlOutput, SqlInsert, SqlUpdate Traits
+//Implements also Output, Insert, Update Traits
 #[sql(unique_id = "a489a304-5de0-4e91-b1aa-28f53b390c2f")]
-#[derive(SqlTable)]
+#[derive(Table)]
 //Name can also be auto generated
 #[sql(table_name = example_table1)]
 struct ExampleTableStructure {
@@ -48,21 +48,21 @@ struct ExampleTableStructure {
 
 //Do static checks to see if table has those fields
 //Can Implement DoesNotNeedGroupBy Trait
-#[derive(SqlOutput)]
+#[derive(Output)]
 #[sql(supports=ExampleTableStructure)]
 struct ExampleOutput {
     id: i64,
     #[sql(database_field = field1)]
     nnnn: String,
 }
-#[derive(SqlInsert)]
+#[derive(Insert)]
 #[sql(supports=ExampleTableStructure)]
 struct ExampleInsert {
     field1: String,
     field2: Vec<i64>,
     field3: ExampleEnum,
 }
-#[derive(SqlUpdate)]
+#[derive(Update)]
 #[sql(supports=ExampleTableStructure)]
 struct ExampleUpdate {
     field1: String,
@@ -83,7 +83,7 @@ async fn get_data_example() -> anyhow::Result<()> {
     let whatever = 15;
 
     //Insert
-    //Type inserted needs to implement SqlInsert, auto implement SqlInsert for Vec<T>
+    //Type inserted needs to implement Insert, auto implement Insert for Vec<T>
     ExampleTableStructure::insert(&conn, ins).await?;
     ExampleTableStructure::insert(&conn, vec![ins]).await?;
 

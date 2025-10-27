@@ -4,7 +4,7 @@ use easy_macros::macros::always_context;
 use crate::{Driver, DriverArguments, QueryBuilder};
 
 #[always_context]
-pub trait SqlInsert<'a, Table, D: Driver> {
+pub trait Insert<'a, Table, D: Driver> {
     fn insert_columns() -> Vec<String>;
     ///Returns number of inserted rows
     fn insert_values(self, builder: &mut QueryBuilder<'_, D>) -> anyhow::Result<usize>;
@@ -16,7 +16,7 @@ pub trait SqlInsert<'a, Table, D: Driver> {
 }
 
 #[always_context]
-impl<'a, Table, T: SqlInsert<'a, Table, D>, D: Driver> SqlInsert<'a, Table, D> for Vec<T> {
+impl<'a, Table, T: Insert<'a, Table, D>, D: Driver> Insert<'a, Table, D> for Vec<T> {
     fn insert_columns() -> Vec<String> {
         T::insert_columns()
     }
@@ -51,9 +51,9 @@ impl<'a, Table, T: SqlInsert<'a, Table, D>, D: Driver> SqlInsert<'a, Table, D> f
 }
 
 #[always_context]
-impl<'a, Table, T: SqlInsert<'a, Table, D>, D: Driver> SqlInsert<'a, Table, D> for &'a Vec<T>
+impl<'a, Table, T: Insert<'a, Table, D>, D: Driver> Insert<'a, Table, D> for &'a Vec<T>
 where
-    &'a T: SqlInsert<'a, Table, D>,
+    &'a T: Insert<'a, Table, D>,
 {
     fn insert_columns() -> Vec<String> {
         T::insert_columns()
@@ -89,9 +89,9 @@ where
 }
 
 #[always_context]
-impl<'a, Table, T: SqlInsert<'a, Table, D>, D: Driver> SqlInsert<'a, Table, D> for &'a [T]
+impl<'a, Table, T: Insert<'a, Table, D>, D: Driver> Insert<'a, Table, D> for &'a [T]
 where
-    &'a T: SqlInsert<'a, Table, D>,
+    &'a T: Insert<'a, Table, D>,
 {
     fn insert_columns() -> Vec<String> {
         T::insert_columns()

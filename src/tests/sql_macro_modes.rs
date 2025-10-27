@@ -9,11 +9,11 @@ mod easy_lib {
 
 use super::Database;
 use anyhow::Context;
-use easy_lib::sql::{SqlInsert, SqlOutput, SqlTable, SqlUpdate};
+use easy_lib::sql::{Insert, Output, Table, Update};
 use easy_macros::macros::always_context;
 use sql_macros::{sql, sql_convenience};
 
-#[derive(SqlTable, Debug)]
+#[derive(Table, Debug)]
 #[sql(version = 1)]
 #[sql(unique_id = "5058fa57-75a8-4db5-855b-7dffdb138c76")]
 struct TestTableModes {
@@ -24,7 +24,7 @@ struct TestTableModes {
     name: String,
 }
 
-#[derive(SqlInsert, SqlUpdate, SqlOutput, Debug)]
+#[derive(Insert, Update, Output, Debug)]
 #[sql(table = TestTableModes)]
 #[sql(default = id)]
 struct TestOps {

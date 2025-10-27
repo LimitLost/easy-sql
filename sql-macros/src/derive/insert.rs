@@ -66,7 +66,7 @@ pub fn sql_insert_base(
     }
 
     Ok(quote! {
-        impl<'a> #sql_crate::SqlInsert<'a,#table,#driver> for #item_name {
+        impl<'a> #sql_crate::Insert<'a,#table,#driver> for #item_name {
             fn insert_columns() -> Vec<String> {
                 #sql_crate::never::never_fn(|| {
                     //Check for validity
@@ -119,7 +119,7 @@ pub fn sql_insert_base(
             }
         }
 
-        impl<'a> #sql_crate::SqlInsert<'a,#table,#driver> for &'a #item_name{
+        impl<'a> #sql_crate::Insert<'a,#table,#driver> for &'a #item_name{
             fn insert_columns() -> Vec<String> {
                 // Validity check needs to be done only once
                 vec![
@@ -164,7 +164,7 @@ pub fn sql_insert_base(
 }
 
 #[always_context]
-pub fn sql_insert(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::TokenStream> {
+pub fn insert(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::TokenStream> {
     let item = parse_macro_input!(item as syn::ItemStruct);
     let item_name = &item.ident;
 

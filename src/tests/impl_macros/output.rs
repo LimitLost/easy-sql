@@ -21,7 +21,7 @@ struct ExampleStruct {
 }
 //Remove in derive
 #[always_context]
-impl crate::SqlOutput<ExampleTableStruct, TestDriver> for ExampleStruct {
+impl crate::Output<ExampleTableStruct, TestDriver> for ExampleStruct {
     type DataToConvert = DriverRow<TestDriver>;
     fn sql_to_query<'a>(
         sql: Sql,

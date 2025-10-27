@@ -22,7 +22,7 @@ fn single_value_str<D: Driver>(columns_len: usize, current_value_n: &mut usize) 
 #[derive(Debug)]
 pub enum Sql {
     Select {
-        // We don't provide output columns here, they are provided inside of SqlOutput trait
+        // We don't provide output columns here, they are provided inside of Output trait
         table: &'static str,
         joins: Vec<TableJoin>,
         clauses: SelectClauses,

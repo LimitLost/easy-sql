@@ -1,6 +1,6 @@
 use ::syn::{self, parse::Parse};
 
-use crate::sql_macros_components::sql_expr::SqlExpr;
+use super::expr::SqlExpr;
 
 pub struct SetExpr {
     pub(crate) updates: Vec<(syn::Ident, SqlExpr)>,

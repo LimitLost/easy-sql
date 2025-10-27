@@ -16,7 +16,7 @@ pub trait ToConvert<D: Driver> {
 pub trait ToConvertSingle<D: Driver>: ToConvert<D> + sqlx::Row {}
 
 #[always_context]
-pub trait SqlOutput<Table, D: Driver>: Sized {
+pub trait Output<Table, D: Driver>: Sized {
     type DataToConvert: ToConvert<D>;
     fn sql_to_query<'a>(sql: Sql, builder: QueryBuilder<'a, D>)
     -> anyhow::Result<QueryData<'a, D>>;

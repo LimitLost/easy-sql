@@ -1,15 +1,15 @@
 mod database_setup;
 pub use database_setup::*;
 
-mod sql_output;
-pub use sql_output::*;
-mod sql_insert;
-pub use sql_insert::*;
-mod sql_update;
-pub use sql_update::*;
+mod output;
+pub use output::*;
+mod insert;
+pub use insert::*;
+mod update;
+pub use update::*;
 
-mod sql_table;
-pub use sql_table::*;
+mod table;
+pub use table::*;
 mod has_table_traits;
 pub use has_table_traits::*;
 mod driver;

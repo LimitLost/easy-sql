@@ -1,8 +1,8 @@
-use crate::sql_macros_components::sql_keyword::DoubleArrow;
+use crate::macros_components::keyword::DoubleArrow;
 
-use super::{sql_column::SqlColumn, sql_next_clause::next_clause_token};
+use super::{column::SqlColumn, next_clause::next_clause_token};
 
-use super::sql_keyword;
+use super::keyword;
 use ::{
     proc_macro2::{self, TokenStream},
     syn::{
@@ -49,11 +49,11 @@ pub enum Operator {
 impl Parse for Operator {
     fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
         let lookahead = input.lookahead1();
-        if lookahead.peek(sql_keyword::and) {
-            input.parse::<sql_keyword::and>()?;
+        if lookahead.peek(keyword::and) {
+            input.parse::<keyword::and>()?;
             Ok(Operator::And)
-        } else if lookahead.peek(sql_keyword::or) {
-            input.parse::<sql_keyword::or>()?;
+        } else if lookahead.peek(keyword::or) {
+            input.parse::<keyword::or>()?;
             Ok(Operator::Or)
         } else if lookahead.peek(syn::Token![+]) {
             input.parse::<syn::Token![+]>()?;
@@ -150,7 +150,7 @@ impl SqlExpr {
                         let ident_str = ident.to_string();
                         quote_spanned! {ident.span()=>
                             #sql_crate::SqlExpr::ColumnFromTable{
-                                table: <#path as #sql_crate::SqlTable<#driver>>::table_name().to_owned(),
+                                table: <#path as #sql_crate::Table<#driver>>::table_name().to_owned(),
                                 column: #ident_str.to_string(),
                             }
                         }
@@ -478,7 +478,7 @@ impl SqlValue {
                         let ident_str = ident.to_string();
                         quote_spanned! {ident.span()=>
                             #sql_crate::SqlExpr::ColumnFromTable{
-                                table: <#path as #sql_crate::SqlTable<#driver>>::table_name().to_owned(),
+                                table: <#path as #sql_crate::Table<#driver>>::table_name().to_owned(),
                                 column: #ident_str.to_string(),
                             }
                         }
@@ -599,20 +599,20 @@ fn continue_parse_value_no_expr(
         return Ok(SqlExpr::Value(current_value));
     }
 
-    if lookahead.peek(sql_keyword::is) {
-        input.parse::<sql_keyword::is>()?;
+    if lookahead.peek(keyword::is) {
+        input.parse::<keyword::is>()?;
         let lookahead2 = input.lookahead1();
-        if lookahead2.peek(sql_keyword::not) {
-            input.parse::<sql_keyword::not>()?;
+        if lookahead2.peek(keyword::not) {
+            input.parse::<keyword::not>()?;
             let lookahead3 = input.lookahead1();
-            if lookahead3.peek(sql_keyword::null) {
-                input.parse::<sql_keyword::null>()?;
+            if lookahead3.peek(keyword::null) {
+                input.parse::<keyword::null>()?;
                 Ok(SqlExpr::IsNotNull(current_value))
             } else {
                 Err(lookahead3.error())
             }
-        } else if lookahead2.peek(sql_keyword::null) {
-            input.parse::<sql_keyword::null>()?;
+        } else if lookahead2.peek(keyword::null) {
+            input.parse::<keyword::null>()?;
             Ok(SqlExpr::IsNull(current_value))
         } else {
             Err(lookahead2.error())
@@ -641,20 +641,20 @@ fn continue_parse_value_no_expr(
         input.parse::<syn::Token![<]>()?;
         let right_value = input.parse::<SqlValue>()?;
         Ok(SqlExpr::LessThan(current_value, right_value))
-    } else if lookahead.peek(sql_keyword::like) {
-        input.parse::<sql_keyword::like>()?;
+    } else if lookahead.peek(keyword::like) {
+        input.parse::<keyword::like>()?;
         let right_value = input.parse::<SqlValue>()?;
         Ok(SqlExpr::Like(current_value, right_value))
-    } else if lookahead.peek(sql_keyword::in_) {
-        input.parse::<sql_keyword::in_>()?;
+    } else if lookahead.peek(keyword::in_) {
+        input.parse::<keyword::in_>()?;
         let right_value = input.parse::<SqlValueIn>()?;
         Ok(SqlExpr::In(current_value, right_value))
-    } else if lookahead.peek(sql_keyword::between) {
-        input.parse::<sql_keyword::between>()?;
+    } else if lookahead.peek(keyword::between) {
+        input.parse::<keyword::between>()?;
         let middle_value = input.parse::<SqlValue>()?;
         let lookahead2 = input.lookahead1();
-        if lookahead2.peek(sql_keyword::and) {
-            input.parse::<sql_keyword::and>()?;
+        if lookahead2.peek(keyword::and) {
+            input.parse::<keyword::and>()?;
             let right_value = input.parse::<SqlValue>()?;
             Ok(SqlExpr::Between(current_value, middle_value, right_value))
         } else {
@@ -675,8 +675,8 @@ fn continue_parse_value_maybe_expr(
 
     let lookahead = input.lookahead1();
 
-    if lookahead.peek(sql_keyword::and)
-        || lookahead.peek(sql_keyword::or)
+    if lookahead.peek(keyword::and)
+        || lookahead.peek(keyword::or)
         || lookahead.peek(syn::Token![+])
         || lookahead.peek(syn::Token![-])
         || lookahead.peek(syn::Token![*])
@@ -700,8 +700,8 @@ fn continue_parse_value_maybe_expr(
 fn sub_where_expr(input: syn::parse::ParseStream) -> syn::Result<SqlExpr> {
     let lookahead = input.lookahead1();
 
-    if lookahead.peek(sql_keyword::not) {
-        input.parse::<sql_keyword::not>()?;
+    if lookahead.peek(keyword::not) {
+        input.parse::<keyword::not>()?;
 
         let expr = sub_where_expr(input)?;
         Ok(SqlExpr::Not(Box::new(expr)))

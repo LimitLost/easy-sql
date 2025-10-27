@@ -6,7 +6,7 @@ use sqlx::{Executor, Row as SqlxRow};
 type CDriver = super::Sqlite;
 
 use crate::{
-    DriverArguments, InternalDriver, QueryBuilder, QueryData, Sql, SqlOutput, ToConvert,
+    DriverArguments, InternalDriver, Output, QueryBuilder, QueryData, Sql, ToConvert,
     ToConvertSingle,
 };
 
@@ -77,9 +77,9 @@ impl ToConvert<CDriver> for Vec<Row> {
 }
 
 #[always_context]
-impl<T, Table> SqlOutput<Table, CDriver> for Vec<T>
+impl<T, Table> Output<Table, CDriver> for Vec<T>
 where
-    T: SqlOutput<Table, CDriver, DataToConvert = Row>,
+    T: Output<Table, CDriver, DataToConvert = Row>,
 {
     type DataToConvert = Vec<Row>;
     fn sql_to_query<'a>(
@@ -104,9 +104,9 @@ where
 }
 
 #[always_context]
-impl<T, Table> SqlOutput<Table, CDriver> for Option<T>
+impl<T, Table> Output<Table, CDriver> for Option<T>
 where
-    T: SqlOutput<Table, CDriver, DataToConvert = Row>,
+    T: Output<Table, CDriver, DataToConvert = Row>,
 {
     type DataToConvert = Option<Row>;
     fn sql_to_query<'a>(
@@ -131,7 +131,7 @@ where
 }
 
 #[always_context]
-impl<Table> SqlOutput<Table, CDriver> for () {
+impl<Table> Output<Table, CDriver> for () {
     type DataToConvert = ();
     fn sql_to_query<'a>(
         sql: Sql,
@@ -150,7 +150,7 @@ impl<Table> SqlOutput<Table, CDriver> for () {
 }
 
 #[always_context]
-impl<Table> SqlOutput<Table, CDriver> for bool {
+impl<Table> Output<Table, CDriver> for bool {
     type DataToConvert = Row;
     fn sql_to_query<'a>(
         sql: Sql,

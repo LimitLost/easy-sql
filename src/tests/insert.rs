@@ -3,7 +3,7 @@ mod easy_lib {
 }
 
 use anyhow::Context;
-use easy_lib::sql::{SqlInsert, SqlOutput, SqlTable, SqlUpdate, sql};
+use easy_lib::sql::{Insert, Output, Table, Update, sql};
 use super::Database;
 use easy_macros::macros::always_context;
 use lazy_static::lazy_static;
@@ -14,7 +14,7 @@ lazy_static!{
     
 }
 
-#[derive(SqlTable, Debug)]
+#[derive(Table, Debug)]
 #[sql(version = 1)]
 #[sql(unique_id = "ce3d4f19-9d47-4fe2-9700-0957df4c04ee")]
 struct ExampleTableInsert {
@@ -27,7 +27,7 @@ struct ExampleTableInsert {
     field_opt: Option<i32>,
 }
 
-#[derive(SqlInsert, SqlUpdate, SqlOutput, Debug)]
+#[derive(Insert, Update, Output, Debug)]
 #[sql(table = ExampleTableInsert)]
 #[sql(default = id)]
 struct ExampleInsert {
@@ -36,7 +36,7 @@ struct ExampleInsert {
     pub field_opt: Option<i32>,
 }
 
-#[derive(SqlInsert, Debug)]
+#[derive(Insert, Debug)]
 #[sql(table = ExampleTableInsert)]
 #[sql(default = id, field_str)]
 struct ExampleInsertDefaultCheck {

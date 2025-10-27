@@ -14,9 +14,9 @@ use easy_macros::{
 use sql_compilation_data::{CompilationData, TableDataVersion};
 
 use crate::{
+    derive::{sql_insert_base, sql_output_base, sql_update_base},
+    macros_components::joined_field::JoinedField,
     sql_crate,
-    sql_derive::{sql_insert_base, sql_output_base, sql_update_base},
-    sql_macros_components::joined_field::JoinedField,
 };
 
 mod keywords {
@@ -47,7 +47,7 @@ impl syn::parse::Parse for ForeignKeyParsed {
 }
 
 #[always_context]
-pub fn sql_table(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::TokenStream> {
+pub fn table(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::TokenStream> {
     let item = parse_macro_input!(item as syn::ItemStruct);
     let item_name = &item.ident;
     let item_name_tokens = item.ident.to_token_stream();
@@ -322,10 +322,10 @@ pub fn sql_table(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::To
             for (foreign_table, (referenced_fields, cascade)) in foreign_keys.iter() {
                 foreign_keys_converted.push(quote! {
                     (
-                        <#foreign_table as #sql_crate::SqlTable<#driver>>::table_name(),
+                        <#foreign_table as #sql_crate::Table<#driver>>::table_name(),
                         (
                             vec![#(#referenced_fields),*],
-                            <#foreign_table as #sql_crate::SqlTable<#driver>>::primary_keys(),
+                            <#foreign_table as #sql_crate::Table<#driver>>::primary_keys(),
                             #cascade
                         ),
                     )
@@ -379,7 +379,7 @@ pub fn sql_table(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::To
             }
         }
 
-        impl #sql_crate::SqlTable<#driver> for #item_name {
+        impl #sql_crate::Table<#driver> for #item_name {
 
             fn table_name() -> &'static str {
                 #table_name

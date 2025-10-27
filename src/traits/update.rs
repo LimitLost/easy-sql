@@ -4,7 +4,7 @@ use crate::{Driver, DriverArguments, QueryBuilder, SqlExpr};
 use anyhow::Context;
 
 #[always_context]
-pub trait SqlUpdate<'a, Table, D: Driver>: Sized {
+pub trait Update<'a, Table, D: Driver>: Sized {
     fn updates(self, builder: &mut QueryBuilder<'_, D>) -> anyhow::Result<Vec<(String, SqlExpr)>>;
 
     fn updates_sqlx(
@@ -16,7 +16,7 @@ pub trait SqlUpdate<'a, Table, D: Driver>: Sized {
 }
 
 #[always_context]
-impl<'a, F, Table, D: Driver> SqlUpdate<'a, Table, D> for (Vec<(String, SqlExpr)>, F)
+impl<'a, F, Table, D: Driver> Update<'a, Table, D> for (Vec<(String, SqlExpr)>, F)
 where
     F: Fn(&mut QueryBuilder<'_, D>) -> anyhow::Result<()>,
 {

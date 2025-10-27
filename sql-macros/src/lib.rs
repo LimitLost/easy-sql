@@ -1,8 +1,8 @@
+mod macros;
+mod macros_components;
 mod sql_convenience_attr;
-mod sql_macros;
-mod sql_macros_components;
 
-mod sql_derive;
+mod derive;
 
 use ::{proc_macro2, quote::quote};
 use easy_macros::{
@@ -111,7 +111,7 @@ fn easy_macros_helpers_crate() -> proc_macro2::TokenStream {
 #[always_context]
 #[anyhow_result]
 pub fn sql(item: TokenStream) -> anyhow::Result<TokenStream> {
-    sql_macros::sql(item)
+    macros::sql(item)
 }
 
 #[always_context]
@@ -121,7 +121,7 @@ pub fn sql(item: TokenStream) -> anyhow::Result<TokenStream> {
 #[anyhow_result]
 #[no_context]
 pub fn sql_debug(item: TokenStream) -> anyhow::Result<TokenStream> {
-    let result = sql_macros::sql(item)?;
+    let result = macros::sql(item)?;
     panic!("{}", result);
 }
 
@@ -129,7 +129,7 @@ pub fn sql_debug(item: TokenStream) -> anyhow::Result<TokenStream> {
 #[proc_macro]
 #[anyhow_result]
 pub fn table_join(item: TokenStream) -> anyhow::Result<TokenStream> {
-    sql_macros::table_join(item)
+    macros::table_join(item)
 }
 
 #[always_context]
@@ -137,7 +137,7 @@ pub fn table_join(item: TokenStream) -> anyhow::Result<TokenStream> {
 #[anyhow_result]
 #[no_context]
 pub fn table_join_debug(item: TokenStream) -> anyhow::Result<TokenStream> {
-    let result = sql_macros::table_join(item)?;
+    let result = macros::table_join(item)?;
     panic!("{}", result);
 }
 
@@ -145,73 +145,73 @@ pub fn table_join_debug(item: TokenStream) -> anyhow::Result<TokenStream> {
 #[proc_macro_derive(DatabaseSetup)]
 #[anyhow_result]
 pub fn database_setup(item: TokenStream) -> anyhow::Result<TokenStream> {
-    sql_derive::database_setup(item)
+    derive::database_setup(item)
 }
 
 #[always_context]
-#[proc_macro_derive(SqlOutput, attributes(sql))]
+#[proc_macro_derive(Output, attributes(sql))]
 #[anyhow_result]
-pub fn sql_output(item: TokenStream) -> anyhow::Result<TokenStream> {
-    sql_derive::sql_output(item)
+pub fn output(item: TokenStream) -> anyhow::Result<TokenStream> {
+    derive::output(item)
 }
 
 #[always_context]
-#[proc_macro_derive(SqlOutputDebug, attributes(sql))]
+#[proc_macro_derive(OutputDebug, attributes(sql))]
 #[anyhow_result]
 #[no_context]
-pub fn sql_output_debug(item: TokenStream) -> anyhow::Result<TokenStream> {
-    let output = sql_derive::sql_output(item)?;
+pub fn output_debug(item: TokenStream) -> anyhow::Result<TokenStream> {
+    let output = derive::output(item)?;
 
     panic!("{}", output);
 }
 
 #[always_context]
-#[proc_macro_derive(SqlInsert, attributes(sql))]
+#[proc_macro_derive(Insert, attributes(sql))]
 #[anyhow_result]
-pub fn sql_insert(item: TokenStream) -> anyhow::Result<TokenStream> {
-    sql_derive::sql_insert(item)
+pub fn insert(item: TokenStream) -> anyhow::Result<TokenStream> {
+    derive::insert(item)
 }
 
 #[always_context]
-#[proc_macro_derive(SqlInsertDebug, attributes(sql))]
+#[proc_macro_derive(InsertDebug, attributes(sql))]
 #[anyhow_result]
 #[no_context]
-pub fn sql_insert_debug(item: TokenStream) -> anyhow::Result<TokenStream> {
-    let output = sql_derive::sql_insert(item)?;
+pub fn insert_debug(item: TokenStream) -> anyhow::Result<TokenStream> {
+    let output = derive::insert(item)?;
 
     panic!("{}", output);
 }
 
 #[always_context]
-#[proc_macro_derive(SqlUpdate, attributes(sql))]
+#[proc_macro_derive(Update, attributes(sql))]
 #[anyhow_result]
 pub fn sql_update(item: TokenStream) -> anyhow::Result<TokenStream> {
-    sql_derive::sql_update(item)
+    derive::update(item)
 }
 
 #[always_context]
-#[proc_macro_derive(SqlUpdateDebug, attributes(sql))]
+#[proc_macro_derive(UpdateDebug, attributes(sql))]
 #[anyhow_result]
 #[no_context]
 pub fn sql_update_debug(item: TokenStream) -> anyhow::Result<TokenStream> {
-    let output = sql_derive::sql_update(item)?;
+    let output = derive::update(item)?;
 
     panic!("{}", output);
 }
 
 #[always_context]
-#[proc_macro_derive(SqlTable, attributes(sql))]
+#[proc_macro_derive(Table, attributes(sql))]
 #[anyhow_result]
-pub fn sql_table(item: TokenStream) -> anyhow::Result<TokenStream> {
-    sql_derive::sql_table(item)
+pub fn table(item: TokenStream) -> anyhow::Result<TokenStream> {
+    derive::table(item)
 }
 
 #[always_context]
-#[proc_macro_derive(SqlTableDebug, attributes(sql))]
+#[proc_macro_derive(TableDebug, attributes(sql))]
 #[anyhow_result]
 #[no_context]
-pub fn sql_table_debug(item: TokenStream) -> anyhow::Result<TokenStream> {
-    let output = sql_derive::sql_table(item)?;
+pub fn table_debug(item: TokenStream) -> anyhow::Result<TokenStream> {
+    let output = derive::table(item)?;
 
     panic!("{}", output);
 }

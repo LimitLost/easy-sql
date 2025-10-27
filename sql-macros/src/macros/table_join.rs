@@ -7,10 +7,10 @@ use syn::Path;
 use syn::punctuated::Punctuated;
 use syn::{self, parse::Parse};
 
+use crate::macros_components::expr::SqlExpr;
 use crate::sql_crate;
-use crate::sql_macros_components::sql_expr::SqlExpr;
 
-use crate::sql_macros_components::sql_keyword;
+use crate::macros_components::keyword;
 
 struct Input {
     drivers: Option<Punctuated<syn::Path, syn::Token![,]>>,
@@ -29,43 +29,43 @@ enum Join {
 impl Parse for Join {
     fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
         let lookahead = input.lookahead1();
-        if lookahead.peek(sql_keyword::inner) {
-            input.parse::<sql_keyword::inner>()?;
-            input.parse::<sql_keyword::join>()?;
+        if lookahead.peek(keyword::inner) {
+            input.parse::<keyword::inner>()?;
+            input.parse::<keyword::join>()?;
 
             let table = input.parse::<syn::Path>()?;
 
-            input.parse::<sql_keyword::on>()?;
+            input.parse::<keyword::on>()?;
 
             let on = input.parse::<SqlExpr>()?;
             Ok(Join::Inner { table, on })
-        } else if lookahead.peek(sql_keyword::left) {
-            input.parse::<sql_keyword::left>()?;
-            input.parse::<sql_keyword::join>()?;
+        } else if lookahead.peek(keyword::left) {
+            input.parse::<keyword::left>()?;
+            input.parse::<keyword::join>()?;
 
             let table = input.parse::<syn::Path>()?;
 
-            input.parse::<sql_keyword::on>()?;
+            input.parse::<keyword::on>()?;
 
             let on = input.parse::<SqlExpr>()?;
             Ok(Join::Left { table, on })
-        } else if lookahead.peek(sql_keyword::right) {
-            input.parse::<sql_keyword::right>()?;
-            input.parse::<sql_keyword::join>()?;
+        } else if lookahead.peek(keyword::right) {
+            input.parse::<keyword::right>()?;
+            input.parse::<keyword::join>()?;
 
             let table = input.parse::<syn::Path>()?;
 
-            input.parse::<sql_keyword::on>()?;
+            input.parse::<keyword::on>()?;
 
             let on = input.parse::<SqlExpr>()?;
             Ok(Join::Right { table, on })
-        } else if lookahead.peek(sql_keyword::cross) {
-            input.parse::<sql_keyword::cross>()?;
-            input.parse::<sql_keyword::join>()?;
+        } else if lookahead.peek(keyword::cross) {
+            input.parse::<keyword::cross>()?;
+            input.parse::<keyword::join>()?;
 
             let table = input.parse::<syn::Path>()?;
 
-            input.parse::<sql_keyword::on>()?;
+            input.parse::<keyword::on>()?;
             Ok(Join::Cross { table })
         } else {
             Err(input.error("Expected join type"))
@@ -288,7 +288,7 @@ pub fn table_join(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::T
 
                 quote! {
                     #sql_crate::TableJoin::<#driver_tokens>{
-                        table: <#table as #sql_crate::SqlTable<#driver>>::table_name(),
+                        table: <#table as #sql_crate::Table<#driver>>::table_name(),
                         join_type: #join_type,
                         alias: #alias,
                         on: #on,
@@ -299,9 +299,9 @@ pub fn table_join(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::T
 
         result.add(quote! {
 
-            impl #sql_crate::SqlTable<#driver> for #item_name {
+            impl #sql_crate::Table<#driver> for #item_name {
                 fn table_name() -> &'static str {
-                    <#main_table_struct as #sql_crate::SqlTable<#driver>>::table_name()
+                    <#main_table_struct as #sql_crate::Table<#driver>>::table_name()
                 }
 
                 fn primary_keys() -> Vec<&'static str>{

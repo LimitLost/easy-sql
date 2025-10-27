@@ -7,11 +7,10 @@ use easy_macros::{helpers::parse_macro_input, macros::always_context};
 use sql_compilation_data::CompilationData;
 
 use crate::{
-    sql_crate,
-    sql_macros_components::{
-        sql_column::SqlColumn, sql_expr::SqlExpr, sql_keyword, sql_limit::SqlLimit,
-        sql_order_by::OrderBy, sql_set::SetExpr,
+    macros_components::{
+        column::SqlColumn, expr::SqlExpr, keyword, limit::SqlLimit, order_by::OrderBy, set::SetExpr,
     },
+    sql_crate,
 };
 
 use super::WrappedInput;
@@ -61,21 +60,21 @@ impl SelectClauses {
 #[always_context]
 impl Parse for MacroMode {
     fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
-        let is_set_clause = input.peek(sql_keyword::set);
+        let is_set_clause = input.peek(keyword::set);
 
         if is_set_clause {
-            input.parse::<sql_keyword::set>()?;
+            input.parse::<keyword::set>()?;
             // Parse as SET clause
             return Ok(MacroMode::SetClause(input.parse()?));
         }
 
         // Check if this starts with a SELECT clause keyword (DISTINCT, WHERE, ORDER, GROUP, HAVING, LIMIT)
-        let has_clause_keyword = input.peek(sql_keyword::distinct)
-            || input.peek(sql_keyword::where_)
-            || input.peek(sql_keyword::order)
-            || input.peek(sql_keyword::group)
-            || input.peek(sql_keyword::having)
-            || input.peek(sql_keyword::limit);
+        let has_clause_keyword = input.peek(keyword::distinct)
+            || input.peek(keyword::where_)
+            || input.peek(keyword::order)
+            || input.peek(keyword::group)
+            || input.peek(keyword::having)
+            || input.peek(keyword::limit);
 
         if has_clause_keyword {
             // Parse as SELECT clauses
@@ -88,19 +87,19 @@ impl Parse for MacroMode {
 
             while !input.is_empty() {
                 let lookahead = input.lookahead1();
-                if !distinct && lookahead.peek(sql_keyword::distinct) {
-                    input.parse::<sql_keyword::distinct>()?;
+                if !distinct && lookahead.peek(keyword::distinct) {
+                    input.parse::<keyword::distinct>()?;
                     distinct = true;
                     continue;
                 }
-                if where_.is_none() && lookahead.peek(sql_keyword::where_) {
-                    input.parse::<sql_keyword::where_>()?;
+                if where_.is_none() && lookahead.peek(keyword::where_) {
+                    input.parse::<keyword::where_>()?;
                     where_ = Some(input.parse()?);
                     continue;
                 }
-                if order_by.is_none() && lookahead.peek(sql_keyword::order) {
-                    input.parse::<sql_keyword::order>()?;
-                    input.parse::<sql_keyword::by>()?;
+                if order_by.is_none() && lookahead.peek(keyword::order) {
+                    input.parse::<keyword::order>()?;
+                    input.parse::<keyword::by>()?;
                     let mut order_by_list = Vec::new();
                     while !input.is_empty() {
                         let order_by_item: OrderBy = input.parse()?;
@@ -114,9 +113,9 @@ impl Parse for MacroMode {
                     order_by = Some(order_by_list);
                     continue;
                 }
-                if group_by.is_none() && lookahead.peek(sql_keyword::group) {
-                    input.parse::<sql_keyword::group>()?;
-                    input.parse::<sql_keyword::by>()?;
+                if group_by.is_none() && lookahead.peek(keyword::group) {
+                    input.parse::<keyword::group>()?;
+                    input.parse::<keyword::by>()?;
                     let mut group_by_list = Vec::new();
                     while !input.is_empty() {
                         let group_by_item: SqlColumn = input.parse()?;
@@ -130,13 +129,13 @@ impl Parse for MacroMode {
                     group_by = Some(group_by_list);
                     continue;
                 }
-                if having.is_none() && lookahead.peek(sql_keyword::having) {
-                    input.parse::<sql_keyword::having>()?;
+                if having.is_none() && lookahead.peek(keyword::having) {
+                    input.parse::<keyword::having>()?;
                     having = Some(input.parse()?);
                     continue;
                 }
-                if limit.is_none() && lookahead.peek(sql_keyword::limit) {
-                    input.parse::<sql_keyword::limit>()?;
+                if limit.is_none() && lookahead.peek(keyword::limit) {
+                    input.parse::<keyword::limit>()?;
                     limit = Some(input.parse()?);
                     continue;
                 }

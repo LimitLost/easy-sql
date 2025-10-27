@@ -11,8 +11,8 @@ use std::fmt::Debug;
 use tokio::sync::Mutex;
 
 use crate::{
-    DatabaseInternal, Driver, DriverArguments, DriverConnection, DriverRow, InternalDriver,
-    QueryBuilder, SetupSql, Sql, SqlOutput, ToConvert,
+    DatabaseInternal, Driver, DriverArguments, DriverConnection, DriverRow, InternalDriver, Output,
+    QueryBuilder, SetupSql, Sql, ToConvert,
     easy_executor::{Break, EasyExecutor},
 };
 #[derive(Debug)]
@@ -45,11 +45,7 @@ impl<'a, D: Driver, DI: DatabaseInternal<Driver = D>> Transaction<'a, D, DI> {
 impl<'c, DI: DatabaseInternal<Driver = D> + Send + Sync, D: Driver> EasyExecutor<D>
     for Transaction<'c, D, DI>
 {
-    async fn query<
-        Y: ToConvert<D> + Send + Sync + 'static,
-        T,
-        O: SqlOutput<T, D, DataToConvert = Y>,
-    >(
+    async fn query<Y: ToConvert<D> + Send + Sync + 'static, T, O: Output<T, D, DataToConvert = Y>>(
         &mut self,
         sql: Sql,
         builder: QueryBuilder<'_, D>,
@@ -102,7 +98,7 @@ impl<'c, DI: DatabaseInternal<Driver = D> + Send + Sync, D: Driver> EasyExecutor
     /// //Inside of closure
     /// handle.block_on(async { ... } )
     /// ```
-    async fn fetch_lazy<T, O: SqlOutput<T, D, DataToConvert = DriverRow<D>>>(
+    async fn fetch_lazy<T, O: Output<T, D, DataToConvert = DriverRow<D>>>(
         &mut self,
         sql: Sql,
         builder: QueryBuilder<'_, D>,
@@ -120,7 +116,7 @@ impl<'c, DI: DatabaseInternal<Driver = D> + Send + Sync, D: Driver> EasyExecutor
 
         // TODO Inform QueryListener
 
-        // sql context to result is added in the SqlTable invocations
+        // sql context to result is added in the Table invocations
         let mut query_output = O::sql_to_query(
             #[context(no)]
             sql,
