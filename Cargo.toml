@@ -23,7 +23,7 @@ rust_decimal = {version = "1.37.1", features = ["serde-str"], optional = true}
 # Used in Table derive macro (and tests)
 lazy_static = {version="*", optional = true}
 
-easy-macros = {path = "../easy-macros", features = ["general"], optional = true}
+easy-macros = {path = "../easy-macros", features = ["general","easy-sql"], optional = true}
 
 anyhow = {version="1",optional = true}
 chrono = {version = "*", features = ["serde"], optional = true}
