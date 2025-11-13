@@ -1,8 +1,4 @@
-mod easy_lib {
-    pub use crate as sql;
-}
-
-use easy_lib::sql::{DatabaseSetup, Table};
+use crate::{DatabaseSetup, Table};
 
 #[derive(Table)]
 // Needed because of automatic migration generation
@@ -120,7 +116,7 @@ struct ExampleTableRenamed {
     field: i64,
 }
 
-use easy_lib::sql::{Insert, Output, Update};
+use easy_sql::{Insert, Output, Update};
 
 #[derive(Insert, Update, Output)]
 #[sql(table = ExampleTableIncrement)]
@@ -129,7 +125,7 @@ struct ExampleInsert {
     pub field: i64,
 }
 
-use easy_lib::sql::{sql, sql_convenience};
+use easy_sql::{sql, sql_convenience};
 
 #[tokio::test]
 #[sql_convenience]
@@ -176,7 +172,7 @@ async fn main2() -> anyhow::Result<()> {
     Ok(())
 }
 
-use easy_lib::sql::table_join;
+use easy_sql::table_join;
 use sql_macros::table_join_debug;
 
 table_join!(JoinedExampleTables | ExampleTable LEFT JOIN ExampleTableWithForeignKey ON ExampleTable.id = ExampleTableWithForeignKey.example_table_id);

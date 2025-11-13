@@ -19,19 +19,8 @@ fn sql_crate() -> proc_macro2::TokenStream {
     }
 }
 
-fn easy_lib_crate() -> proc_macro2::TokenStream {
-    if let Some(found) = find_crate_list(&[("easy-lib", quote! {})]) {
-        found
-    } else {
-        quote! {}
-    }
-}
-
 fn easy_macros_helpers_crate() -> proc_macro2::TokenStream {
-    if let Some(found) = find_crate_list(&[
-        ("easy-lib", quote! {::helpers}),
-        ("easy-macros", quote! {::helpers}),
-    ]) {
+    if let Some(found) = find_crate_list(&[("easy-macros", quote! {::helpers})]) {
         found
     } else {
         quote! {self}

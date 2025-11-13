@@ -1,10 +1,6 @@
-mod easy_lib {
-    pub use crate as sql;
-}
-
 use super::Database;
+use crate::{Insert, Output, Table, Update, sql};
 use anyhow::Context;
-use easy_lib::sql::{Insert, Output, Table, Update, sql};
 use easy_macros::macros::always_context;
 use sql_macros::sql_convenience;
 

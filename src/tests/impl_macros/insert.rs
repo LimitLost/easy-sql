@@ -3,7 +3,7 @@ use easy_macros::macros::always_context;
 
 use super::{DatabaseInternalDefault, TestDriver};
 
-use crate::{Connection, DriverArguments, QueryBuilder, Insert, Table, TableJoin};
+use crate::{Connection, DriverArguments, Insert, QueryBuilder, Table, TableJoin};
 #[allow(dead_code)]
 struct ExampleTableStruct {
     id: i64,
@@ -26,9 +26,9 @@ struct ExampleStruct {
 #[no_context]
 impl<'a> Insert<'a, ExampleTableStruct, TestDriver> for ExampleStruct {
     fn insert_columns() -> Vec<String> {
-        crate::never::never_fn(|| {
+        let _ = || {
             //Check for validity
-            let this_instance = crate::never::never_any::<Self>();
+            let this_instance = crate::macro_support::never_any::<Self>();
 
             ExampleTableStruct {
                 id: Default::default(),
@@ -38,7 +38,7 @@ impl<'a> Insert<'a, ExampleTableStruct, TestDriver> for ExampleStruct {
                 field3: this_instance.field3,
                 field4: this_instance.field4,
             }
-        });
+        };
         vec![
             "field0".to_string(),
             "field1".to_string(),

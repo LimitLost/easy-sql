@@ -31,6 +31,7 @@ pub fn sql_update_base(
         .collect::<Vec<_>>();
 
     let sql_crate = sql_crate();
+    let macro_support = quote! { #sql_crate::macro_support };
 
     let mut update_values = Vec::new();
     let mut insert_values_debug = Vec::new();
@@ -78,16 +79,16 @@ pub fn sql_update_base(
 
     Ok(quote! {
         impl<'a> #sql_crate::Update<'a,#table, #driver> for #item_name {
-            fn updates(self, builder: &mut #sql_crate::QueryBuilder<'_, #driver>) -> ::anyhow::Result<Vec<(String, #sql_crate::Expr)>> {
-                use #sql_crate::macro_support::Context as _;
+            fn updates(self, builder: &mut #sql_crate::QueryBuilder<'_, #driver>) -> #macro_support::Result<Vec<(String, #sql_crate::Expr)>> {
+                use #macro_support::Context as _;
 
-                #sql_crate::never::never_fn(|| {
+                let _ = || {
                     //Check for validity
-                    let update_instance = #sql_crate::never::never_any::<Self>();
-                    let mut table_instance = #sql_crate::never::never_any::<#table>();
+                    let update_instance = #macro_support::never_any::<Self>();
+                    let mut table_instance = #macro_support::never_any::<#table>();
 
                     #(table_instance.#field_names = update_instance.#field_names;)*
-                });
+                };
                 // Fully safe because we pass by value, not by reference
                 unsafe {
                     #(
@@ -108,11 +109,11 @@ pub fn sql_update_base(
                 mut args_list: #sql_crate::DriverArguments<'a, #driver>,
                 current_query: &mut String,
                 parameter_n: &mut usize,
-            ) -> anyhow::Result<#sql_crate::DriverArguments<'a, #driver>>{
-                use #sql_crate::macro_support::{Arguments, Context as _};
+            ) -> #macro_support::Result<#sql_crate::DriverArguments<'a, #driver>>{
+                use #macro_support::{Arguments, Context as _};
 
                 #(
-                    args_list.add(#update_values).map_err(anyhow::Error::from_boxed)#insert_values_debug?;
+                    args_list.add(#update_values).map_err(#macro_support::Error::from_boxed)#insert_values_debug?;
                 )*
 
                 let delimeter = <#driver as #sql_crate::Driver>::identifier_delimiter();
@@ -130,8 +131,8 @@ pub fn sql_update_base(
         }
 
         impl<'a> #sql_crate::Update<'a,#table, #driver> for &'a #item_name {
-            fn updates( self, builder: &mut #sql_crate::QueryBuilder<'_, #driver>) -> ::anyhow::Result<Vec<(String, #sql_crate::Expr)>> {
-                use #sql_crate::macro_support::Context as _;
+            fn updates( self, builder: &mut #sql_crate::QueryBuilder<'_, #driver>) -> #macro_support::Result<Vec<(String, #sql_crate::Expr)>> {
+                use #macro_support::Context as _;
                 // Validity check needs to be done only once
                 // SAFETY: Fully safe because we pass by reference, and the reference lives until
                 // the end of the QueryBuilder usage (parent function call)
@@ -153,11 +154,11 @@ pub fn sql_update_base(
                 mut args_list: #sql_crate::DriverArguments<'a, #driver>,
                 current_query: &mut String,
                 parameter_n: &mut usize,
-            ) -> anyhow::Result<#sql_crate::DriverArguments<'a, #driver>>{
-                use #sql_crate::macro_support::{Arguments, Context as _};
+            ) -> #macro_support::Result<#sql_crate::DriverArguments<'a, #driver>>{
+                use #macro_support::{Arguments, Context as _};
 
                 #(
-                    args_list.add(&#update_values).map_err(anyhow::Error::from_boxed)#insert_values_debug_ref?;
+                    args_list.add(&#update_values).map_err(#macro_support::Error::from_boxed)#insert_values_debug_ref?;
                 )*
 
                 let delimeter = <#driver as #sql_crate::Driver>::identifier_delimiter();

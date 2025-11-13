@@ -149,7 +149,7 @@ impl syn::parse::Parse for SqlMacroInput {
 fn macro_check(item: &mut syn::Macro, context_info: &mut SqlData) {
     let path = token_stream_to_consistent_string(item.path.to_token_stream());
     match path.as_str() {
-        "sql" | "sql_debug" | "easy_lib::sql::sql" | "easy_lib::sql::sql_debug" => {
+        "sql" | "sql_debug" | "easy_sql::sql" | "easy_sql::sql_debug" => {
             let macro_input: SqlMacroInput = if let Ok(r) = syn::parse2(item.tokens.clone()) {
                 r
             } else {

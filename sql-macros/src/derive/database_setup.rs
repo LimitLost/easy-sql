@@ -10,15 +10,15 @@ use easy_macros::{
 };
 use sql_compilation_data::CompilationData;
 
-use crate::{easy_lib_crate, easy_macros_helpers_crate, sql_crate};
+use crate::{easy_macros_helpers_crate, sql_crate};
 
 #[always_context]
 pub fn database_setup(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::TokenStream> {
     let item = parse_macro_input!(item as syn::ItemStruct);
 
     let sql_crate = sql_crate();
-    let easy_lib_crate = easy_lib_crate();
     let easy_macros_helpers_crate = easy_macros_helpers_crate();
+    let macro_support = quote! { #sql_crate::macro_support };
 
     let fields = match &item.fields {
         syn::Fields::Named(fields_named) => &fields_named.named,
@@ -56,8 +56,8 @@ pub fn database_setup(item: proc_macro::TokenStream) -> anyhow::Result<proc_macr
             impl #sql_crate::DatabaseSetup<#driver> for #item_name {
                 async fn setup(
                     conn: &mut (impl #sql_crate::EasyExecutor<#driver> + Send + Sync)
-                ) -> #easy_lib_crate::anyhow::Result<()> {
-                    use #easy_lib_crate::anyhow::Context;
+                ) -> #macro_support::Result<()> {
+                    use #macro_support::Context;
 
                     #(
                         #fields_mapped

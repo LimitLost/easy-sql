@@ -231,7 +231,7 @@ fn struct_table_handle_wrapper(item: &mut syn::ItemStruct, context_info: &mut Se
 fn macro_check(item: &mut Macro, context_info: &mut SearchData) {
     let path = item.path.to_token_stream().to_string();
     match path.as_str() {
-        "sql" | "sql_where" | "easy_lib::sql::sql" | "easy_lib::sql::sql_where" => {
+        "sql" | "easy_sql::sql" => {
             context_info.found = true;
         }
         _ => {}
@@ -276,7 +276,7 @@ fn has_sql_convenience(attrs: &[syn::Attribute]) -> bool {
                 .to_token_stream()
                 .to_string()
                 .replace(|c: char| c.is_whitespace(), "");
-            if let "sql_convenience" | "easy_lib::sql::sql_convenience" = path_str.as_str() {
+            if let "sql_convenience" | "easy_sql::sql_convenience" = path_str.as_str() {
                 return true;
             }
         }

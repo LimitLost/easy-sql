@@ -11,8 +11,7 @@ use easy_macros::{
 };
 use sql_compilation_data::CompilationData;
 
-use crate::{
-    easy_lib_crate, sql_crate,  macros_components::joined_field::JoinedField
+use crate::{ sql_crate,  macros_components::joined_field::JoinedField
 };
 
 #[always_context]
@@ -31,7 +30,7 @@ pub fn sql_output_base(
     }).collect::<Vec<_>>();
 
     let sql_crate = sql_crate();
-    let easy_lib_crate = easy_lib_crate();
+    let macro_support = quote! { #sql_crate::macro_support };
 
     let joined_checks = joined_fields.iter().map(|joined_field| {
         let field_name = joined_field.field.ident.as_ref().unwrap();
@@ -100,7 +99,7 @@ pub fn sql_output_base(
         quote! {
             let #field_name = {
                 //Get field from reference table
-                let mut table_instance = #sql_crate::never::never_any::<#ref_table>();
+                let mut table_instance = #macro_support::never_any::<#ref_table>();
 
                 #flatten
                     
@@ -157,15 +156,15 @@ pub fn sql_output_base(
 
             fields_quotes.push(quote! {
                 #field_name: #sql_crate::from_binary_vec( <#sql_crate::DriverRow<#driver> as #sql_crate::SqlxRow>::try_get(&data, #field_name_str).with_context(
-                    context!(#context_str),
+                    #macro_support::context!(#context_str),
                 )?).with_context(
-                    context!(#context_str2),
+                    #macro_support::context!(#context_str2),
                 )?,
             });
         }else{
             fields_quotes.push(quote! {
                 #field_name: <#sql_crate::DriverRow<#driver> as #sql_crate::SqlxRow>::try_get(&data, #field_name_str).with_context(
-                    context!(#context_str),
+                    #macro_support::context!(#context_str),
                 )?,
             });
         }
@@ -221,10 +220,12 @@ pub fn sql_output_base(
         impl #sql_crate::Output<#table, #driver> for #item_name {
             type DataToConvert = #sql_crate::DriverRow<#driver>;
 
-            fn sql_to_query<'a>(sql: #sql_crate::Sql, builder: #sql_crate::QueryBuilder<'a, #driver>) -> #easy_lib_crate::anyhow::Result<#sql_crate::QueryData<'a, #driver>> {
-                #sql_crate::never::never_fn(|| {
+            fn sql_to_query<'a>(sql: #sql_crate::Sql, builder: #sql_crate::QueryBuilder<'a, #driver>) -> #macro_support::Result<#sql_crate::QueryData<'a, #driver>> {
+                use #macro_support::Context;
+                
+                let _ = || {
                     //Check for validity
-                    let table_instance = #sql_crate::never::never_any::<#table>();
+                    let table_instance = #macro_support::never_any::<#table>();
 
                     //Joined fields check for validity
                     #(#joined_checks)*
@@ -234,7 +235,7 @@ pub fn sql_output_base(
                         //Joined fields
                         #(#joined_checks_field_names,)*
                     }
-                });
+                };
 
                 let requested_columns = vec![
                     #(
@@ -257,14 +258,14 @@ pub fn sql_output_base(
             }
             
             fn select_sqlx(current_query: &mut String) {
+                use #macro_support::Context;
                 let delimeter = <#driver as #sql_crate::Driver>::identifier_delimiter();
                 #select_sqlx_str_call
                 #(#select_sqlx_joined)*
             }
 
-            fn convert(data: #sql_crate::DriverRow<#driver>) -> ::anyhow::Result<Self> {
-                use ::anyhow::Context;
-                use #sql_crate::macro_support::context;
+            fn convert(data: #sql_crate::DriverRow<#driver>) -> #macro_support::Result<Self> {
+                use #macro_support::{Context,context};
 
                 Ok(Self {
                     #(
@@ -272,7 +273,7 @@ pub fn sql_output_base(
                     )*
                     #(
                         #joined_checks_field_names: <#sql_crate::DriverRow<#driver> as #sql_crate::SqlxRow>::try_get(&data, #joined_field_aliases).with_context(
-                            context!(#context_strs2),
+                            #macro_support::context!(#context_strs2),
                         )?,
                     )*
                 })

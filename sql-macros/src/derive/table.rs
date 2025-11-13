@@ -53,6 +53,7 @@ pub fn table(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::TokenS
     let item_name_tokens = item.ident.to_token_stream();
 
     let sql_crate = sql_crate();
+    let macro_support = quote! { #sql_crate::macro_support };
 
     let fields = match &item.fields {
         syn::Fields::Named(fields_named) => fields_named.named.clone(),
@@ -210,18 +211,18 @@ pub fn table(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::TokenS
             let binary_field = if has_attributes!(field, #[sql(bytes)]) {
                 field_types.push(quote! {
                     {
-                        use #sql_crate::macro_support::TypeInfo;
+                        use #macro_support::TypeInfo;
 
-                        <Vec<u8> as #sql_crate::macro_support::Type<#sql_crate::InternalDriver<#driver>>>::type_info().name().to_owned()
+                        <Vec<u8> as #macro_support::Type<#sql_crate::InternalDriver<#driver>>>::type_info().name().to_owned()
                     }
                 });
                 true
             } else {
                 field_types.push(quote! {
                     {
-                        use #sql_crate::macro_support::TypeInfo;
+                        use #macro_support::TypeInfo;
 
-                        <#field_type as #sql_crate::macro_support::Type<#sql_crate::InternalDriver<#driver>>>::type_info().name().to_owned()
+                        <#field_type as #macro_support::Type<#sql_crate::InternalDriver<#driver>>>::type_info().name().to_owned()
                     }
                 });
 
@@ -253,11 +254,11 @@ pub fn table(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::TokenS
                     default_values.push(
                         quote! {
                             {
-                                use crate::macro_support::Context as _;
+                                use #macro_support::Context as _;
 
                                 //Check if default value has valid type for the current column
                                 let _ = ||{
-                                    let mut table_instance = #sql_crate::never::never_any::<#item_name>();
+                                    let mut table_instance = #macro_support::never_any::<#item_name>();
                                     table_instance.#field_name = #default_value;
                                 };
 
@@ -267,18 +268,17 @@ pub fn table(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::TokenS
                             }
                         });
                 } else {
-                    default_values.push(
-                        quote! {
-                            {
-                                //Check if default value has valid type for the current column
-                                #sql_crate::never::never_fn(||{
-                                    let mut table_instance = #sql_crate::never::never_any::<#item_name>();
-                                    table_instance.#field_name = #default_value;
-                                });
+                    default_values.push(quote! {
+                        {
+                            //Check if default value has valid type for the current column
+                            let _ = ||{
+                                let mut table_instance = #macro_support::never_any::<#item_name>();
+                                table_instance.#field_name = #default_value;
+                            };
 
-                                Some(#sql_crate::ToDefault::to_default(#default_value))
-                            }
-                        });
+                            Some(#sql_crate::ToDefault::to_default(#default_value))
+                        }
+                    });
                 }
 
                 default_value_found = true;
@@ -339,8 +339,8 @@ pub fn table(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::TokenS
 
             async fn setup(
                 conn: &mut (impl #sql_crate::EasyExecutor<#driver> + Send + Sync),
-            ) -> ::anyhow::Result<()> {
-                use ::anyhow::Context;
+            ) -> #macro_support::Result<()> {
+                use #macro_support::Context;
 
                 let current_version_number = #sql_crate::EasySqlTables_get_version!(#driver, conn,#unique_id);
 

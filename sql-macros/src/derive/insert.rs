@@ -41,6 +41,7 @@ pub fn sql_insert_base(
         .collect::<Vec<_>>();
 
     let sql_crate = sql_crate();
+    let macro_support = quote! { #sql_crate::macro_support };
 
     let mut insert_values = Vec::new();
     let mut insert_values_debug = Vec::new();
@@ -68,9 +69,9 @@ pub fn sql_insert_base(
     Ok(quote! {
         impl<'a> #sql_crate::Insert<'a,#table,#driver> for #item_name {
             fn insert_columns() -> Vec<String> {
-                #sql_crate::never::never_fn(|| {
+                let _ = || {
                     //Check for validity
-                    let this_instance = #sql_crate::never::never_any::<Self>();
+                    let this_instance = #macro_support::never_any::<Self>();
 
                     #table {
                         #(
@@ -80,7 +81,7 @@ pub fn sql_insert_base(
                         #field_names: this_instance.#field_names,
                         )*
                     }
-                });
+                };
                 vec![
                     #(
                         #field_names_str.to_string(),
@@ -91,8 +92,8 @@ pub fn sql_insert_base(
             fn insert_values(
                 self,
                 builder: &mut #sql_crate::QueryBuilder<'_, #driver>,
-            ) -> anyhow::Result<usize>{
-                use #sql_crate::macro_support::Context as _;
+            ) -> #macro_support::Result<usize>{
+                use #macro_support::Context as _;
 
                 // Fully safe because we pass by value, not by reference
                 unsafe{
@@ -106,12 +107,12 @@ pub fn sql_insert_base(
             fn insert_values_sqlx(
                 self,
                 mut args_list: #sql_crate::DriverArguments<'a, #driver>,
-            ) -> anyhow::Result<(#sql_crate::DriverArguments<'a, #driver>, usize)> {
-                use #sql_crate::macro_support::Context as _;
+            ) -> #macro_support::Result<(#sql_crate::DriverArguments<'a, #driver>, usize)> {
+                use #macro_support::Context as _;
 
-                use #sql_crate::macro_support::Arguments;
+                use #macro_support::Arguments;
                     #(
-                        args_list.add(#insert_values).map_err(anyhow::Error::from_boxed)#insert_values_debug?;
+                        args_list.add(#insert_values).map_err(#macro_support::Error::from_boxed)#insert_values_debug?;
                     )*
 
 
@@ -132,8 +133,8 @@ pub fn sql_insert_base(
             fn insert_values(
                 self,
                 builder: &mut #sql_crate::QueryBuilder<'_, #driver>,
-            ) -> anyhow::Result<usize>{
-                use #sql_crate::macro_support::Context as _;
+            ) -> #macro_support::Result<usize>{
+                use #macro_support::Context as _;
 
                 // Fully safe because we pass by reference, and the reference lives until
                 // the end of the QueryBuilder usage (parent function call)
@@ -148,12 +149,12 @@ pub fn sql_insert_base(
             fn insert_values_sqlx(
                 self,
                 mut args_list: #sql_crate::DriverArguments<'a, #driver>,
-            ) -> anyhow::Result<(#sql_crate::DriverArguments<'a, #driver>, usize)> {
-                use #sql_crate::macro_support::Context as _;
+            ) -> #macro_support::Result<(#sql_crate::DriverArguments<'a, #driver>, usize)> {
+                use #macro_support::Context as _;
 
-                use #sql_crate::macro_support::Arguments;
+                use #macro_support::Arguments;
                 #(
-                    args_list.add(&#insert_values).map_err(anyhow::Error::from_boxed)#insert_values_debug_ref?;
+                    args_list.add(&#insert_values).map_err(#macro_support::Error::from_boxed)#insert_values_debug_ref?;
                 )*
                 Ok((args_list, 1))
             }
