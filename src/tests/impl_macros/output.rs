@@ -27,16 +27,16 @@ impl crate::Output<ExampleTableStruct, TestDriver> for ExampleStruct {
         sql: Sql,
         builder: QueryBuilder<'a, TestDriver>,
     ) -> anyhow::Result<QueryData<'a, TestDriver>> {
-        crate::never::never_fn(|| {
+        let _ = || {
             //Check for validity
-            let table_instance = crate::never::never_any::<ExampleTableStruct>();
+            let table_instance = crate::macro_support::never_any::<ExampleTableStruct>();
 
             Self {
                 field1: table_instance.field1,
                 field2: table_instance.field2,
                 field3: table_instance.field3,
             }
-        });
+        };
 
         let requested_columns = vec![
             crate::RequestedColumn {

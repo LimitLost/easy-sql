@@ -4,8 +4,8 @@ use anyhow::Context;
 use easy_macros::always_context;
 
 use crate::{
-    Connection, Driver, DriverArguments, DriverRow, Insert, Output, QueryBuilder, Expr, Table,
-    TableJoin, Update, never::never_any,
+    Connection, Driver, DriverArguments, DriverRow, Expr, Insert, Output, QueryBuilder, Table,
+    TableJoin, Update, macro_support::never_any,
 };
 
 use super::{DatabaseInternalDefault, TestDriver};

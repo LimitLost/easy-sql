@@ -26,15 +26,15 @@ impl<'a> Update<'a, ExampleTableStruct, TestDriver> for ExampleStruct {
         self,
         builder: &mut QueryBuilder<'_, TestDriver>,
     ) -> anyhow::Result<Vec<(String, Expr)>> {
-        crate::never::never_fn(|| {
+        let _ = || {
             //Check for validity
-            let update_instance = crate::never::never_any::<Self>();
-            let mut table_instance = crate::never::never_any::<ExampleTableStruct>();
+            let update_instance = crate::macro_support::never_any::<Self>();
+            let mut table_instance = crate::macro_support::never_any::<ExampleTableStruct>();
 
             table_instance.field1 = update_instance.field1;
             table_instance.field2 = update_instance.field2;
             table_instance.field3 = update_instance.field3;
-        });
+        };
         // Fully safe because we pass by value, not by reference
         unsafe {
             builder
@@ -96,15 +96,15 @@ impl<'a> Update<'a, ExampleTableStruct, TestDriver> for ExampleStruct2 {
         builder: &mut QueryBuilder<'_, TestDriver>,
     ) -> anyhow::Result<Vec<(String, Expr)>> {
         //If Option is set to None then ignore
-        crate::never::never_fn(|| {
+        let _ = || {
             //Check for validity
-            let update_instance = crate::never::never_any::<Self>();
-            let mut table_instance = crate::never::never_any::<ExampleTableStruct>();
+            let update_instance = crate::macro_support::never_any::<Self>();
+            let mut table_instance = crate::macro_support::never_any::<ExampleTableStruct>();
 
             table_instance.field1 = update_instance.field1;
             table_instance.field2 = update_instance.field2.unwrap();
             table_instance.field3 = update_instance.field3.unwrap();
-        });
+        };
         let mut updates = Vec::new();
         updates.push(("field1".to_string(), crate::Expr::Value));
         // Fully safe because we pass by value, not by reference

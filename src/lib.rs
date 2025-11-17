@@ -5,8 +5,6 @@ mod database_structs;
 #[cfg(feature = "not_build")]
 mod easy_executor;
 #[cfg(feature = "not_build")]
-pub mod never;
-#[cfg(feature = "not_build")]
 mod query;
 #[cfg(feature = "not_build")]
 mod traits;
@@ -18,8 +16,7 @@ pub use drivers::*;
 
 #[cfg(feature = "not_build")]
 pub use {
-    database_structs::*, easy_executor::*, query::*, sql_compilation_data::SqlType, sql_macros::*,
-    sqlx::Row as SqlxRow, traits::*,
+    database_structs::*, easy_executor::*, query::*, sql_macros::*, sqlx::Row as SqlxRow, traits::*,
 };
 
 #[cfg(feature = "not_build")]
@@ -59,9 +56,4 @@ pub fn to_binary<T: serde::Serialize>(value: T) -> anyhow::Result<Vec<u8>> {
     Ok(result)
 }
 #[cfg(feature = "not_build")]
-pub mod macro_support {
-    pub use anyhow::{Context, Result};
-    pub use easy_macros::helpers::context;
-    pub use lazy_static::lazy_static;
-    pub use sqlx::{Arguments, Type, TypeInfo};
-}
+pub mod macro_support;

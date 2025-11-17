@@ -1,7 +1,7 @@
 use easy_macros::always_context;
 
 use super::{DatabaseInternalDefault, TestDriver};
-use crate::{Connection, Expr, QueryBuilder, Table, TableJoin, never::never_any};
+use crate::{Connection, Expr, QueryBuilder, Table, TableJoin, macro_support::never_any};
 
 #[allow(dead_code)]
 struct ExampleTable {
