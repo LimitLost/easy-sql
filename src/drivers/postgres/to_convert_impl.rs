@@ -1,12 +1,12 @@
 use anyhow::Context;
-use easy_macros::{helpers::context, macros::always_context};
+use easy_macros::{always_context, context};
 use sqlx::{Executor, Row as SqlxRow};
 
 /// Current Driver
 type CDriver = super::Postgres;
 
 use crate::{
-    DriverArguments, InternalDriver, QueryBuilder, QueryData, Sql, Output, ToConvert,
+    DriverArguments, InternalDriver, Output, QueryBuilder, QueryData, Sql, ToConvert,
     ToConvertSingle,
 };
 

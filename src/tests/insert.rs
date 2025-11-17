@@ -3,7 +3,7 @@
 use anyhow::Context;
 use crate::{Insert, Output, Table, Update, sql};
 use super::Database;
-use easy_macros::macros::always_context;
+use easy_macros::always_context;
 use lazy_static::lazy_static;
 use sql_macros::{sql_convenience};
 

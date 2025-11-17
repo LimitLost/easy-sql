@@ -3,7 +3,7 @@ use ::{
     quote::{quote, quote_spanned},
     syn::{self, Token, parse::Parse, punctuated::Punctuated, spanned::Spanned},
 };
-use easy_macros::macros::always_context;
+use easy_macros::always_context;
 #[derive(Debug, Clone)]
 pub enum Column {
     SpecificTableColumn(Punctuated<syn::Ident, Token![::]>, syn::Ident),

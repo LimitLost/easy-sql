@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use anyhow::Context;
-use easy_macros::macros::always_context;
+use easy_macros::always_context;
 
 mod database_internal_default;
 pub use database_internal_default::*;

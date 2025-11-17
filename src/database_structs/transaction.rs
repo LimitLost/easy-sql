@@ -4,7 +4,7 @@ use std::{
 };
 
 use anyhow::Context;
-use easy_macros::macros::always_context;
+use easy_macros::always_context;
 use futures::StreamExt;
 use sqlx::Database;
 use std::fmt::Debug;

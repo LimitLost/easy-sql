@@ -6,7 +6,7 @@
 use super::Database;
 use crate::{Insert, Output, Table, Update};
 use anyhow::Context;
-use easy_macros::macros::always_context;
+use easy_macros::always_context;
 use sql_macros::{sql, sql_convenience};
 
 #[derive(Table, Debug)]

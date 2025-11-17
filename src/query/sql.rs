@@ -1,8 +1,8 @@
 use std::fmt::{Debug, Display};
 
-use easy_macros::macros::always_context;
+use easy_macros::always_context;
 
-use crate::{Driver, DriverArguments, QueryBuilder, Expr};
+use crate::{Driver, DriverArguments, Expr, QueryBuilder};
 
 use super::{QueryData, RequestedColumn, SelectClauses, TableJoin, WhereClause};
 

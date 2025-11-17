@@ -2,7 +2,7 @@ use std::ops::DerefMut;
 
 use super::Sqlite;
 use anyhow::Context;
-use easy_macros::{helpers::context, macros::always_context};
+use easy_macros::{always_context, context};
 use sqlx::SqliteConnection;
 
 use super::table_field_definition;

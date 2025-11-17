@@ -23,7 +23,7 @@ pub use {
 };
 
 #[cfg(feature = "not_build")]
-use {easy_macros::macros::always_context, serde::de::DeserializeOwned};
+use {easy_macros::always_context, serde::de::DeserializeOwned};
 
 #[cfg(feature = "build")]
 pub use sql_build::*;

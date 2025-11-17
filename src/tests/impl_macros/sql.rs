@@ -1,4 +1,4 @@
-use easy_macros::macros::always_context;
+use easy_macros::always_context;
 
 use super::{DatabaseInternalDefault, TestDriver};
 use crate::{Connection, Expr, QueryBuilder, Table, TableJoin, never::never_any};

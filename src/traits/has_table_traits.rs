@@ -1,4 +1,4 @@
-use easy_macros::macros::always_context;
+use easy_macros::always_context;
 
 #[always_context]
 /// Used to check if current struct representing tables has the table used in a query

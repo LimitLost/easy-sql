@@ -5,8 +5,7 @@ use ::{
     quote::{ToTokens, quote},
 };
 use easy_macros::{
-    helpers::{parse_macro_input, token_stream_to_consistent_string},
-    macros::{all_syntax_cases, always_context},
+    all_syntax_cases, always_context, parse_macro_input, token_stream_to_consistent_string,
 };
 
 #[derive(Debug, Default)]

@@ -23,7 +23,7 @@ rust_decimal = {version = "1.37.1", features = ["serde-str"], optional = true}
 # Used in Table derive macro (and tests)
 lazy_static = {version="*", optional = true}
 
-easy-macros = {path = "../easy-macros", features = ["general","easy-sql"], optional = true}
+easy-macros = {version="1.0.2", features = ["general","easy-sql"], optional = true}
 
 anyhow = {version="1",optional = true}
 chrono = {version = "*", features = ["serde"], optional = true}
@@ -46,7 +46,7 @@ tokio = {version = "1", features = ["full"]}
 dotenvy = "0.15" 
 
 [build-dependencies]
-easy-macros = {path = "../easy-macros", features = ["build"]}
+easy-macros = {version="1.0.2", features = ["build"]}
 sql-build = {path = "./sql-build"}
 regex="*"
 

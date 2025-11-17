@@ -38,55 +38,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "all-syntax-cases"
-version = "0.1.0"
-dependencies = [
- "all-syntax-cases-helpers",
- "proc-macro2",
- "quote",
- "syn 2.0.100",
-]
-
-[[package]]
-name = "all-syntax-cases-helpers"
-version = "0.1.0"
-dependencies = [
- "helpers",
- "proc-macro2",
- "quote",
- "syn 2.0.100",
-]
-
-[[package]]
 name = "allocator-api2"
 version = "0.2.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "683d7910e743518b0e34f1186f92494becacb047c7b6bf616c96772180fef923"
-
-[[package]]
-name = "always-context"
-version = "1.0.0"
-dependencies = [
- "all-syntax-cases",
- "helpers",
- "proc-macro2",
- "quote",
- "replace_with",
- "syn 2.0.100",
-]
-
-[[package]]
-name = "always-context-build"
-version = "0.1.0"
-dependencies = [
- "always-context",
- "anyhow",
- "helpers",
- "proc-macro2",
- "quote",
- "regex",
- "syn 2.0.100",
-]
 
 [[package]]
 name = "android-tzdata"
@@ -110,16 +65,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dcfed56ad506cb2c684a14971b8861fdc3baaaae314b9e5f9bb532cbe3ba7a4f"
 
 [[package]]
-name = "anyhow-result"
-version = "0.1.0"
-dependencies = [
- "helpers",
- "proc-macro2",
- "quote",
- "syn 2.0.100",
-]
-
-[[package]]
 name = "arrayvec"
 version = "0.7.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -132,39 +77,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f28d99ec8bfea296261ca1af174f24225171fea9664ba9003cbebee704810528"
 dependencies = [
  "num-traits",
-]
-
-[[package]]
-name = "attributes"
-version = "0.1.0"
-dependencies = [
- "always-context",
- "always-context-build",
- "anyhow",
- "attributes-macros",
- "helpers",
- "lazy_static",
- "proc-macro2",
- "quote",
- "regex",
- "syn 2.0.100",
-]
-
-[[package]]
-name = "attributes-macros"
-version = "0.1.0"
-dependencies = [
- "always-context",
- "always-context-build",
- "anyhow",
- "anyhow-result",
- "helpers",
- "lazy_static",
- "proc-macro-crate",
- "proc-macro2",
- "quote",
- "regex",
- "syn 2.0.100",
 ]
 
 [[package]]
@@ -388,15 +300,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2459377285ad874054d797f3ccebf984978aa39129f6eafde5cdc8315b612f8"
 
 [[package]]
-name = "context-internal"
-version = "0.1.0"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 2.0.100",
-]
-
-[[package]]
 name = "convert_case"
 version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -543,17 +446,145 @@ checksum = "1aaf95b3e5c8f23aa320147307562d361db0ae0d51242340f558153b4eb2439b"
 
 [[package]]
 name = "easy-macros"
-version = "1.0.0"
+version = "1.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "38022b1f602a0efcf901e30b0f230ccc475c979ca0c45b5a9a58e6b5d3eee604"
 dependencies = [
- "all-syntax-cases",
- "always-context",
- "always-context-build",
- "anyhow",
- "anyhow-result",
- "attributes",
- "helpers",
+ "docify",
+ "easy-macros-all-syntax-cases",
+ "easy-macros-always-context",
+ "easy-macros-always-context-build",
+ "easy-macros-anyhow-result",
+ "easy-macros-attributes",
+ "easy-macros-helpers",
+]
+
+[[package]]
+name = "easy-macros-all-syntax-cases"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "79fd6e873ee14e736738502875d1b84aa0b1ef59d2a1b278194d14ef01e8769b"
+dependencies = [
+ "easy-macros-all-syntax-cases-helpers",
  "proc-macro2",
  "quote",
+ "syn 2.0.100",
+]
+
+[[package]]
+name = "easy-macros-all-syntax-cases-helpers"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7a4c2d31bcec68040c1498989b9ca8de974f5a7350cfaf34f76f61ab502543f5"
+dependencies = [
+ "easy-macros-helpers",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.100",
+]
+
+[[package]]
+name = "easy-macros-always-context"
+version = "1.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "17dcfdfc692dd53e65fc120de6fddf1187c5099823f6db0180bad3e7381c016a"
+dependencies = [
+ "easy-macros-all-syntax-cases",
+ "easy-macros-helpers",
+ "proc-macro2",
+ "quote",
+ "replace_with",
+ "syn 2.0.100",
+]
+
+[[package]]
+name = "easy-macros-always-context-build"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a2e1991ebcb7824b648a51e5e876f6e1443fb706c54f98ade2f6d622250ef9b3"
+dependencies = [
+ "anyhow",
+ "easy-macros-always-context",
+ "easy-macros-helpers",
+ "proc-macro2",
+ "quote",
+ "regex",
+ "syn 2.0.100",
+]
+
+[[package]]
+name = "easy-macros-anyhow-result"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c4765959f7c6f68ec7305a186ed9db27bd0dd58f0516f812a2232c615a4a6bf9"
+dependencies = [
+ "easy-macros-helpers",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.100",
+]
+
+[[package]]
+name = "easy-macros-attributes"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "882aa7bf8f95098ccfc24e681fdb86d3d8dd6e6c11a785607e869cf86eb1e58f"
+dependencies = [
+ "anyhow",
+ "docify",
+ "easy-macros-always-context",
+ "easy-macros-always-context-build",
+ "easy-macros-attributes-macros",
+ "easy-macros-helpers",
+ "lazy_static",
+ "proc-macro2",
+ "quote",
+ "regex",
+ "syn 2.0.100",
+]
+
+[[package]]
+name = "easy-macros-attributes-macros"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bc88ad4771ed4281eb825e7c93b50f2f82da924d63427bf784414f76ee9f71d8"
+dependencies = [
+ "anyhow",
+ "easy-macros-always-context",
+ "easy-macros-always-context-build",
+ "easy-macros-anyhow-result",
+ "easy-macros-helpers",
+ "lazy_static",
+ "proc-macro-crate",
+ "proc-macro2",
+ "quote",
+ "regex",
+ "syn 2.0.100",
+]
+
+[[package]]
+name = "easy-macros-context-internal"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2473ac2ac0f4c3beb6bf0db75bba93e00b105db312e3a6b48e595bc2bd81c7a2"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.100",
+]
+
+[[package]]
+name = "easy-macros-helpers"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "83a8229fdf7897c00b0d8effb2f69f5246826b95ee5a9dde08719a2ae2099387"
+dependencies = [
+ "docify",
+ "easy-macros-context-internal",
+ "proc-macro-crate",
+ "proc-macro2",
+ "quote",
+ "replace_with",
  "syn 2.0.100",
 ]
 
@@ -856,19 +887,6 @@ name = "heck"
 version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2304e00983f87ffb38b55b444b5e3b60a884b5d30c0fca7d82fe33449bbe55ea"
-
-[[package]]
-name = "helpers"
-version = "0.1.0"
-dependencies = [
- "context-internal",
- "docify",
- "proc-macro-crate",
- "proc-macro2",
- "quote",
- "replace_with",
- "syn 2.0.100",
-]
 
 [[package]]
 name = "hex"

@@ -1,7 +1,7 @@
 use std::fmt::Debug;
 
 use crate::{Driver, DriverConnection, InternalDriver, Output, QueryBuilder};
-use easy_macros::macros::always_context;
+use easy_macros::always_context;
 use sql_macros::{Insert, Update, sql_convenience};
 use sqlx::TypeInfo;
 

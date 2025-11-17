@@ -5,10 +5,7 @@ mod sql_convenience_attr;
 mod derive;
 
 use ::{proc_macro2, quote::quote};
-use easy_macros::{
-    helpers::find_crate_list,
-    macros::{always_context, anyhow_result},
-};
+use easy_macros::{always_context, anyhow_result, find_crate_list};
 use proc_macro::TokenStream;
 
 fn sql_crate() -> proc_macro2::TokenStream {

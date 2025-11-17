@@ -3,7 +3,7 @@ use ::{
     quote::{quote, quote_spanned},
     syn::{self, parse::Parse, spanned::Spanned},
 };
-use easy_macros::macros::always_context;
+use easy_macros::always_context;
 
 pub enum Limit {
     Literal(i64),

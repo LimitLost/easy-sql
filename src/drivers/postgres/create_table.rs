@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::ops::DerefMut;
 
 use anyhow::Context;
-use easy_macros::{helpers::context, macros::always_context};
+use easy_macros::{always_context, context};
 use sqlx::PgConnection;
 
 use super::{Postgres, table_field_definition};

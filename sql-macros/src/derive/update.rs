@@ -4,10 +4,7 @@ use ::{
     quote::{ToTokens, quote},
     syn::{self, punctuated::Punctuated},
 };
-use easy_macros::{
-    helpers::{context, parse_macro_input},
-    macros::{always_context, get_attributes, has_attributes},
-};
+use easy_macros::{always_context, context, get_attributes, has_attributes, parse_macro_input};
 use sql_compilation_data::CompilationData;
 
 use crate::sql_crate;

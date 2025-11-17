@@ -1,6 +1,6 @@
 use std::{collections::HashMap, fmt::Debug};
 
-use easy_macros::macros::always_context;
+use easy_macros::always_context;
 use serde::{Serialize, de::DeserializeOwned};
 use sqlx::Encode;
 

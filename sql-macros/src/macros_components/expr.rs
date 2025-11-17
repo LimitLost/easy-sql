@@ -11,8 +11,8 @@ use ::{
         spanned::Spanned,
     },
 };
-use easy_macros::helpers::readable_token_stream;
-use easy_macros::macros::always_context;
+use easy_macros::always_context;
+use easy_macros::readable_token_stream;
 use quote::{ToTokens, quote, quote_spanned};
 
 #[derive(Debug, Clone)]
@@ -266,8 +266,7 @@ impl Expr {
                 let mut items_parsed = Vec::new();
                 for ((and_or, where_expr), next_item_bool) in items.into_iter().zip(next_item_bool)
                 {
-                    let current_expected_bool =
-                        matches!(and_or, Operator::And | Operator::Or) || next_item_bool;
+                    let current_expected_bool = matches!(and_or, Operator::And | Operator::Or);
 
                     let inside_parsed = where_expr.into_tokens_with_checks(
                         checks,

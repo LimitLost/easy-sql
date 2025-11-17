@@ -13,7 +13,7 @@ mod to_default_impl;
 use std::collections::HashMap;
 
 use anyhow::Context;
-use easy_macros::macros::always_context;
+use easy_macros::always_context;
 
 use crate::{Driver, EasyExecutor, TableField};
 

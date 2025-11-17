@@ -3,7 +3,7 @@ use ::{
     syn::{self, parse::Parse},
 };
 use anyhow::Context;
-use easy_macros::{helpers::parse_macro_input, macros::always_context};
+use easy_macros::{always_context, parse_macro_input};
 use sql_compilation_data::CompilationData;
 
 use crate::{

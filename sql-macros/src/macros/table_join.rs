@@ -1,6 +1,6 @@
 use anyhow::Context;
-use easy_macros::helpers::{TokensBuilder, parse_macro_input};
-use easy_macros::macros::always_context;
+use easy_macros::always_context;
+use easy_macros::{TokensBuilder, parse_macro_input};
 use quote::{ToTokens, quote};
 use sql_compilation_data::CompilationData;
 use syn::Path;

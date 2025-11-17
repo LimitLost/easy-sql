@@ -1,4 +1,4 @@
-use easy_macros::macros::always_context;
+use easy_macros::always_context;
 
 use crate::{DriverRow, QueryBuilder, QueryData, Sql};
 
@@ -66,7 +66,7 @@ impl crate::Output<ExampleTableStruct, TestDriver> for ExampleStruct {
     #[no_context]
     fn convert(data: DriverRow<TestDriver>) -> anyhow::Result<Self> {
         use anyhow::Context;
-        use easy_macros::helpers::context;
+        use easy_macros::context;
 
         Ok(Self {
             field1: <DriverRow<TestDriver> as crate::SqlxRow>::try_get(&data, "field1")

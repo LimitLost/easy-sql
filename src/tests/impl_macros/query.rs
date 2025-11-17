@@ -1,7 +1,7 @@
 //! Prototype output implementation for sql_full! macro
 
 use anyhow::Context;
-use easy_macros::macros::always_context;
+use easy_macros::always_context;
 
 use crate::{
     Connection, Driver, DriverArguments, DriverRow, Insert, Output, QueryBuilder, Expr, Table,
@@ -239,7 +239,7 @@ impl Output<ExampleTable, TestDriver> for ExampleOutput {
     #[no_context]
     fn convert<'r>(data: DriverRow<TestDriver>) -> anyhow::Result<Self> {
         use anyhow::Context;
-        use easy_macros::helpers::context;
+        use easy_macros::context;
 
         Ok(Self {
             field1: <DriverRow<TestDriver> as crate::SqlxRow>::try_get(&data, "field1")

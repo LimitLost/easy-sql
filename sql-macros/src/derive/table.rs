@@ -8,8 +8,7 @@ use ::{
 };
 use convert_case::{Case, Casing};
 use easy_macros::{
-    helpers::{TokensBuilder, context, parse_macro_input},
-    macros::{always_context, get_attributes, has_attributes},
+    TokensBuilder, always_context, context, get_attributes, has_attributes, parse_macro_input,
 };
 use sql_compilation_data::{CompilationData, TableDataVersion};
 

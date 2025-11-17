@@ -1,7 +1,7 @@
 use crate::Driver;
 
 use super::{Expr, GroupByClause, HavingClause, LimitClause, OrderByClause, WhereClause};
-use easy_macros::macros::always_context;
+use easy_macros::always_context;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize)]

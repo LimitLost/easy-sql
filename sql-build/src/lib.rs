@@ -14,10 +14,7 @@ use ::{
     },
 };
 use convert_case::{Case, Casing};
-use easy_macros::{
-    helpers::context,
-    macros::{all_syntax_cases, always_context, get_attributes},
-};
+use easy_macros::{all_syntax_cases, always_context, context, get_attributes};
 use sql_compilation_data::{CompilationData, TableData, TableDataVersion};
 #[derive(Debug)]
 struct SearchData {

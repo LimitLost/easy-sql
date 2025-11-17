@@ -1,7 +1,7 @@
 #[cfg(test)]
 use std::path::PathBuf;
 
-use easy_macros::macros::always_context;
+use easy_macros::always_context;
 
 use crate::{DatabaseInternal, Sql};
 

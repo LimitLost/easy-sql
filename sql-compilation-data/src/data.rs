@@ -9,8 +9,8 @@ use proc_macro2::TokenStream;
 use quote::{ToTokens, quote};
 
 use easy_macros::{
-    helpers::{TokensBuilder, token_stream_to_consistent_string},
-    macros::{always_context, get_attributes, has_attributes},
+    TokensBuilder, always_context, get_attributes, has_attributes,
+    token_stream_to_consistent_string,
 };
 use serde::{Deserialize, Serialize, Serializer};
 

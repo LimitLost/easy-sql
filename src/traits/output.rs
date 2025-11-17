@@ -1,4 +1,4 @@
-use easy_macros::macros::always_context;
+use easy_macros::always_context;
 use sqlx::Executor;
 
 use crate::{Driver, DriverArguments, QueryBuilder, QueryData, Sql};

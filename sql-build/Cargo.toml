@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-easy-macros = { path = "../../easy-macros", features = ["for-macro"] }
+easy-macros = { version="1.0.2",  features = ["full"] }
 proc-macro2 = { version = "*", features = ["span-locations"] }
 
 regex = "1.11.1"

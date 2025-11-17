@@ -6,8 +6,8 @@ use ::{
 };
 
 use easy_macros::{
-    helpers::{context, parse_macro_input, TokensBuilder},
-    macros::{always_context, get_attributes, has_attributes},
+    context, parse_macro_input, TokensBuilder,
+    always_context, get_attributes, has_attributes,
 };
 use sql_compilation_data::CompilationData;
 

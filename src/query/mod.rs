@@ -8,7 +8,7 @@ pub use table_field::*;
 
 pub use clauses::*;
 pub use column::*;
-use easy_macros::macros::always_context;
+use easy_macros::always_context;
 
 mod sql;
 pub use sql::*;

@@ -1,4 +1,4 @@
-use easy_macros::macros::always_context;
+use easy_macros::always_context;
 
 #[allow(dead_code)]
 struct DatabaseSetupTest {
@@ -7,7 +7,6 @@ struct DatabaseSetupTest {
 
 use super::TestDriver;
 use crate::{self as sql_crate, Driver, EasySqlTables_create, InternalDriver, QueryBuilder};
-use easy_macros::helpers as easy_macros_helpers_crate;
 
 #[allow(dead_code)]
 struct ExampleReferencedTable {
@@ -64,7 +63,7 @@ impl sql_crate::DatabaseSetup<TestDriver> for ExampleTable {
 
         let table_exists = <TestDriver as Driver>::table_exists(conn, "example_table")
             .await
-            .with_context(easy_macros_helpers_crate::context!(
+            .with_context(easy_macros::context!(
                 "Checking if table exists: {:?}",
                 "example_table"
             ))?;
@@ -79,10 +78,12 @@ impl sql_crate::DatabaseSetup<TestDriver> for ExampleTable {
                 vec![sql_crate::TableField {
                     name: "id",
                     data_type: {
-                    use crate::macro_support::TypeInfo;
+                        use crate::macro_support::TypeInfo;
 
-                    <i64 as crate::macro_support::Type<InternalDriver<TestDriver>>>::type_info().name().to_string()
-                },
+                        <i64 as crate::macro_support::Type<InternalDriver<TestDriver>>>::type_info()
+                            .name()
+                            .to_string()
+                    },
                     is_unique: false,
                     is_not_null: false,
                     default: None,
@@ -94,7 +95,8 @@ impl sql_crate::DatabaseSetup<TestDriver> for ExampleTable {
                         <ExampleReferencedTable as sql_crate::Table<TestDriver>>::table_name(),
                         (
                             vec!["field3"],
-                            <ExampleReferencedTable as sql_crate::Table<TestDriver>>::primary_keys(),
+                            <ExampleReferencedTable as sql_crate::Table<TestDriver>>::primary_keys(
+                            ),
                             false,
                         ),
                     )]

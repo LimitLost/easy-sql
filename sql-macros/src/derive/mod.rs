@@ -11,7 +11,7 @@ use ::{
     syn::{self},
 };
 pub use database_setup::*;
-use easy_macros::macros::{always_context, get_attributes};
+use easy_macros::{always_context, get_attributes};
 pub use insert::*;
 pub use output::*;
 use sql_compilation_data::CompilationData;

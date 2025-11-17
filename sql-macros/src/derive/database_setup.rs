@@ -4,10 +4,7 @@ use ::{
     syn,
 };
 
-use easy_macros::{
-    helpers::{TokensBuilder, parse_macro_input},
-    macros::always_context,
-};
+use easy_macros::{TokensBuilder, always_context, parse_macro_input};
 use sql_compilation_data::CompilationData;
 
 use crate::{easy_macros_helpers_crate, sql_crate};
