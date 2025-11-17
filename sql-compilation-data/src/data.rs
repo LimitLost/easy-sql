@@ -14,17 +14,14 @@ use easy_macros::{
 };
 use serde::{Deserialize, Serialize, Serializer};
 
-use crate::SqlType;
-
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct TableField {
     pub name: String,
     #[serde(default)]
     pub ty_to_bytes: bool,
-    pub sql_type: super::sql_type::SqlType,
+    pub field_type: String,
     ///Tokens converted to_string()
     pub default: Option<String>,
-    pub is_not_null: bool,
     pub is_unique: bool,
 }
 #[derive(Debug, Serialize, Deserialize, Eq, PartialEq)]
@@ -78,23 +75,7 @@ impl TableDataVersion {
                 auto_increment = true;
             }
 
-            let (sql_type, is_not_null) = SqlType::from_syn_type(&field.ty)?;
-
-            let to_bytes = has_attributes!(field, #[sql(bytes)]);
-
-            let sql_type = if to_bytes {
-                SqlType::Bytes
-            } else {
-                match sql_type {
-                    Some(o) => o,
-                    None => {
-                        anyhow::bail!(
-                            "Field type `{}` is not supported, use #[sql(bytes)] to convert it into bytes",
-                            field.ty.to_token_stream()
-                        );
-                    }
-                }
-            };
+            let ty_to_bytes = has_attributes!(field, #[sql(bytes)]);
 
             let default = get_attributes!(field, #[sql(default = __unknown__)])
                 .into_iter()
@@ -117,13 +98,10 @@ impl TableDataVersion {
 
             let is_unique = has_attributes!(field, #[sql(unique)]);
 
-            let ty_to_bytes = has_attributes!(field, #[sql(bytes)]);
-
             fields_converted.push(TableField {
                 name,
-                sql_type: sql_type,
+                field_type: token_stream_to_consistent_string(field.ty.to_token_stream()),
                 default,
-                is_not_null,
                 is_unique,
                 ty_to_bytes,
             });
@@ -277,6 +255,8 @@ impl CompilationData {
         sql_crate: &TokenStream,
         item_name: &TokenStream,
     ) -> anyhow::Result<TokenStream> {
+        let macro_support = quote! { #sql_crate::macro_support };
+
         let table_data = self
             .tables
             .get(current_unique_id)
@@ -348,15 +328,7 @@ impl CompilationData {
                     });
                 }
                 //Everything else on old column is not supported
-                if old_field.is_not_null != new_field.is_not_null {
-                    anyhow::bail!(
-                        "Field type change is not supported (yet) (only rename) -> Latest Version: {:?} ||| Version {}: {:?}",
-                        latest_version.fields,
-                        version_number,
-                        version_data.fields
-                    );
-                }
-                if old_field.sql_type != new_field.sql_type {
+                if old_field.field_type != new_field.field_type {
                     anyhow::bail!(
                         "Field type change is not supported (yet) (only rename) -> Latest Version: {:?} ||| Version {}: {:?}",
                         latest_version.fields,
@@ -385,7 +357,7 @@ impl CompilationData {
             //New Columns Check
             for new_field in latest_version.fields.iter().skip(version_data.fields.len()) {
                 //New columns need default value
-                if new_field.default.is_none() && new_field.is_not_null {
+                if new_field.default.is_none() && !new_field.field_type.starts_with("Option<") {
                     anyhow::bail!(
                         "New (not null) column without default value is not supported -> Latest Version: {:?} ||| Version {}: {:?}",
                         latest_version.fields,
@@ -395,8 +367,8 @@ impl CompilationData {
                 }
 
                 let field_name = new_field.name.as_str();
-                let data_type = new_field.sql_type.to_tokens(sql_crate);
-                let is_not_null = new_field.is_not_null;
+                let data_type: syn::Type = syn::parse_str(new_field.field_type.as_str())?;
+                let is_not_null = !new_field.field_type.starts_with("Option<");
                 let is_unique = new_field.is_unique;
 
                 let default_value = if let Some(default_value) = new_field.default.as_deref() {
@@ -459,7 +431,9 @@ impl CompilationData {
                     #sql_crate::AlterTableSingle::AddColumn{
                         column: #sql_crate::TableField {
                             name: #field_name,
-                            data_type: #data_type,
+                            data_type: <#data_type as #macro_support::Type<#sql_crate::InternalDriver<D>>>::type_info()
+                            .name()
+                            .to_owned(),
                             is_unique: #is_unique,
                             is_not_null: #is_not_null,
                             default: #default_value,

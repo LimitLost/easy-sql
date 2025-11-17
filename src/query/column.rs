@@ -1,14 +1,7 @@
 use easy_macros::macros::always_context;
 
-use sql_compilation_data::SqlType;
-
 use crate::Driver;
 
-pub struct Column {
-    pub name: String,
-    pub alias: Option<String>,
-    pub ty: SqlType,
-}
 #[derive(Debug)]
 pub struct RequestedColumn {
     pub table_name: Option<&'static str>,
