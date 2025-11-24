@@ -1,5 +1,6 @@
 mod macros;
 mod macros_components;
+mod query_macro_components;
 mod sql_convenience_attr;
 
 mod derive;
@@ -108,6 +109,73 @@ pub fn sql(item: TokenStream) -> anyhow::Result<TokenStream> {
 #[no_context]
 pub fn sql_debug(item: TokenStream) -> anyhow::Result<TokenStream> {
     let result = macros::sql(item)?;
+    panic!("{}", result);
+}
+
+/// Type-safe query! macro for executing SQL queries.
+///
+/// # Usage
+///
+/// ## SELECT Query
+/// ```rust
+/// // Basic SELECT
+/// let result = query!(&mut conn, SELECT OutputType FROM TableType WHERE id = {user_id}).await?;
+///
+/// // With ORDER BY and LIMIT
+/// let results = query!(&mut conn, SELECT OutputType FROM TableType WHERE status = "active" ORDER BY created_at DESC LIMIT 10).await?;
+/// ```
+///
+/// ## INSERT Query
+/// ```rust
+/// // INSERT without RETURNING
+/// query!(&mut conn, INSERT INTO TableType VALUES {data}).await?;
+///
+/// // INSERT with RETURNING
+/// let inserted = query!(&mut conn, INSERT INTO TableType VALUES {data} RETURNING OutputType).await?;
+/// ```
+///
+/// ## UPDATE Query
+/// ```rust
+/// // UPDATE without RETURNING
+/// query!(&mut conn, UPDATE TableType SET field = {new_value} WHERE id = {user_id}).await?;
+///
+/// // UPDATE with RETURNING
+/// let updated = query!(&mut conn, UPDATE TableType SET field = {new_value} WHERE id = {user_id} RETURNING OutputType).await?;
+/// ```
+///
+/// ## DELETE Query
+/// ```rust
+/// // DELETE without RETURNING
+/// query!(&mut conn, DELETE FROM TableType WHERE id = {user_id}).await?;
+///
+/// // DELETE with RETURNING
+/// let deleted = query!(&mut conn, DELETE FROM TableType WHERE id = {user_id} RETURNING OutputType).await?;
+/// ```
+///
+/// ## EXISTS Query
+/// ```rust
+/// // Check if records exist
+/// let exists: bool = query!(&mut conn, EXISTS TableType WHERE email = {user_email}).await?;
+/// ```
+///
+/// # Type Safety
+/// All field names and types are validated at compile-time. The macro generates proper
+/// parameter binding and SQL construction code.
+#[proc_macro]
+#[always_context]
+#[anyhow_result]
+pub fn query(item: TokenStream) -> anyhow::Result<TokenStream> {
+    macros::query(item)
+}
+
+#[always_context]
+/// Debug version of `query!` that prints the generated code and panics.
+/// Useful for inspecting macro expansion during development.
+#[proc_macro]
+#[anyhow_result]
+#[no_context]
+pub fn query_debug(item: TokenStream) -> anyhow::Result<TokenStream> {
+    let result = macros::query(item)?;
     panic!("{}", result);
 }
 

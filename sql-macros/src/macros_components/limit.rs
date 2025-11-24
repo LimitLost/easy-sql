@@ -5,6 +5,7 @@ use ::{
 };
 use easy_macros::always_context;
 
+#[derive(Debug, Clone)]
 pub enum Limit {
     Literal(i64),
     Expr(syn::Expr),
@@ -46,6 +47,29 @@ impl Limit {
                 quote_spanned! {expr.span()=>#sql_crate::LimitClause{
                     limit: {#expr},
                 } }
+            }
+        }
+    }
+
+    pub fn into_query_string(
+        self,
+        checks: &mut Vec<TokenStream>,
+        format_args: &mut Vec<TokenStream>,
+    ) -> String {
+        match self {
+            Limit::Literal(s) => {
+                format_args.push(quote! {#s});
+
+                "{}".to_string()
+            }
+            Limit::Expr(expr) => {
+                format_args.push(quote! {#expr});
+
+                checks.push(quote_spanned! {expr.span()=>
+                    let _test:i64 = #expr as i64;
+                });
+
+                "{}".to_string()
             }
         }
     }

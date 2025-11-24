@@ -2,6 +2,8 @@ mod sql;
 pub use sql::*;
 mod table_join;
 pub use table_join::*;
+mod query;
+pub use query::*;
 
 use syn::{self, parse::Parse};
 

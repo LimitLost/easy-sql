@@ -9,6 +9,7 @@ use ::{
 };
 use easy_macros::always_context;
 
+#[derive(Debug, Clone)]
 pub enum Order {
     Asc,
     Desc,
@@ -30,6 +31,7 @@ impl Parse for Order {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct OrderBy {
     pub column: Column,
     pub order: Order,
@@ -54,6 +56,23 @@ impl OrderBy {
                 column: #column_parsed,
             }
         }
+    }
+
+    pub fn into_query_string(
+        self,
+        checks: &mut Vec<TokenStream>,
+        sql_crate: &TokenStream,
+        format_args: &mut Vec<TokenStream>,
+    ) -> String {
+        let column_query = self
+            .column
+            .into_query_string(checks, sql_crate, format_args);
+        let order_query_str = match self.order {
+            Order::Asc => quote! {"ASC"},
+            Order::Desc => quote! {"DESC"},
+        };
+
+        format!("{} {}", column_query, order_query_str)
     }
 }
 

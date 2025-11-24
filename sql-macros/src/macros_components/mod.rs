@@ -6,3 +6,7 @@ pub mod limit;
 pub mod next_clause;
 pub mod order_by;
 pub mod set;
+
+pub use expr::*;
+pub use limit::*;
+pub use order_by::*;

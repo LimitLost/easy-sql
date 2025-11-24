@@ -284,3 +284,13 @@ sql_keyword!(right);
 sql_keyword!(cross);
 sql_keyword!(join);
 sql_keyword!(on);
+
+sql_keyword!(select);
+sql_keyword!(from);
+sql_keyword!(insert);
+sql_keyword!(into);
+sql_keyword!(values);
+sql_keyword!(update);
+sql_keyword!(delete);
+sql_keyword!(returning);
+sql_keyword!(exists);

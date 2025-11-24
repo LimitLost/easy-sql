@@ -1,0 +1,178 @@
+use proc_macro2::TokenStream;
+use quote::quote;
+
+use crate::macros_components::{Expr, Limit, OrderBy, column::Column};
+
+use super::SetClause;
+
+fn sql_expr_clause(
+    expr: Expr,
+    format_str: &mut String,
+    format_params: &mut Vec<TokenStream>,
+    binds: &mut Vec<TokenStream>,
+    checks: &mut Vec<TokenStream>,
+    sql_crate: &TokenStream,
+    driver: &TokenStream,
+    param_counter: &mut usize,
+    clause_name: &'static str,
+    before_param_n: &TokenStream,
+) {
+    let sql_template = expr.into_query_string(
+        binds,
+        checks,
+        sql_crate,
+        driver,
+        param_counter,
+        format_params,
+        before_param_n,
+    );
+    format_str.push_str(&format!(" {clause_name} {sql_template}"));
+}
+
+pub fn where_clause(
+    where_expr: Expr,
+    format_str: &mut String,
+    format_params: &mut Vec<TokenStream>,
+    binds: &mut Vec<TokenStream>,
+    checks: &mut Vec<TokenStream>,
+    sql_crate: &TokenStream,
+    driver: &TokenStream,
+    param_counter: &mut usize,
+    before_param_n: &TokenStream,
+) {
+    sql_expr_clause(
+        where_expr,
+        format_str,
+        format_params,
+        binds,
+        checks,
+        sql_crate,
+        driver,
+        param_counter,
+        "WHERE",
+        before_param_n,
+    )
+}
+
+pub fn having_clause(
+    having_expr: Expr,
+    format_str: &mut String,
+    format_params: &mut Vec<TokenStream>,
+    binds: &mut Vec<TokenStream>,
+    checks: &mut Vec<TokenStream>,
+    sql_crate: &TokenStream,
+    driver: &TokenStream,
+    param_counter: &mut usize,
+    before_param_n: &TokenStream,
+) {
+    sql_expr_clause(
+        having_expr,
+        format_str,
+        format_params,
+        binds,
+        checks,
+        sql_crate,
+        driver,
+        param_counter,
+        "HAVING",
+        before_param_n,
+    )
+}
+
+pub fn group_by_clause(
+    group_by_list: Vec<Column>,
+    format_str: &mut String,
+    format_params: &mut Vec<TokenStream>,
+    sql_crate: &TokenStream,
+    checks: &mut Vec<TokenStream>,
+) {
+    let clause_args = group_by_list
+        .into_iter()
+        .map(|gb| gb.into_query_string(checks, sql_crate, format_params))
+        .collect::<Vec<_>>()
+        .join(", ");
+
+    format_str.push_str(&format!(" GROUP BY {}", clause_args));
+}
+
+pub fn order_by_clause(
+    order_by_list: Vec<OrderBy>,
+    format_str: &mut String,
+    format_params: &mut Vec<TokenStream>,
+    sql_crate: &TokenStream,
+    checks: &mut Vec<TokenStream>,
+) {
+    let clause_args = order_by_list
+        .into_iter()
+        .map(|ob| ob.into_query_string(checks, sql_crate, format_params))
+        .collect::<Vec<_>>()
+        .join(", ");
+
+    format_str.push_str(&format!(" ORDER BY {}", clause_args));
+}
+
+pub fn limit_clause(
+    limit: Limit,
+    format_str: &mut String,
+    format_params: &mut Vec<TokenStream>,
+    checks: &mut Vec<TokenStream>,
+) {
+    let clause_args = limit.into_query_string(checks, format_params);
+
+    format_str.push_str(&format!(" LIMIT {}", clause_args));
+}
+
+pub fn set_clause(
+    clause: SetClause,
+    format_str: &mut String,
+    format_params: &mut Vec<TokenStream>,
+    sql_crate: &TokenStream,
+    driver: &TokenStream,
+    param_counter: &mut usize,
+    all_binds: &mut Vec<TokenStream>,
+    checks: &mut Vec<TokenStream>,
+) -> (TokenStream, Option<TokenStream>) {
+    match clause {
+        SetClause::FromType(type_expr) => {
+            format_str.push_str(" SET ");
+            let result = (
+                quote! {
+                    // Use Update trait's updates_sqlx method to add SET arguments
+                    let mut current_arg_n = #param_counter;
+                    _easy_sql_args = {#type_expr}.updates_sqlx(_easy_sql_args, &mut query, &mut current_arg_n).context("Update::updates_sqlx failed")?;
+                },
+                Some(quote! { current_arg_n + }),
+            );
+            *param_counter = 0;
+            result
+        }
+        SetClause::Expr(set_expr) => {
+            // Generate SET clause with compile-time SQL generation
+            let mut set_sql_parts = Vec::new();
+
+            for (ident, expr) in set_expr.updates {
+                let ident_str = ident.to_string();
+                let value_sql = expr.into_query_string(
+                    all_binds,
+                    checks,
+                    sql_crate,
+                    driver,
+                    param_counter,
+                    format_params,
+                    &quote! {},
+                );
+                set_sql_parts.push(format!(
+                    "{{_easy_sql_d}}{}{{_easy_sql_d}} = {}",
+                    ident_str, value_sql
+                ));
+            }
+
+            // Generate compile-time SQL template for SET clause
+            let set_sql_template = set_sql_parts.join(", ");
+
+            format_str.push_str(&format!(" SET {}", set_sql_template));
+
+            (quote! {}, None)
+        }
+    }
+}

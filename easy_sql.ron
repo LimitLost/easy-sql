@@ -223,6 +223,49 @@ CompilationData(
             },
             latest_version: 1,
         ),
+        "865c36d9-2998-46bc-bfd5-9769b6ad715b": TableData(
+            saved_versions: {
+                1: TableDataVersion(
+                    table_name: "query_test_table",
+                    fields: [
+                        TableField(
+                            name: "id",
+                            ty_to_bytes: false,
+                            field_type: "i64",
+                            default: None,
+                            is_unique: false,
+                        ),
+                        TableField(
+                            name: "field1",
+                            ty_to_bytes: false,
+                            field_type: "String",
+                            default: None,
+                            is_unique: false,
+                        ),
+                        TableField(
+                            name: "field2",
+                            ty_to_bytes: false,
+                            field_type: "i32",
+                            default: None,
+                            is_unique: false,
+                        ),
+                        TableField(
+                            name: "field3",
+                            ty_to_bytes: false,
+                            field_type: "i64",
+                            default: None,
+                            is_unique: false,
+                        ),
+                    ],
+                    primary_keys: [
+                        "id",
+                    ],
+                    auto_increment: true,
+                    foreign_keys: {},
+                ),
+            },
+            latest_version: 1,
+        ),
         "9a5884dd-3f0c-4323-bd5f-07fd1bbb10ed": TableData(
             saved_versions: {
                 1: TableDataVersion(

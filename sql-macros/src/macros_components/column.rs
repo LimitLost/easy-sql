@@ -43,6 +43,38 @@ impl Column {
             }
         }
     }
+
+    pub fn into_query_string(
+        self,
+        checks: &mut Vec<TokenStream>,
+        sql_crate: &TokenStream,
+        format_args: &mut Vec<TokenStream>,
+    ) -> String {
+        match self {
+            Column::SpecificTableColumn(path, ident) => {
+                checks.push(quote_spanned! {path.span()=>
+                    fn has_table<T:#sql_crate::HasTable<#path>>(test:&T){}
+                    has_table(&___t___);
+                    //TODO "RealColumns" trait with type leading to the struct with actual database columns
+                    let mut table_instance = #sql_crate::never::never_any::<#path>();
+                    let _ = table_instance.#ident;
+                });
+
+                let ident_str = ident.to_string();
+
+                format_args.push(quote! {<#path as #sql_crate::Table>::table_name()});
+
+                format!("{{d}}{{}}{{d}}.{{d}}{}{{d}}", ident_str).to_string()
+            }
+            Column::Column(ident) => {
+                checks.push(quote! {
+                        let _ = ___t___.#ident;
+                });
+
+                format!("{{d}}{}{{d}}", ident.to_string())
+            }
+        }
+    }
 }
 
 #[always_context]

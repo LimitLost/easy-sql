@@ -1,4 +1,4 @@
-//! Prototype output implementation for sql_full! macro
+//! Prototype output implementation for query! macro
 
 use anyhow::Context;
 use easy_macros::always_context;
@@ -265,11 +265,11 @@ async fn _test_select() -> anyhow::Result<ExampleOutput> {
 
     let random_id = 42;
 
-    // sql_full!(&mut fake_conn, SELECT ExampleOutput FROM ExampleTable WHERE id = {random_id} AND field2 > 17);
+    // query!(&mut fake_conn, SELECT ExampleOutput FROM ExampleTable WHERE id = {random_id} AND field2 > 17);
 
-    //TODO Add documentation for sql_full! : "IMPORTANT: Await is called inside the macro and unfortunately cannot be moved outside of the invocation"
+    //TODO Add documentation for query! : "IMPORTANT: Await is called inside the macro and unfortunately cannot be moved outside of the invocation"
 
-    // sql_full! macro output
+    // query! macro output
     let result = {
         //TODO Security checks
         // Imports
@@ -337,9 +337,9 @@ async fn _test_insert() -> anyhow::Result<()> {
         field4: 7,
     };
 
-    // sql_full!(&mut fake_conn, INSERT INTO ExampleTable VALUES {new_entry});
+    // query!(&mut fake_conn, INSERT INTO ExampleTable VALUES {new_entry});
 
-    // sql_full! macro output
+    // query! macro output
     {
         //TODO Security checks
         // Imports
@@ -422,9 +422,9 @@ async fn _test_update() -> anyhow::Result<()> {
         field4: 10,
     };
 
-    // sql_full!(&mut fake_conn, UPDATE ExampleTable SET {data_update} WHERE id = {data_update.id});
+    // query!(&mut fake_conn, UPDATE ExampleTable SET {data_update} WHERE id = {data_update.id});
 
-    // sql_full! macro output
+    // query! macro output
     {
         //TODO Security checks
         // Imports
@@ -477,9 +477,9 @@ async fn _test_delete() -> anyhow::Result<()> {
 
     let delete_id = 1;
 
-    // sql_full!(&mut fake_conn, DELETE FROM ExampleTable WHERE id = {delete_id});
+    // query!(&mut fake_conn, DELETE FROM ExampleTable WHERE id = {delete_id});
 
-    // sql_full! macro output
+    // query! macro output
     {
         //TODO Security checks
         // Imports

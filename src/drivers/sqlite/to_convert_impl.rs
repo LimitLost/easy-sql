@@ -15,7 +15,7 @@ type Row = sqlx::sqlite::SqliteRow;
 #[always_context]
 impl ToConvert<CDriver> for Row {
     async fn get<'a>(
-        exec: impl Executor<'a, Database = InternalDriver<CDriver>>,
+        exec: impl Executor<'_, Database = InternalDriver<CDriver>>,
         query: sqlx::query::Query<'a, InternalDriver<CDriver>, DriverArguments<'a, CDriver>>,
     ) -> anyhow::Result<Self>
     where
@@ -32,7 +32,7 @@ impl ToConvertSingle<CDriver> for Row {}
 #[always_context]
 impl ToConvert<CDriver> for Option<Row> {
     async fn get<'a>(
-        exec: impl Executor<'a, Database = InternalDriver<CDriver>>,
+        exec: impl Executor<'_, Database = InternalDriver<CDriver>>,
         query: sqlx::query::Query<'a, InternalDriver<CDriver>, DriverArguments<'a, CDriver>>,
     ) -> anyhow::Result<Self>
     where
@@ -47,7 +47,7 @@ impl ToConvert<CDriver> for Option<Row> {
 #[always_context]
 impl ToConvert<CDriver> for () {
     async fn get<'a>(
-        exec: impl Executor<'a, Database = InternalDriver<CDriver>>,
+        exec: impl Executor<'_, Database = InternalDriver<CDriver>>,
         query: sqlx::query::Query<'a, InternalDriver<CDriver>, DriverArguments<'a, CDriver>>,
     ) -> anyhow::Result<Self>
     where
@@ -64,7 +64,7 @@ impl ToConvert<CDriver> for () {
 #[always_context]
 impl ToConvert<CDriver> for Vec<Row> {
     async fn get<'a>(
-        exec: impl Executor<'a, Database = InternalDriver<CDriver>>,
+        exec: impl Executor<'_, Database = InternalDriver<CDriver>>,
         query: sqlx::query::Query<'a, InternalDriver<CDriver>, DriverArguments<'a, CDriver>>,
     ) -> anyhow::Result<Self>
     where
@@ -161,7 +161,7 @@ impl<Table> Output<Table, CDriver> for bool {
 
     fn select_sqlx(_current_query: &mut String) {
         panic!(
-            "Usage of `bool` type as output of sql_full! macro should be dissallowed by the macro itself. Are you using type to circumvent security checks? ;) If not please report this bug to easy-sql repository."
+            "Usage of `bool` type as output of query! macro should be dissallowed by the macro itself. Are you using `type` to circumvent security checks? ;) If not please report this bug to easy-sql repository."
         );
     }
 

@@ -6,7 +6,7 @@ use crate::{Driver, DriverArguments, QueryBuilder, QueryData, Sql};
 #[always_context]
 pub trait ToConvert<D: Driver> {
     async fn get<'a>(
-        exec: impl Executor<'a, Database = D::InternalDriver>,
+        exec: impl Executor<'_, Database = D::InternalDriver>,
         query: sqlx::query::Query<'a, D::InternalDriver, DriverArguments<'a, D>>,
     ) -> anyhow::Result<Self>
     where
