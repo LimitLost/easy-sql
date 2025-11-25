@@ -10,15 +10,7 @@ use easy_macros::{always_context, anyhow_result, find_crate_list};
 use proc_macro::TokenStream;
 
 fn sql_crate() -> proc_macro2::TokenStream {
-    if let Some(found) = find_crate_list(&[("easy-lib", quote! {::sql}), ("easy-sql", quote! {})]) {
-        found
-    } else {
-        quote! {self}
-    }
-}
-
-fn easy_macros_helpers_crate() -> proc_macro2::TokenStream {
-    if let Some(found) = find_crate_list(&[("easy-macros", quote! {::helpers})]) {
+    if let Some(found) = find_crate_list(&[("easy-sql", quote! {})]) {
         found
     } else {
         quote! {self}

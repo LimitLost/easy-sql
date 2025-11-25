@@ -7,14 +7,13 @@ use ::{
 use easy_macros::{TokensBuilder, always_context, parse_macro_input};
 use sql_compilation_data::CompilationData;
 
-use crate::{easy_macros_helpers_crate, sql_crate};
+use crate::sql_crate;
 
 #[always_context]
 pub fn database_setup(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::TokenStream> {
     let item = parse_macro_input!(item as syn::ItemStruct);
 
     let sql_crate = sql_crate();
-    let easy_macros_helpers_crate = easy_macros_helpers_crate();
     let macro_support = quote! { #sql_crate::macro_support };
 
     let fields = match &item.fields {
@@ -43,7 +42,7 @@ pub fn database_setup(item: proc_macro::TokenStream) -> anyhow::Result<proc_macr
             let context=format!("Field `{}` with type `{}` of struct `{}` ",field_name, field_type_str, item.ident);
 
             quote! {
-                <#field_type as #sql_crate::DatabaseSetup<#driver>>::setup(conn).await.with_context(#easy_macros_helpers_crate::context!(#context))?;
+                <#field_type as #sql_crate::DatabaseSetup<#driver>>::setup(conn).await.with_context(#macro_support::context!(#context))?;
             }
         });
 
