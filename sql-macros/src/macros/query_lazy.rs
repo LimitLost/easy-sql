@@ -1,7 +1,6 @@
 use crate::{
     query_macro_components::{
-        QueryType, generate_delete, generate_exists, generate_insert, generate_select,
-        generate_update,
+        QueryType, generate_delete, generate_insert, generate_select, generate_update,
     },
     sql_crate,
 };
@@ -12,34 +11,28 @@ use quote::quote;
 use sql_compilation_data::CompilationData;
 use syn::{self, parse::Parse};
 
-/// Input structure for query! macro: connection, query_type
-struct QueryInput {
-    connection: syn::Expr,
+struct Input {
     query: QueryType,
 }
 
 #[always_context]
-impl Parse for QueryInput {
+impl Parse for Input {
     fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
-        let connection = input.parse::<syn::Expr>()?;
-        input.parse::<syn::Token![,]>()?;
         let query = input.parse::<QueryType>()?;
-        Ok(QueryInput { connection, query })
+        Ok(Input { query })
     }
 }
 
 #[always_context]
-pub fn query(input_raw: proc_macro::TokenStream) -> anyhow::Result<proc_macro::TokenStream> {
+pub fn query_lazy(input_raw: proc_macro::TokenStream) -> anyhow::Result<proc_macro::TokenStream> {
     let input_str = input_raw.to_string();
-    let input = easy_macros::parse_macro_input!(input_raw as QueryInput);
-
-    let connection = input.connection;
+    let input = easy_macros::parse_macro_input!(input_raw as Input);
 
     // Load compilation data to get driver information
     let sql_crate = sql_crate();
 
     let compilation_data = CompilationData::load(Vec::<String>::new(), false).with_context(|| {
-        "Failed to load compilation data for query! macro. Make sure easy_sql::build is called in build.rs"
+        "Failed to load compilation data for query_lazy! macro. Make sure easy_sql::build is called in build.rs"
     })?;
 
     let driver = if let Some(driver_str) = compilation_data.default_drivers.first() {
@@ -55,34 +48,40 @@ pub fn query(input_raw: proc_macro::TokenStream) -> anyhow::Result<proc_macro::T
     let result = match input.query {
         QueryType::Select(select) => generate_select(
             select.clone(),
-            Some(&connection),
+            #[context(no)]
+            None,
             &driver,
             &sql_crate,
             &input_str,
         )?,
         QueryType::Insert(insert) => generate_insert(
             insert.clone(),
-            Some(&connection),
+            #[context(no)]
+            None,
             &driver,
             &sql_crate,
             &input_str,
         )?,
         QueryType::Update(update) => generate_update(
             update.clone(),
-            Some(&connection),
+            #[context(no)]
+            None,
             &driver,
             &sql_crate,
             &input_str,
         )?,
         QueryType::Delete(delete) => generate_delete(
             delete.clone(),
-            Some(&connection),
+            #[context(no)]
+            None,
             &driver,
             &sql_crate,
             &input_str,
         )?,
-        QueryType::Exists(exists) => {
-            generate_exists(exists.clone(), &connection, &driver, &sql_crate, &input_str)?
+        QueryType::Exists(_) => {
+            anyhow::bail!(
+                "exists queries are not supported in query_lazy! macro, use query! macro instead"
+            )
         }
     };
 

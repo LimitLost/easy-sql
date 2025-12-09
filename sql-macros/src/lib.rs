@@ -171,6 +171,19 @@ pub fn query_debug(item: TokenStream) -> anyhow::Result<TokenStream> {
     panic!("{}", result);
 }
 
+/// Documentation WIP
+/// - Takes same input as query! macro
+/// - Returns a value implementing `fetch(conn)` function
+///    - taking `impl sqlx::Executor` as an argument,
+///    - returning `futures::Stream<Item = anyhow::Result<Output>>`
+/// - Selected Query needs to returning a value (use SELECT or RETURNING clause, EXISTS is not supported)
+#[proc_macro]
+#[always_context]
+#[anyhow_result]
+pub fn query_lazy(item: TokenStream) -> anyhow::Result<TokenStream> {
+    macros::query_lazy(item)
+}
+
 #[always_context]
 #[proc_macro]
 #[anyhow_result]
