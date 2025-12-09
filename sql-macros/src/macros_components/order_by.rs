@@ -68,8 +68,8 @@ impl OrderBy {
             .column
             .into_query_string(checks, sql_crate, format_args);
         let order_query_str = match self.order {
-            Order::Asc => quote! {"ASC"},
-            Order::Desc => quote! {"DESC"},
+            Order::Asc => "ASC",
+            Order::Desc => "DESC",
         };
 
         format!("{} {}", column_query, order_query_str)

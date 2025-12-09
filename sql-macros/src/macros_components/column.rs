@@ -64,14 +64,18 @@ impl Column {
 
                 format_args.push(quote! {<#path as #sql_crate::Table>::table_name()});
 
-                format!("{{d}}{{}}{{d}}.{{d}}{}{{d}}", ident_str).to_string()
+                format!(
+                    "{{_easy_sql_d}}{{}}{{_easy_sql_d}}.{{_easy_sql_d}}{}{{_easy_sql_d}}",
+                    ident_str
+                )
+                .to_string()
             }
             Column::Column(ident) => {
                 checks.push(quote! {
                         let _ = ___t___.#ident;
                 });
 
-                format!("{{d}}{}{{d}}", ident.to_string())
+                format!("{{_easy_sql_d}}{}{{_easy_sql_d}}", ident.to_string())
             }
         }
     }
