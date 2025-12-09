@@ -2,7 +2,7 @@ use super::Database;
 use crate::{Insert, Output, Table, Update, sql};
 use anyhow::Context;
 use easy_macros::always_context;
-use sql_macros::sql_convenience;
+use sql_macros::{query, sql_convenience};
 
 #[derive(Table, Debug)]
 #[sql(version = 1)]
@@ -25,71 +25,63 @@ struct ExampleDeleteInsert {
     pub field_opt: Option<i32>,
 }
 
+#[always_context(skip(!))]
 #[sql_convenience]
-#[always_context]
 #[tokio::test]
 async fn test_delete_basic() -> anyhow::Result<()> {
     let db = Database::setup_for_testing::<ExampleTableDelete>().await?;
     let mut conn = db.transaction().await?;
-    ExampleTableDelete::insert(
-        &mut conn,
-        &ExampleDeleteInsert {
-            field: 1,
-            field_str: "A".to_string(),
-            field_opt: None,
-        },
-    )
-    .await?;
-    ExampleTableDelete::delete(&mut conn, sql!(id = 1)).await?;
+    let insert_data = ExampleDeleteInsert {
+        field: 1,
+        field_str: "A".to_string(),
+        field_opt: None,
+    };
+    query!(conn, INSERT INTO ExampleTableDelete VALUES {insert_data}).await?;
+    query!(conn, DELETE FROM ExampleTableDelete WHERE id = 1).await?;
     let result: Result<ExampleDeleteInsert, _> =
-        ExampleTableDelete::get(&mut conn, sql!(id = 1)).await;
+        query!(conn, SELECT ExampleDeleteInsert FROM ExampleTableDelete WHERE id = 1).await;
     assert!(result.is_err());
     conn.rollback().await?;
     Ok(())
 }
 
 #[sql_convenience]
-#[always_context]
+#[always_context(skip(!))]
 #[tokio::test]
 async fn test_delete_no_match() -> anyhow::Result<()> {
     let db = Database::setup_for_testing::<ExampleTableDelete>().await?;
     let mut conn = db.transaction().await?;
-    ExampleTableDelete::insert(
-        &mut conn,
-        &ExampleDeleteInsert {
-            field: 2,
-            field_str: "B".to_string(),
-            field_opt: None,
-        },
-    )
-    .await?;
-    ExampleTableDelete::delete(&mut conn, sql!(id = 999)).await?;
-    let row: ExampleDeleteInsert = ExampleTableDelete::get(&mut conn, sql!(id = 1)).await?;
+    let insert_data = ExampleDeleteInsert {
+        field: 2,
+        field_str: "B".to_string(),
+        field_opt: None,
+    };
+    query!(conn, INSERT INTO ExampleTableDelete VALUES {insert_data}).await?;
+    query!(conn, DELETE FROM ExampleTableDelete WHERE id = 999).await?;
+    let row: ExampleDeleteInsert =
+        query!(conn, SELECT ExampleDeleteInsert FROM ExampleTableDelete WHERE id = 1).await?;
     assert_eq!(row.field, 2);
     conn.rollback().await?;
     Ok(())
 }
 
 #[sql_convenience]
-#[always_context]
+#[always_context(skip(!))]
 #[tokio::test]
 async fn test_delete_multiple_rows() -> anyhow::Result<()> {
     let db = Database::setup_for_testing::<ExampleTableDelete>().await?;
     let mut conn = db.transaction().await?;
     for i in 1..=3 {
-        ExampleTableDelete::insert(
-            &mut conn,
-            &ExampleDeleteInsert {
-                field: i,
-                field_str: format!("S{i}"),
-                field_opt: None,
-            },
-        )
-        .await?;
+        let insert_data = ExampleDeleteInsert {
+            field: i,
+            field_str: format!("S{i}"),
+            field_opt: None,
+        };
+        query!(conn, INSERT INTO ExampleTableDelete VALUES {insert_data}).await?;
     }
-    ExampleTableDelete::delete(&mut conn, sql!(id >= 2)).await?;
+    query!(conn, DELETE FROM ExampleTableDelete WHERE id >= 2).await?;
     let rows: Vec<ExampleDeleteInsert> =
-        ExampleTableDelete::select(&mut conn, sql!(id >= 1)).await?;
+        query!(conn, SELECT Vec<ExampleDeleteInsert> FROM ExampleTableDelete WHERE id >= 1).await?;
     assert_eq!(rows.len(), 1);
     assert_eq!(rows[0].field, 1);
     conn.rollback().await?;
@@ -97,184 +89,159 @@ async fn test_delete_multiple_rows() -> anyhow::Result<()> {
 }
 
 #[sql_convenience]
-#[always_context]
+#[always_context(skip(!))]
 #[tokio::test]
 async fn test_delete_where_field() -> anyhow::Result<()> {
     let db = Database::setup_for_testing::<ExampleTableDelete>().await?;
     let mut conn = db.transaction().await?;
-    ExampleTableDelete::insert(
-        &mut conn,
-        &ExampleDeleteInsert {
-            field: 10,
-            field_str: "X".to_string(),
-            field_opt: None,
-        },
-    )
-    .await?;
-    ExampleTableDelete::delete(&mut conn, sql!(field = 10)).await?;
+    let insert_data = ExampleDeleteInsert {
+        field: 10,
+        field_str: "X".to_string(),
+        field_opt: None,
+    };
+    query!(conn, INSERT INTO ExampleTableDelete VALUES {insert_data}).await?;
+    query!(conn, DELETE FROM ExampleTableDelete WHERE field = 10).await?;
     let result: Result<ExampleDeleteInsert, _> =
-        ExampleTableDelete::get(&mut conn, sql!(id = 1)).await;
+        query!(conn, SELECT ExampleDeleteInsert FROM ExampleTableDelete WHERE id = 1).await;
     assert!(result.is_err());
     conn.rollback().await?;
     Ok(())
 }
 
 #[sql_convenience]
-#[always_context]
+#[always_context(skip(!))]
 #[tokio::test]
 async fn test_delete_all_rows() -> anyhow::Result<()> {
     let db = Database::setup_for_testing::<ExampleTableDelete>().await?;
     let mut conn = db.transaction().await?;
     for i in 1..=3 {
-        ExampleTableDelete::insert(
-            &mut conn,
-            &ExampleDeleteInsert {
-                field: i,
-                field_str: format!("S{i}"),
-                field_opt: None,
-            },
-        )
-        .await?;
+        let insert_data = ExampleDeleteInsert {
+            field: i,
+            field_str: format!("S{i}"),
+            field_opt: None,
+        };
+        query!(conn, INSERT INTO ExampleTableDelete VALUES {insert_data}).await?;
     }
-    ExampleTableDelete::delete(&mut conn, sql!(true)).await?;
-    let rows: Vec<ExampleDeleteInsert> = ExampleTableDelete::select(&mut conn, sql!(true)).await?;
+    query!(conn, DELETE FROM ExampleTableDelete WHERE true).await?;
+    let rows: Vec<ExampleDeleteInsert> =
+        query!(conn, SELECT Vec<ExampleDeleteInsert> FROM ExampleTableDelete WHERE true).await?;
     assert_eq!(rows.len(), 0);
     conn.rollback().await?;
     Ok(())
 }
 
 #[sql_convenience]
-#[always_context]
+#[always_context(skip(!))]
 #[tokio::test]
 async fn test_delete_and_rollback() -> anyhow::Result<()> {
     let db = Database::setup_for_testing::<ExampleTableDelete>().await?;
     let mut conn = db.transaction().await?;
-    ExampleTableDelete::insert(
-        &mut conn,
-        &ExampleDeleteInsert {
-            field: 4,
-            field_str: "Y".to_string(),
-            field_opt: None,
-        },
-    )
-    .await?;
-    ExampleTableDelete::delete(&mut conn, sql!(id = 1)).await?;
+    let insert_data = ExampleDeleteInsert {
+        field: 4,
+        field_str: "Y".to_string(),
+        field_opt: None,
+    };
+    query!(conn, INSERT INTO ExampleTableDelete VALUES {insert_data}).await?;
+    query!(conn, DELETE FROM ExampleTableDelete WHERE id = 1).await?;
     conn.rollback().await?;
     let db2 = Database::setup_for_testing::<ExampleTableDelete>().await?;
     let mut conn2 = db2.transaction().await?;
     let result: Result<ExampleDeleteInsert, _> =
-        ExampleTableDelete::get(&mut conn2, sql!(id = 1)).await;
+        query!(conn2, SELECT ExampleDeleteInsert FROM ExampleTableDelete WHERE id = 1).await;
     assert!(result.is_err());
     Ok(())
 }
 
 #[sql_convenience]
-#[always_context]
+#[always_context(skip(!))]
 #[tokio::test]
 async fn test_delete_boundary_values() -> anyhow::Result<()> {
     let db = Database::setup_for_testing::<ExampleTableDelete>().await?;
     let mut conn = db.transaction().await?;
-    ExampleTableDelete::insert(
-        &mut conn,
-        &ExampleDeleteInsert {
-            field: i64::MAX,
-            field_str: "MAX".to_string(),
-            field_opt: Some(i32::MAX),
-        },
-    )
-    .await?;
-    ExampleTableDelete::delete(&mut conn, sql!(field = { i64::MAX })).await?;
+    let insert_data = ExampleDeleteInsert {
+        field: i64::MAX,
+        field_str: "MAX".to_string(),
+        field_opt: Some(i32::MAX),
+    };
+    query!(conn, INSERT INTO ExampleTableDelete VALUES {insert_data}).await?;
+    let max_val = i64::MAX;
+    query!(conn, DELETE FROM ExampleTableDelete WHERE field = {max_val}).await?;
     let result: Result<ExampleDeleteInsert, _> =
-        ExampleTableDelete::get(&mut conn, sql!(id = 1)).await;
+        query!(conn, SELECT ExampleDeleteInsert FROM ExampleTableDelete WHERE id = 1).await;
     assert!(result.is_err());
     conn.rollback().await?;
     Ok(())
 }
 
 #[sql_convenience]
-#[always_context]
+#[always_context(skip(!))]
 #[tokio::test]
 async fn test_delete_nullable_field() -> anyhow::Result<()> {
     let db = Database::setup_for_testing::<ExampleTableDelete>().await?;
     let mut conn = db.transaction().await?;
-    ExampleTableDelete::insert(
-        &mut conn,
-        &ExampleDeleteInsert {
-            field: 8,
-            field_str: "N".to_string(),
-            field_opt: None,
-        },
-    )
-    .await?;
-    ExampleTableDelete::delete(&mut conn, sql!(field_opt IS NULL)).await?;
+    let insert_data = ExampleDeleteInsert {
+        field: 8,
+        field_str: "N".to_string(),
+        field_opt: None,
+    };
+    query!(conn, INSERT INTO ExampleTableDelete VALUES {insert_data}).await?;
+    query!(conn, DELETE FROM ExampleTableDelete WHERE field_opt IS NULL).await?;
     let result: Result<ExampleDeleteInsert, _> =
-        ExampleTableDelete::get(&mut conn, sql!(id = 1)).await;
+        query!(conn, SELECT ExampleDeleteInsert FROM ExampleTableDelete WHERE id = 1).await;
     assert!(result.is_err());
     conn.rollback().await?;
     Ok(())
 }
 
 #[sql_convenience]
-#[always_context]
+#[always_context(skip(!))]
 #[tokio::test]
 async fn test_delete_after_update() -> anyhow::Result<()> {
     let db = Database::setup_for_testing::<ExampleTableDelete>().await?;
     let mut conn = db.transaction().await?;
-    ExampleTableDelete::insert(
-        &mut conn,
-        &ExampleDeleteInsert {
-            field: 9,
-            field_str: "U".to_string(),
-            field_opt: None,
-        },
-    )
-    .await?;
-    ExampleTableDelete::update(
-        &mut conn,
-        &ExampleDeleteInsert {
-            field: 99,
-            field_str: "UU".to_string(),
-            field_opt: Some(1),
-        },
-        sql!(id = 1),
-    )
-    .await?;
-    ExampleTableDelete::delete(&mut conn, sql!(field = 99)).await?;
+    let insert_data = ExampleDeleteInsert {
+        field: 9,
+        field_str: "U".to_string(),
+        field_opt: None,
+    };
+    query!(conn, INSERT INTO ExampleTableDelete VALUES {insert_data}).await?;
+    let update_data = ExampleDeleteInsert {
+        field: 99,
+        field_str: "UU".to_string(),
+        field_opt: Some(1),
+    };
+    query!(conn, UPDATE ExampleTableDelete SET {update_data} WHERE id = 1).await?;
+    query!(conn, DELETE FROM ExampleTableDelete WHERE field = 99).await?;
     let result: Result<ExampleDeleteInsert, _> =
-        ExampleTableDelete::get(&mut conn, sql!(id = 1)).await;
+        query!(conn, SELECT ExampleDeleteInsert FROM ExampleTableDelete WHERE id = 1).await;
     assert!(result.is_err());
     conn.rollback().await?;
     Ok(())
 }
 
 #[sql_convenience]
-#[always_context]
+#[always_context(skip(!))]
 #[tokio::test]
 async fn test_delete_and_reinsert() -> anyhow::Result<()> {
     let db = Database::setup_for_testing::<ExampleTableDelete>().await?;
     let mut conn = db.transaction().await?;
-    ExampleTableDelete::insert(
-        &mut conn,
-        &ExampleTableDelete {
-            id: 1,
-            field: 10,
-            field_str: "R".to_string(),
-            field_opt: None,
-        },
-    )
-    .await?;
-    ExampleTableDelete::delete(&mut conn, sql!(id = 1)).await?;
-    ExampleTableDelete::insert(
-        &mut conn,
-        &ExampleTableDelete {
-            id: 2,
-            field: 11,
-            field_str: "RR".to_string(),
-            field_opt: None,
-        },
-    )
-    .await?;
-    let row: ExampleDeleteInsert = ExampleTableDelete::get(&mut conn, sql!(id = 2)).await?;
+    let insert_data1 = ExampleTableDelete {
+        id: 1,
+        field: 10,
+        field_str: "R".to_string(),
+        field_opt: None,
+    };
+    query!(conn, INSERT INTO ExampleTableDelete VALUES {insert_data1}).await?;
+    query!(conn, DELETE FROM ExampleTableDelete WHERE id = 1).await?;
+    let insert_data2 = ExampleTableDelete {
+        id: 2,
+        field: 11,
+        field_str: "RR".to_string(),
+        field_opt: None,
+    };
+    query!(conn, INSERT INTO ExampleTableDelete VALUES {insert_data2}).await?;
+    let row: ExampleDeleteInsert =
+        query!(conn, SELECT ExampleDeleteInsert FROM ExampleTableDelete WHERE id = 2).await?;
     assert_eq!(row.field, 11);
     assert_eq!(row.field_str, "RR");
     conn.rollback().await?;

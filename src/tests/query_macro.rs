@@ -3,7 +3,7 @@
 use crate::{Insert, Output, Table, Update};
 use anyhow::Context;
 use easy_macros::always_context;
-use sql_macros::{query, query_debug, sql, sql_convenience};
+use sql_macros::{query, sql, sql_convenience};
 
 use super::Database;
 
@@ -29,29 +29,25 @@ struct QueryTestData {
 }
 
 #[sql_convenience]
-#[always_context]
+#[always_context(skip(!))]
 #[tokio::test]
 async fn test_query_select() -> anyhow::Result<()> {
     let db = Database::setup_for_testing::<QueryTestTable>().await?;
     let mut conn = db.transaction().await?;
 
     // Insert test data
-    QueryTestTable::insert(
-        &mut conn,
-        &QueryTestData {
+    query!(conn, INSERT INTO QueryTestTable VALUES {&QueryTestData {
             field1: "test".to_string(),
             field2: 42,
             field3: 100,
-        },
+        }}
     )
     .await?;
 
     // Test SELECT with WHERE clause
     let random_id = 1i64;
-    let result: QueryTestData =
-        query!(conn, SELECT QueryTestData FROM QueryTestTable WHERE id = {random_id})
-            .await
-            .context("")?;
+    let result =
+        query!(conn, SELECT QueryTestData FROM QueryTestTable WHERE id = {random_id}).await?;
 
     assert_eq!(result.field1, "test");
     assert_eq!(result.field2, 42);
@@ -62,7 +58,87 @@ async fn test_query_select() -> anyhow::Result<()> {
 }
 
 #[sql_convenience]
-#[always_context]
+#[always_context(skip(!))]
+#[tokio::test]
+async fn test_query_select_optional_some() -> anyhow::Result<()> {
+    let db = Database::setup_for_testing::<QueryTestTable>().await?;
+    let mut conn = db.transaction().await?;
+
+    // Insert test data
+    query!(conn, INSERT INTO QueryTestTable VALUES {&QueryTestData {
+            field1: "test".to_string(),
+            field2: 42,
+            field3: 100,
+        }}
+    )
+    .await?;
+
+    // Test SELECT with WHERE clause
+    let random_id = 1i64;
+    let result =
+        query!(conn, SELECT Option<QueryTestData> FROM QueryTestTable WHERE id = {random_id})
+            .await?;
+
+    let result = result.context("Expected Some(result) but got None")?;
+
+    assert_eq!(result.field1, "test");
+    assert_eq!(result.field2, 42);
+    assert_eq!(result.field3, 100);
+
+    conn.rollback().await?;
+    Ok(())
+}
+
+#[always_context(skip(!))]
+#[tokio::test]
+async fn test_query_select_optional_none() -> anyhow::Result<()> {
+    let db = Database::setup_for_testing::<QueryTestTable>().await?;
+    let mut conn = db.transaction().await?;
+
+    // Ensure no data is present
+    // Test SELECT with WHERE clause for non-existent ID
+    let random_id = 999i64;
+    let result =
+        query!(conn, SELECT Option<QueryTestData> FROM QueryTestTable WHERE id = {random_id})
+            .await?;
+
+    assert!(result.is_none(), "Expected None but got Some(result)");
+
+    conn.rollback().await?;
+    Ok(())
+}
+
+#[sql_convenience]
+#[always_context(skip(!))]
+#[tokio::test]
+async fn test_query_select_vec() -> anyhow::Result<()> {
+    let db = Database::setup_for_testing::<QueryTestTable>().await?;
+    let mut conn = db.transaction().await?;
+
+    // Insert test data
+    query!(conn, INSERT INTO QueryTestTable VALUES {&QueryTestData {
+            field1: "test".to_string(),
+            field2: 42,
+            field3: 100,
+        }}
+    )
+    .await?;
+
+    // Test SELECT with WHERE clause
+    let result =
+        query!(conn, SELECT Vec<QueryTestData> FROM QueryTestTable WHERE field2 = {42}).await?;
+
+    assert_eq!(result.len(), 1);
+    assert_eq!(result[0].field1, "test");
+    assert_eq!(result[0].field2, 42);
+    assert_eq!(result[0].field3, 100);
+
+    conn.rollback().await?;
+    Ok(())
+}
+
+#[sql_convenience]
+#[always_context(skip(!))]
 #[tokio::test]
 async fn test_query_insert() -> anyhow::Result<()> {
     let db = Database::setup_for_testing::<QueryTestTable>().await?;
@@ -75,13 +151,12 @@ async fn test_query_insert() -> anyhow::Result<()> {
     };
 
     // Test INSERT
-    query!(conn, INSERT INTO QueryTestTable VALUES {new_data})
-        .await
-        .context("")?;
+    query!(conn, INSERT INTO QueryTestTable VALUES {new_data}).await?;
 
     // Verify the insert
     let result: Vec<QueryTestData> =
-        QueryTestTable::select(&mut conn, sql!(field1 = "inserted")).await?;
+        query!(conn, SELECT Vec<QueryTestData> FROM QueryTestTable WHERE field1 = "inserted")
+            .await?;
     assert_eq!(result.len(), 1);
     assert_eq!(result[0].field2, 99);
 
@@ -90,33 +165,29 @@ async fn test_query_insert() -> anyhow::Result<()> {
 }
 
 #[sql_convenience]
-#[always_context]
+#[always_context(skip(!))]
 #[tokio::test]
 async fn test_query_delete() -> anyhow::Result<()> {
     let db = Database::setup_for_testing::<QueryTestTable>().await?;
     let mut conn = db.transaction().await?;
 
     // Insert test data
-    QueryTestTable::insert(
-        &mut conn,
-        &QueryTestData {
+    query!(conn, INSERT INTO QueryTestTable VALUES {&QueryTestData {
             field1: "to_delete".to_string(),
             field2: 5,
             field3: 10,
-        },
+        }}
     )
     .await?;
 
     let delete_id = 1i64;
 
     // Test DELETE
-    query!(conn, DELETE FROM QueryTestTable WHERE id = {delete_id})
-        .await
-        .context("")?;
+    query!(conn, DELETE FROM QueryTestTable WHERE id = {delete_id}).await?;
 
     // Verify deletion
     let results: Vec<QueryTestData> =
-        QueryTestTable::select(&mut conn, sql!(id = { delete_id })).await?;
+        query!(conn, SELECT Vec<QueryTestData> FROM QueryTestTable WHERE id = {delete_id}).await?;
     assert_eq!(results.len(), 0);
 
     conn.rollback().await?;
@@ -124,7 +195,7 @@ async fn test_query_delete() -> anyhow::Result<()> {
 }
 
 #[sql_convenience]
-#[always_context]
+#[always_context(skip(!))]
 #[tokio::test]
 async fn test_query_exists() -> anyhow::Result<()> {
     let db = Database::setup_for_testing::<QueryTestTable>().await?;
@@ -132,27 +203,21 @@ async fn test_query_exists() -> anyhow::Result<()> {
 
     // Test EXISTS when no data
     let check_id = 999i64;
-    let exists: bool = query!(conn, EXISTS QueryTestTable WHERE id = {check_id})
-        .await
-        .context("")?;
+    let exists: bool = query!(conn, EXISTS QueryTestTable WHERE id = {check_id}).await?;
     assert!(!exists);
 
     // Insert test data
-    QueryTestTable::insert(
-        &mut conn,
-        &QueryTestData {
+    query!(conn, INSERT INTO QueryTestTable VALUES {&QueryTestData {
             field1: "exists_test".to_string(),
             field2: 1,
             field3: 2,
-        },
+        }}
     )
     .await?;
 
     // Test EXISTS when data exists
     let check_id = 1i64;
-    let exists: bool = query!(conn, EXISTS QueryTestTable WHERE id = {check_id})
-        .await
-        .context("")?;
+    let exists: bool = query!(conn, EXISTS QueryTestTable WHERE id = {check_id}).await?;
     assert!(exists);
 
     conn.rollback().await?;
@@ -162,20 +227,18 @@ async fn test_query_exists() -> anyhow::Result<()> {
 // Additional comprehensive tests
 
 #[sql_convenience]
-#[always_context]
+#[always_context(skip(!))]
 #[tokio::test]
 async fn test_query_select_with_limit() -> anyhow::Result<()> {
     let db = Database::setup_for_testing::<QueryTestTable>().await?;
     let mut conn = db.transaction().await?;
 
     // Insert test data
-    QueryTestTable::insert(
-        &mut conn,
-        &QueryTestData {
+    query!(conn, INSERT INTO QueryTestTable VALUES {&QueryTestData {
             field1: "test".to_string(),
             field2: 42,
             field3: 100,
-        },
+        }}
     )
     .await?;
 
@@ -184,8 +247,7 @@ async fn test_query_select_with_limit() -> anyhow::Result<()> {
         conn,
         SELECT QueryTestData FROM QueryTestTable LIMIT {limit_val}
     )
-    .await
-    .context("")?;
+    .await?;
 
     assert_eq!(result.field1, "test");
 
@@ -194,7 +256,7 @@ async fn test_query_select_with_limit() -> anyhow::Result<()> {
 }
 
 #[sql_convenience]
-#[always_context]
+#[always_context(skip(!))]
 #[tokio::test]
 async fn test_query_insert_with_returning() -> anyhow::Result<()> {
     let db = Database::setup_for_testing::<QueryTestTable>().await?;
@@ -212,8 +274,7 @@ async fn test_query_insert_with_returning() -> anyhow::Result<()> {
         conn,
         INSERT INTO QueryTestTable VALUES {new_data} RETURNING QueryTestData
     )
-    .await
-    .context("")?;
+    .await?;
 
     assert_eq!(returned.field1, "returned");
     assert_eq!(returned.field2, 777);
@@ -224,20 +285,18 @@ async fn test_query_insert_with_returning() -> anyhow::Result<()> {
 }
 
 #[sql_convenience]
-#[always_context]
+#[always_context(skip(!))]
 #[tokio::test]
 async fn test_update_by_value() -> anyhow::Result<()> {
     let db = Database::setup_for_testing::<QueryTestTable>().await?;
     let mut conn = db.transaction().await?;
 
     // Insert test data
-    QueryTestTable::insert(
-        &mut conn,
-        &QueryTestData {
+    query!(conn, INSERT INTO QueryTestTable VALUES {&QueryTestData {
             field1: "original".to_string(),
             field2: 10,
             field3: 20,
-        },
+        }}
     )
     .await?;
 
@@ -252,13 +311,11 @@ async fn test_update_by_value() -> anyhow::Result<()> {
         field3: 30,
     };
 
-    query!(conn, UPDATE QueryTestTable SET {update_data} WHERE id = {update_id})
-        .await
-        .context("Failed to execute UPDATE by value")?;
+    query!(conn, UPDATE QueryTestTable SET {update_data} WHERE id = {update_id}).await?;
 
     // Verify update
     let results: Vec<QueryTestData> =
-        QueryTestTable::select(&mut conn, sql!(id = { update_id })).await?;
+        query!(conn, SELECT Vec<QueryTestData> FROM QueryTestTable WHERE id = {update_id}).await?;
     assert_eq!(results.len(), 1);
     assert_eq!(results[0].field1, "updated_by_value");
     assert_eq!(results[0].field2, 88);
@@ -269,7 +326,7 @@ async fn test_update_by_value() -> anyhow::Result<()> {
 }
 
 #[sql_convenience]
-#[always_context]
+#[always_context(skip(!))]
 #[tokio::test]
 async fn test_query_update_with_returning() -> anyhow::Result<()> {
     let db = Database::setup_for_testing::<QueryTestTable>().await?;
@@ -277,14 +334,12 @@ async fn test_query_update_with_returning() -> anyhow::Result<()> {
 
     let update_id = 1i64;
     // Insert test data
-    QueryTestTable::insert(
-        &mut conn,
-        &QueryTestTable {
+    query!(conn, INSERT INTO QueryTestTable VALUES {&QueryTestTable {
             id: update_id,
             field1: "before".to_string(),
             field2: 10,
             field3: 20,
-        },
+        }}
     )
     .await?;
 
@@ -295,9 +350,10 @@ async fn test_query_update_with_returning() -> anyhow::Result<()> {
     };
 
     // First, verify the row was inserted
-    let verify: QueryTestData = QueryTestTable::get(&mut conn, sql!(id = { update_id }))
-        .await
-        .context("Failed to find inserted row")?;
+    let verify: QueryTestData =
+        query!(conn, SELECT QueryTestData FROM QueryTestTable WHERE id = {update_id})
+            .await
+            .context("Failed to find inserted row")?;
 
     eprintln!(
         "DEBUG: Found row before update: field1={}, field2={}, field3={}",
@@ -316,13 +372,11 @@ async fn test_query_update_with_returning() -> anyhow::Result<()> {
         conn,
         UPDATE QueryTestTable SET field1 = {update_data.field1}, field2 = {update_data.field2}, field3 = {update_data.field3} WHERE id = {update_id} RETURNING Option<QueryTestData>
     )
-    .await
-    .context("")?;
+    .await?;
 
     // First, verify the row was updated
-    let verify: QueryTestData = QueryTestTable::get(&mut conn, sql!(id = { update_id }))
-        .await
-        .context("Failed to find updated row")?;
+    let verify: QueryTestData =
+        query!(conn, SELECT QueryTestData FROM QueryTestTable WHERE id = {update_id}).await?;
     eprintln!(
         "DEBUG: Found row after update: field1={}, field2={}, field3={}",
         verify.field1, verify.field2, verify.field3
@@ -344,20 +398,18 @@ async fn test_query_update_with_returning() -> anyhow::Result<()> {
 }
 
 #[sql_convenience]
-#[always_context]
+#[always_context(skip(!))]
 #[tokio::test]
 async fn test_query_delete_with_returning() -> anyhow::Result<()> {
     let db = Database::setup_for_testing::<QueryTestTable>().await?;
     let mut conn = db.transaction().await?;
 
     // Insert test data
-    QueryTestTable::insert(
-        &mut conn,
-        &QueryTestData {
+    query!(conn, INSERT INTO QueryTestTable VALUES {&QueryTestData {
             field1: "to_be_deleted".to_string(),
             field2: 111,
             field3: 222,
-        },
+        }}
     )
     .await?;
 
@@ -369,21 +421,18 @@ async fn test_query_delete_with_returning() -> anyhow::Result<()> {
         conn,
         DELETE FROM QueryTestTable WHERE id = {delete_id} RETURNING QueryTestData
     )
-    .await
-    .context("")?;
+    .await?;
 
     assert_eq!(returned.field1, "to_be_deleted");
     assert_eq!(returned.field2, 111);
     assert_eq!(returned.field3, 222);
 
     // Test DELETE without RETURNING
-    query!(conn, DELETE FROM QueryTestTable WHERE id = {delete_id})
-        .await
-        .context("")?;
+    query!(conn, DELETE FROM QueryTestTable WHERE id = {delete_id}).await?;
 
     // Verify deletion
     let results: Vec<QueryTestData> =
-        QueryTestTable::select(&mut conn, sql!(id = { delete_id })).await?;
+        query!(conn, SELECT Vec<QueryTestData> FROM QueryTestTable WHERE id = {delete_id}).await?;
     assert_eq!(results.len(), 0);
 
     conn.rollback().await?;
@@ -391,7 +440,7 @@ async fn test_query_delete_with_returning() -> anyhow::Result<()> {
 }
 
 #[sql_convenience]
-#[always_context]
+#[always_context(skip(!))]
 #[tokio::test]
 async fn test_query_exists_without_where() -> anyhow::Result<()> {
     let db = Database::setup_for_testing::<QueryTestTable>().await?;
@@ -421,20 +470,18 @@ async fn test_query_exists_without_where() -> anyhow::Result<()> {
 }
 
 #[sql_convenience]
-#[always_context]
+#[always_context(skip(!))]
 #[tokio::test]
 async fn test_query_select_with_complex_where() -> anyhow::Result<()> {
     let db = Database::setup_for_testing::<QueryTestTable>().await?;
     let mut conn = db.transaction().await?;
 
     // Insert test data
-    QueryTestTable::insert(
-        &mut conn,
-        &QueryTestData {
+    query!(conn, INSERT INTO QueryTestTable VALUES {&QueryTestData {
             field1: "complex".to_string(),
             field2: 50,
             field3: 150,
-        },
+        }}
     )
     .await?;
 
@@ -444,8 +491,7 @@ async fn test_query_select_with_complex_where() -> anyhow::Result<()> {
         conn,
         SELECT QueryTestData FROM QueryTestTable WHERE field2 > {min_val} AND field2 < {max_val}
     )
-    .await
-    .context("")?;
+    .await?;
 
     assert_eq!(result.field1, "complex");
     assert_eq!(result.field2, 50);
@@ -455,20 +501,18 @@ async fn test_query_select_with_complex_where() -> anyhow::Result<()> {
 }
 
 #[sql_convenience]
-#[always_context]
+#[always_context(skip(!))]
 #[tokio::test]
 async fn test_query_select_distinct() -> anyhow::Result<()> {
     let db = Database::setup_for_testing::<QueryTestTable>().await?;
     let mut conn = db.transaction().await?;
 
     // Insert test data
-    QueryTestTable::insert(
-        &mut conn,
-        &QueryTestData {
+    query!(conn, INSERT INTO QueryTestTable VALUES {&QueryTestData {
             field1: "distinct_test".to_string(),
             field2: 100,
             field3: 200,
-        },
+        }}
     )
     .await?;
 
@@ -477,8 +521,7 @@ async fn test_query_select_distinct() -> anyhow::Result<()> {
         conn,
         SELECT DISTINCT QueryTestData FROM QueryTestTable WHERE field2 = {check_val}
     )
-    .await
-    .context("")?;
+    .await?;
 
     assert_eq!(result.field1, "distinct_test");
 
@@ -487,20 +530,18 @@ async fn test_query_select_distinct() -> anyhow::Result<()> {
 }
 
 #[sql_convenience]
-#[always_context]
+#[always_context(skip(!))]
 #[tokio::test]
 async fn test_query_update_with_set_expr_simple() -> anyhow::Result<()> {
     let db = Database::setup_for_testing::<QueryTestTable>().await?;
     let mut conn = db.transaction().await?;
 
     // Insert test data
-    QueryTestTable::insert(
-        &mut conn,
-        &QueryTestData {
+    query!(conn, INSERT INTO QueryTestTable VALUES {&QueryTestData {
             field1: "original".to_string(),
             field2: 10,
             field3: 20,
-        },
+        }}
     )
     .await?;
 
@@ -513,12 +554,11 @@ async fn test_query_update_with_set_expr_simple() -> anyhow::Result<()> {
         conn,
         UPDATE QueryTestTable SET field1 = {new_value}, field2 = {new_field2} + 5 WHERE id = {update_id}
     )
-    .await
-    .context("Failed to execute UPDATE with SET expr")?;
+    .await?;
 
     // Verify update
     let results: Vec<QueryTestData> =
-        QueryTestTable::select(&mut conn, sql!(id = { update_id })).await?;
+        query!(conn, SELECT Vec<QueryTestData> FROM QueryTestTable WHERE id = {update_id}).await?;
     assert_eq!(results[0].field1, "updated_with_expr");
     assert_eq!(results[0].field2, 104);
     assert_eq!(results[0].field3, 20); // This shouldn't change
@@ -528,20 +568,18 @@ async fn test_query_update_with_set_expr_simple() -> anyhow::Result<()> {
 }
 
 #[sql_convenience]
-#[always_context]
+#[always_context(skip(!))]
 #[tokio::test]
 async fn test_query_update_with_set_expr_single_field() -> anyhow::Result<()> {
     let db = Database::setup_for_testing::<QueryTestTable>().await?;
     let mut conn = db.transaction().await?;
 
     // Insert test data
-    QueryTestTable::insert(
-        &mut conn,
-        &QueryTestData {
+    query!(conn, INSERT INTO QueryTestTable VALUES {&QueryTestData {
             field1: "original".to_string(),
             field2: 10,
             field3: 20,
-        },
+        }}
     )
     .await?;
 
@@ -553,12 +591,11 @@ async fn test_query_update_with_set_expr_single_field() -> anyhow::Result<()> {
         conn,
         UPDATE QueryTestTable SET field3 = {new_field3} WHERE id = {update_id}
     )
-    .await
-    .context("")?;
+    .await?;
 
     // Verify update
     let results: Vec<QueryTestData> =
-        QueryTestTable::select(&mut conn, sql!(id = { update_id })).await?;
+        query!(conn, SELECT Vec<QueryTestData> FROM QueryTestTable WHERE id = {update_id}).await?;
     assert_eq!(results[0].field1, "original");
     assert_eq!(results[0].field2, 10);
     assert_eq!(results[0].field3, 999);
@@ -568,20 +605,18 @@ async fn test_query_update_with_set_expr_single_field() -> anyhow::Result<()> {
 }
 
 #[sql_convenience]
-#[always_context]
+#[always_context(skip(!))]
 #[tokio::test]
 async fn test_query_update_with_set_expr_returning() -> anyhow::Result<()> {
     let db = Database::setup_for_testing::<QueryTestTable>().await?;
     let mut conn = db.transaction().await?;
 
     // Insert test data
-    QueryTestTable::insert(
-        &mut conn,
-        &QueryTestData {
+    query!(conn, INSERT INTO QueryTestTable VALUES {&QueryTestData {
             field1: "original".to_string(),
             field2: 10,
             field3: 20,
-        },
+        }}
     )
     .await?;
 
@@ -594,8 +629,7 @@ async fn test_query_update_with_set_expr_returning() -> anyhow::Result<()> {
         conn,
         UPDATE QueryTestTable SET field1 = {new_value} WHERE id = {update_id} RETURNING QueryTestData
     )
-    .await
-    .context("")?;
+    .await?;
 
     assert_eq!(returned.field1, "returned");
     assert_eq!(returned.field2, 10);
@@ -606,20 +640,18 @@ async fn test_query_update_with_set_expr_returning() -> anyhow::Result<()> {
 }
 
 #[sql_convenience]
-#[always_context]
+#[always_context(skip(!))]
 #[tokio::test]
 async fn test_query_update_with_set_expr_literals() -> anyhow::Result<()> {
     let db = Database::setup_for_testing::<QueryTestTable>().await?;
     let mut conn = db.transaction().await?;
 
     // Insert test data
-    QueryTestTable::insert(
-        &mut conn,
-        &QueryTestData {
+    query!(conn, INSERT INTO QueryTestTable VALUES {&QueryTestData {
             field1: "original".to_string(),
             field2: 10,
             field3: 20,
-        },
+        }}
     )
     .await?;
 
@@ -630,12 +662,11 @@ async fn test_query_update_with_set_expr_literals() -> anyhow::Result<()> {
         conn,
         UPDATE QueryTestTable SET field1 = "literal_string", field2 = 777 WHERE id = {update_id}
     )
-    .await
-    .context("")?;
+    .await?;
 
     // Verify update
     let results: Vec<QueryTestData> =
-        QueryTestTable::select(&mut conn, sql!(id = { update_id })).await?;
+        query!(conn, SELECT Vec<QueryTestData> FROM QueryTestTable WHERE id = {update_id}).await?;
     assert_eq!(results[0].field1, "literal_string");
     assert_eq!(results[0].field2, 777);
 
