@@ -4,6 +4,9 @@ use crate::drivers::postgres::{Database, DatabaseInternalDefault, Postgres as Te
 #[cfg(all(feature = "sqlite", not(feature = "postgres")))]
 use crate::drivers::sqlite::{Database, DatabaseInternalDefault, Sqlite as TestDriver};
 
+mod _logger;
+pub use _logger::*;
+
 #[cfg(any(feature = "postgres", feature = "sqlite"))]
 mod impl_macros;
 // TODO Readme will be remade
