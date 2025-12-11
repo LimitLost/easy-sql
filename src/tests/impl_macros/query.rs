@@ -4,13 +4,15 @@ use anyhow::Context;
 use easy_macros::always_context;
 
 use crate::{
-    Connection, Driver, DriverArguments, DriverRow, Expr, Insert, Output, QueryBuilder, Table,
-    TableJoin, Update, macro_support::never_any,
+    Connection, Driver, DriverArguments, Insert, Output, Table, Update, macro_support::never_any,
 };
 
 use super::{DatabaseInternalDefault, TestDriver};
-
+#[derive(Debug, Table)]
+#[sql(version = 1)]
+#[sql(unique_id = "192edcad-1b14-42d5-a4d0-246923d46561")]
 struct ExampleTable {
+    #[sql(primary_key)]
     id: i64,
     field0: String,
     field1: String,
@@ -18,246 +20,14 @@ struct ExampleTable {
     field3: i64,
     field4: i16,
 }
-
-#[always_context]
-impl Table<TestDriver> for ExampleTable {
-    fn table_name() -> &'static str {
-        "example_table"
-    }
-
-    fn primary_keys() -> Vec<&'static str> {
-        vec!["id"]
-    }
-
-    fn table_joins(_builder: &mut QueryBuilder<'_, TestDriver>) -> Vec<TableJoin> {
-        vec![]
-    }
-}
-
-#[always_context]
-#[no_context]
-impl<'a> Insert<'a, ExampleTable, TestDriver> for ExampleTable {
-    fn insert_columns() -> Vec<String> {
-        vec![
-            "id".into(),
-            "field0".into(),
-            "field1".into(),
-            "field2".into(),
-            "field3".into(),
-            "field4".into(),
-        ]
-    }
-
-    fn insert_values(self, builder: &mut QueryBuilder<'_, TestDriver>) -> anyhow::Result<usize> {
-        unsafe {
-            builder.bind(self.id)?;
-            builder.bind(self.field0)?;
-            builder.bind(self.field1)?;
-            builder.bind(self.field2)?;
-            builder.bind(self.field3)?;
-            builder.bind(self.field4)?;
-        }
-        Ok(1)
-    }
-
-    fn insert_values_sqlx(
-        self,
-        mut args: DriverArguments<'a, TestDriver>,
-    ) -> anyhow::Result<(DriverArguments<'a, TestDriver>, usize)> {
-        use sqlx::Arguments;
-        args.add(self.id).map_err(anyhow::Error::from_boxed)?;
-        args.add(self.field0).map_err(anyhow::Error::from_boxed)?;
-        args.add(self.field1).map_err(anyhow::Error::from_boxed)?;
-        args.add(self.field2).map_err(anyhow::Error::from_boxed)?;
-        args.add(self.field3).map_err(anyhow::Error::from_boxed)?;
-        args.add(self.field4).map_err(anyhow::Error::from_boxed)?;
-        Ok((args, 1))
-    }
-}
-
-#[always_context]
-impl<'a> Insert<'a, ExampleTable, TestDriver> for &'a ExampleTable {
-    fn insert_columns() -> Vec<String> {
-        ExampleTable::insert_columns()
-    }
-
-    fn insert_values(self, builder: &mut QueryBuilder<'_, TestDriver>) -> anyhow::Result<usize> {
-        unsafe {
-            builder.bind(&self.id)?;
-            builder.bind(&self.field0)?;
-            builder.bind(&self.field1)?;
-            builder.bind(&self.field2)?;
-            builder.bind(&self.field3)?;
-            builder.bind(&self.field4)?;
-        }
-        Ok(1)
-    }
-
-    fn insert_values_sqlx(
-        self,
-        mut args: DriverArguments<'a, TestDriver>,
-    ) -> anyhow::Result<(DriverArguments<'a, TestDriver>, usize)> {
-        use sqlx::Arguments;
-        args.add(&self.id).map_err(anyhow::Error::from_boxed)?;
-        args.add(&self.field0).map_err(anyhow::Error::from_boxed)?;
-        args.add(&self.field1).map_err(anyhow::Error::from_boxed)?;
-        args.add(&self.field2).map_err(anyhow::Error::from_boxed)?;
-        args.add(&self.field3).map_err(anyhow::Error::from_boxed)?;
-        args.add(&self.field4).map_err(anyhow::Error::from_boxed)?;
-        Ok((args, 1))
-    }
-}
-
-#[always_context]
-impl<'a> Update<'a, ExampleTable, TestDriver> for &'a ExampleTable {
-    fn updates(
-        self,
-        builder: &mut QueryBuilder<'_, TestDriver>,
-    ) -> anyhow::Result<Vec<(String, Expr)>> {
-        unsafe {
-            builder.bind(&self.id)?;
-            builder.bind(&self.field0)?;
-            builder.bind(&self.field1)?;
-            builder.bind(&self.field2)?;
-            builder.bind(&self.field3)?;
-            builder.bind(&self.field4)?;
-        }
-        Ok(vec![
-            ("id".to_string(), crate::Expr::Value),
-            ("field0".to_string(), crate::Expr::Value),
-            ("field1".to_string(), crate::Expr::Value),
-            ("field2".to_string(), crate::Expr::Value),
-            ("field3".to_string(), crate::Expr::Value),
-            ("field4".to_string(), crate::Expr::Value),
-        ])
-    }
-
-    fn updates_sqlx(
-        self,
-        mut args_list: DriverArguments<'a, TestDriver>,
-        current_query: &mut String,
-        parameter_n: &mut usize,
-    ) -> anyhow::Result<DriverArguments<'a, TestDriver>> {
-        use sqlx::Arguments;
-        let _easy_sql_d = TestDriver::identifier_delimiter();
-
-        args_list.add(self.id).map_err(anyhow::Error::from_boxed)?;
-        current_query.push_str(&format!(
-            "{_easy_sql_d}id{_easy_sql_d} = {}, ",
-            TestDriver::parameter_placeholder(*parameter_n)
-        ));
-        *parameter_n += 1;
-
-        args_list
-            .add(&self.field0)
-            .map_err(anyhow::Error::from_boxed)?;
-        current_query.push_str(&format!(
-            "{_easy_sql_d}field0{_easy_sql_d} = {}, ",
-            TestDriver::parameter_placeholder(*parameter_n)
-        ));
-        *parameter_n += 1;
-
-        args_list
-            .add(&self.field1)
-            .map_err(anyhow::Error::from_boxed)?;
-        current_query.push_str(&format!(
-            "{_easy_sql_d}field1{_easy_sql_d} = {}, ",
-            TestDriver::parameter_placeholder(*parameter_n)
-        ));
-        *parameter_n += 1;
-
-        args_list
-            .add(&self.field2)
-            .map_err(anyhow::Error::from_boxed)?;
-        current_query.push_str(&format!(
-            "{_easy_sql_d}field2{_easy_sql_d} = {}, ",
-            TestDriver::parameter_placeholder(*parameter_n)
-        ));
-        *parameter_n += 1;
-
-        args_list
-            .add(&self.field3)
-            .map_err(anyhow::Error::from_boxed)?;
-        current_query.push_str(&format!(
-            "{_easy_sql_d}field3{_easy_sql_d} = {}, ",
-            TestDriver::parameter_placeholder(*parameter_n)
-        ));
-        *parameter_n += 1;
-
-        args_list
-            .add(&self.field4)
-            .map_err(anyhow::Error::from_boxed)?;
-        current_query.push_str(&format!(
-            "{_easy_sql_d}field4{_easy_sql_d} = {}",
-            TestDriver::parameter_placeholder(*parameter_n)
-        ));
-        *parameter_n += 1;
-
-        Ok(args_list)
-    }
-}
-
 #[allow(dead_code)]
+#[derive(Debug, Output)]
+#[sql(table = ExampleTable)]
 struct ExampleOutput {
     field1: String,
     field2: i32,
     field3: i64,
 }
-
-#[always_context]
-impl Output<ExampleTable, TestDriver> for ExampleOutput {
-    type DataToConvert = DriverRow<TestDriver>;
-    fn sql_to_query<'a>(
-        sql: crate::Sql,
-        builder: QueryBuilder<'a, TestDriver>,
-    ) -> anyhow::Result<crate::QueryData<'a, TestDriver>> {
-        let requested_columns = vec![
-            crate::RequestedColumn {
-                table_name: None,
-                name: "field1".to_owned(),
-                alias: None,
-            },
-            crate::RequestedColumn {
-                table_name: None,
-                name: "field2".to_owned(),
-                alias: None,
-            },
-            crate::RequestedColumn {
-                table_name: None,
-                name: "field3".to_owned(),
-                alias: None,
-            },
-        ];
-
-        sql.query_output(builder, requested_columns)
-    }
-
-    fn select_sqlx(current_query: &mut String) {
-        current_query.push_str("field1, field2, field3");
-    }
-
-    #[no_context]
-    fn convert<'r>(data: DriverRow<TestDriver>) -> anyhow::Result<Self> {
-        use anyhow::Context;
-        use easy_macros::context;
-
-        Ok(Self {
-            field1: <DriverRow<TestDriver> as crate::SqlxRow>::try_get(&data, "field1")
-                .with_context(context!(
-                    "Getting field `field1` with type String for struct ExampleStruct"
-                ))?,
-            field2: <DriverRow<TestDriver> as crate::SqlxRow>::try_get(&data, "field2")
-                .with_context(context!(
-                    "Getting field `field2` with type i32 for struct ExampleStruct"
-                ))?,
-            field3: <DriverRow<TestDriver> as crate::SqlxRow>::try_get(&data, "field3")
-                .with_context(context!(
-                    "Getting field `field3` with type i64 for struct ExampleStruct"
-                ))?,
-        })
-    }
-}
-
 #[always_context]
 #[no_context]
 async fn _test_select() -> anyhow::Result<ExampleOutput> {
@@ -266,8 +36,6 @@ async fn _test_select() -> anyhow::Result<ExampleOutput> {
     let random_id = 42;
 
     // query!(&mut fake_conn, SELECT ExampleOutput FROM ExampleTable WHERE id = {random_id} AND field2 > 17);
-
-    //TODO Add documentation for query! : "IMPORTANT: Await is called inside the macro and unfortunately cannot be moved outside of the invocation"
 
     // query! macro output
     let result = {
