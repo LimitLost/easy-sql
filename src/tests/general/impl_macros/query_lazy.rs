@@ -2,16 +2,16 @@
 
 use anyhow::Context;
 use easy_macros::always_context;
-use futures::{StreamExt, TryStreamExt};
+use futures::StreamExt;
 
 use crate::{
     Connection, Driver, DriverArguments, InternalDriver, Output, Table, macro_support::never_any,
 };
 
-use super::{DatabaseInternalDefault, TestDriver};
+use super::TestDriver;
 #[derive(Debug, Table)]
 #[sql(version = 1)]
-#[sql(unique_id = "fb592059-c4c6-4e04-b955-ddd3d5728d61")]
+#[sql(unique_id = "36a1547d-1bb3-478b-afcd-be31d65ccdd0")]
 struct ExampleTable {
     #[sql(primary_key)]
     id: i64,
@@ -31,8 +31,9 @@ struct ExampleOutput {
 }
 #[always_context]
 #[no_context]
+#[allow(dead_code)]
 async fn _test_select() -> anyhow::Result<Vec<ExampleOutput>> {
-    let mut fake_conn = never_any::<Connection<TestDriver, DatabaseInternalDefault>>();
+    let mut fake_conn = never_any::<Connection<TestDriver>>();
 
     let random_id = 42;
 
@@ -58,7 +59,7 @@ async fn _test_select() -> anyhow::Result<Vec<ExampleOutput>> {
         use sqlx::Arguments;
         let mut args = DriverArguments::<TestDriver>::default();
         let mut query = "SELECT ".to_string();
-        let mut current_arg_n = 0;
+        let current_arg_n = 0;
         let mut _easy_sql_d = TestDriver::identifier_delimiter();
         // Build query
         ExampleOutput::select_sqlx(&mut query);
@@ -70,7 +71,6 @@ async fn _test_select() -> anyhow::Result<Vec<ExampleOutput>> {
             TestDriver::parameter_placeholder(current_arg_n + 1)
         ));
         args.add(&random_id).map_err(anyhow::Error::from_boxed)?;
-        current_arg_n += 1;
 
         let builder = sqlx::QueryBuilder::with_arguments(query, args);
 

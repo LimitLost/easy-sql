@@ -3,10 +3,14 @@ mod insert;
 mod output;
 mod query;
 mod query_lazy;
-mod sql;
 mod table;
 mod update;
 
 use super::*;
 
 //TODO Test whenever query_lazy!(...).fetch(conn) borrows conn forever (it shouldn't)
+
+/// Represents a connection that will be never created
+/// TODO will be changed conditionally when the `watcher` feature will be added
+#[allow(dead_code)]
+type NeverConnection = crate::Connection<TestDriver>;

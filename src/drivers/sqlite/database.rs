@@ -99,6 +99,10 @@ impl Database {
     pub async fn setup_for_testing<T: DatabaseSetup<Sqlite>>() -> anyhow::Result<Self> {
         use tokio::sync::Mutex;
 
+        use crate::tests::init_test_logger;
+
+        init_test_logger();
+
         lazy_static::lazy_static! {
             static ref CURRENT_NAME_N:Mutex<usize>=Default::default();
         }

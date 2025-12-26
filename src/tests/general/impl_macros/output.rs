@@ -22,6 +22,7 @@ struct ExampleStruct {
 //Remove in derive
 #[always_context]
 impl crate::Output<ExampleTableStruct, TestDriver> for ExampleStruct {
+    type UsedForChecks = Self;
     type DataToConvert = DriverRow<TestDriver>;
     fn sql_to_query<'a>(
         sql: Sql,

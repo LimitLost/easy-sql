@@ -1,9 +1,9 @@
 use anyhow::Context;
 use easy_macros::always_context;
 
-use super::{DatabaseInternalDefault, TestDriver};
+use super::{NeverConnection, TestDriver};
 
-use crate::{Connection, DriverArguments, Insert, QueryBuilder, Table, TableJoin};
+use crate::{DriverArguments, Insert, QueryBuilder, Table, TableJoin, query};
 #[allow(dead_code)]
 struct ExampleTableStruct {
     id: i64,
@@ -163,9 +163,9 @@ impl Table<TestDriver> for ExampleTableStruct {
     }
 }
 
-#[always_context]
+#[always_context(skip(!))]
 /// Test used just for compile time checking of the SqlInsert macro implementation
-async fn _test(conn: &mut Connection<TestDriver, DatabaseInternalDefault>) -> anyhow::Result<()> {
+async fn _test(mut conn: &mut NeverConnection) -> anyhow::Result<()> {
     let to_insert = ExampleStruct {
         field0: "value0".to_string(),
         field1: "value1".to_string(),
@@ -173,6 +173,6 @@ async fn _test(conn: &mut Connection<TestDriver, DatabaseInternalDefault>) -> an
         field3: 3,
         field4: 4,
     };
-    ExampleTableStruct::insert(conn, &to_insert).await?;
+    query!(conn, INSERT INTO ExampleTableStruct VALUES {to_insert}).await?;
     Ok(())
 }

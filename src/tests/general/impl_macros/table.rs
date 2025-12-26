@@ -105,7 +105,7 @@ impl sql_crate::DatabaseSetup<TestDriver> for ExampleTable {
                 },
             )
             .await?;
-            EasySqlTables_create!(TestDriver, conn, "table_name".to_string(), 5);
+            EasySqlTables_create!(TestDriver, *conn, "table_name".to_string(), 5);
         }
 
         //If table doesn't exist ( https://stackoverflow.com/questions/1601151/how-do-i-check-in-sqlite-whether-a-table-exists )

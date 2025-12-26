@@ -24,6 +24,7 @@ pub fn init_test_logger() {
     });
 }
 #[test]
+/// This test ensures that the logger is properly initialized, when all tests are run, before any of them start
 fn setup_logger() {
     init_test_logger();
 }
