@@ -1,11 +1,10 @@
 use std::collections::HashMap;
-use std::ops::DerefMut;
 
 use anyhow::Context;
 use easy_macros::{always_context, context};
-use sqlx::PgConnection;
 
 use super::{Postgres, table_field_definition};
+use crate::EasyExecutor;
 use crate::SetupSql;
 
 use crate::TableField;
@@ -25,10 +24,7 @@ pub struct CreateTable {
 impl SetupSql<Postgres> for CreateTable {
     type Output = ();
 
-    async fn query(
-        self,
-        exec: &mut (impl DerefMut<Target = PgConnection> + Send + Sync),
-    ) -> anyhow::Result<Self::Output> {
+    async fn query(self, exec: &mut impl EasyExecutor<Postgres>) -> anyhow::Result<Self::Output> {
         let mut table_fields = String::new();
         let mut table_constrains = String::new();
 
@@ -83,7 +79,7 @@ impl SetupSql<Postgres> for CreateTable {
 
         #[no_context]
         sqlx_query
-            .execute(exec.deref_mut())
+            .execute(exec.executor())
             .await
             .with_context(context!(
                 "table_name: {:?} | query: {:?}",

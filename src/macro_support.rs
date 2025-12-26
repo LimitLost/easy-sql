@@ -1,6 +1,7 @@
 pub use anyhow::{Context, Error, Result};
 pub use easy_macros::context;
 pub use futures::FutureExt;
+pub use futures_core::Stream;
 pub use lazy_static::lazy_static;
 pub use sqlx::{Arguments, Executor, QueryBuilder, Type, TypeInfo, query::Query};
 

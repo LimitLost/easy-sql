@@ -1,76 +1,59 @@
-use std::sync::Arc;
-
 use anyhow::Context;
 use easy_macros::always_context;
 
-use tokio::sync::Mutex;
-
-use crate::{Connection, DatabaseInternal, DatabaseSetup, EasySqlTables, Transaction};
+use crate::{Connection, DatabaseSetup, EasySqlTables, Transaction};
 
 use super::Db;
 
 pub use sqlx::postgres::{PgConnectOptions, PgPoolOptions};
 
-use super::{DatabaseInternalDefault, Postgres};
+use super::Postgres;
 
 #[derive(Debug)]
-pub struct Database<DI: DatabaseInternal<Driver = Postgres> + Send + Sync = DatabaseInternalDefault>
-{
+pub struct Database {
     connection_pool: sqlx::Pool<Db>,
-    internal: Arc<Mutex<DI>>,
 }
 
 #[always_context]
-impl<DI: DatabaseInternal<Driver = Postgres> + Send + Sync> Database<DI> {
-    pub async fn setup<T: DatabaseSetup<Postgres>>(
-        url: &str,
-        internal: Arc<Mutex<DI>>,
-    ) -> anyhow::Result<Self> {
+impl Database {
+    pub async fn setup<T: DatabaseSetup<Postgres>>(url: &str) -> anyhow::Result<Self> {
         let connection_pool = sqlx::Pool::<Db>::connect(url).await?;
 
-        let mut conn = Connection::new(connection_pool.acquire().await?, internal.clone());
+        let mut conn = Connection::new(connection_pool.acquire().await?);
 
-        EasySqlTables::setup(&mut conn).await?;
-        T::setup(&mut conn).await?;
+        EasySqlTables::setup(&mut &mut conn).await?;
+        T::setup(&mut &mut conn).await?;
 
-        Ok(Database {
-            connection_pool,
-            internal,
-        })
+        Ok(Database { connection_pool })
     }
 
     pub async fn setup_with_options<T: DatabaseSetup<Postgres>>(
         options: PgConnectOptions,
-        internal: Arc<Mutex<DI>>,
     ) -> anyhow::Result<Self> {
         let connection_pool = sqlx::Pool::<Db>::connect_with(options.clone()).await?;
 
-        let mut conn = Connection::new(connection_pool.acquire().await?, internal.clone());
+        let mut conn = Connection::new(connection_pool.acquire().await?);
 
-        EasySqlTables::setup(&mut conn).await?;
-        T::setup(&mut conn).await?;
+        EasySqlTables::setup(&mut &mut conn).await?;
+        T::setup(&mut &mut conn).await?;
 
-        Ok(Database {
-            connection_pool,
-            internal,
-        })
+        Ok(Database { connection_pool })
     }
 
-    pub async fn conn(&self) -> anyhow::Result<Connection<Postgres, DI>> {
+    pub async fn conn(&self) -> anyhow::Result<Connection<Postgres>> {
         let conn = self.connection_pool.acquire().await?;
-        Ok(Connection::new(conn, self.internal.clone()))
+        Ok(Connection::new(conn))
     }
 
-    pub async fn transaction(&self) -> anyhow::Result<Transaction<'_, Postgres, DI>> {
+    pub async fn transaction(&self) -> anyhow::Result<Transaction<'_, Postgres>> {
         let conn = self.connection_pool.begin().await?;
-        Ok(Transaction::new(conn, self.internal.clone()))
+        Ok(Transaction::new(conn))
     }
-}
 
-#[always_context]
-impl Database<DatabaseInternalDefault> {
     #[cfg(test)]
     pub async fn setup_for_testing<T: DatabaseSetup<Postgres>>() -> anyhow::Result<Self> {
+        use tokio::sync::Mutex;
+
         lazy_static::lazy_static! {
             static ref CURRENT_NAME_N:Mutex<usize>=Default::default();
         }
@@ -126,19 +109,11 @@ impl Database<DatabaseInternalDefault> {
         )
         .await?;
 
-        let internal: Arc<Mutex<DatabaseInternalDefault>> =
-            Arc::new(Mutex::new(DatabaseInternalDefault {
-                test_db_file_path: None, // Postgres doesn't use file paths
-            }));
+        let mut conn = Connection::new(connection_pool.acquire().await?);
 
-        let mut conn = Connection::new(connection_pool.acquire().await?, internal.clone());
+        EasySqlTables::setup(&mut &mut conn).await?;
+        T::setup(&mut &mut conn).await?;
 
-        EasySqlTables::setup(&mut conn).await?;
-        T::setup(&mut conn).await?;
-
-        Ok(Database {
-            connection_pool,
-            internal,
-        })
+        Ok(Database { connection_pool })
     }
 }

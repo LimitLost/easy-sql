@@ -55,6 +55,11 @@ impl Limit {
         self,
         checks: &mut Vec<TokenStream>,
         format_args: &mut Vec<TokenStream>,
+        binds: &mut Vec<TokenStream>,
+        sql_crate: &TokenStream,
+        driver: &TokenStream,
+        param_counter: &mut usize,
+        before_param_n: &TokenStream,
     ) -> String {
         match self {
             Limit::Literal(s) => {
@@ -63,11 +68,26 @@ impl Limit {
                 "{}".to_string()
             }
             Limit::Expr(expr) => {
-                format_args.push(quote! {#expr});
-
+                // Check if the expression can be converted to i64
                 checks.push(quote_spanned! {expr.span()=>
                     let _test:i64 = #expr as i64;
                 });
+
+                // Add binding for the parameter
+                let debug_str = format!(
+                    "Failed to bind `{}` to LIMIT parameter",
+                    quote! {#expr}.to_string()
+                );
+                binds.push(quote_spanned! {expr.span()=>
+                    _easy_sql_args.add(&#expr).map_err(anyhow::Error::from_boxed).context(#debug_str)?;
+                });
+
+                // Add parameter placeholder
+                let current_param_n = *param_counter;
+                format_args.push(quote! {
+                    <#driver as #sql_crate::Driver>::parameter_placeholder(#before_param_n #current_param_n)
+                });
+                *param_counter += 1;
 
                 "{}".to_string()
             }

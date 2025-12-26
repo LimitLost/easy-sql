@@ -16,6 +16,12 @@ syn = { version = "2.0", features = ["full","extra-traits"] }
 quote = { version = "1.0"}
 proc-macro2 = { version = "1.0.100" }
 anyhow = { version = "1" }
+lazy_static = "1.5.0"
 
 [build-dependencies]
 easy-macros = { version="1.0.2", features = ["build"] }
+
+[features]
+default = []
+use_output_columns = []
+parse_debug = []

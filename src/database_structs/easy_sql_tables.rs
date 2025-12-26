@@ -1,6 +1,6 @@
 use std::fmt::Debug;
 
-use crate::{Driver, DriverConnection, InternalDriver, Output, QueryBuilder};
+use crate::{Driver, DriverConnection, HasTable, InternalDriver, Output, QueryBuilder};
 use easy_macros::always_context;
 use sql_macros::{Insert, Update, sql_convenience};
 use sqlx::TypeInfo;
@@ -14,6 +14,8 @@ pub struct EasySqlTables {
     pub version: i64,
 }
 
+impl HasTable<EasySqlTables> for EasySqlTables {}
+
 #[macro_export]
 macro_rules! EasySqlTables_create {
     ($driver:path, $conn:expr, $table_id:expr, $version:expr) => {
@@ -21,32 +23,26 @@ macro_rules! EasySqlTables_create {
             table_id: $table_id,
             version: $version,
         };
-        <$crate::EasySqlTables as $crate::Table<$driver>>::insert($conn, &inserted)
-            .await
-            .with_context($crate::macro_support::context!(
-                "Failed to create EasySqlTables | inserted: {:?}",
-                inserted
-            ))?;
+        $crate::query!($conn, INSERT INTO $crate::EasySqlTables VALUES { &inserted })
+        .await
+        .with_context($crate::macro_support::context!(
+            "Failed to create EasySqlTables | inserted: {:?}",
+            inserted
+        ))?;
     };
 }
 
 #[macro_export]
 macro_rules! EasySqlTables_update_version {
     ($driver:path, $conn:expr, $table_id:expr, $new_version:expr) => {{
-        #[derive($crate::Update, $crate::Output, Debug)]
-        #[sql(table = $crate::EasySqlTables)]
-        struct EasySqlTableVersion {
-            pub version: i64,
-        }
 
-        <$crate::EasySqlTables as $crate::Table<$driver>>::update(
-            $conn,
-            &mut EasySqlTableVersion {
-                version: $new_version,
-            },
-            $crate::sql!(table_id = { $table_id }),
-        )
-        .await?;
+        $crate::query!($conn, UPDATE $crate::EasySqlTables SET version = { $new_version } WHERE table_id = { $table_id })
+            .await
+            .with_context($crate::macro_support::context!(
+                "Failed to update EasySqlTables version | table_id: {:?} | new_version: {:?}",
+                $table_id,
+                $new_version
+            ))?;
     }};
 }
 
@@ -59,11 +55,7 @@ macro_rules! EasySqlTables_get_version {
             pub version: i64,
         }
 
-        let version: Option<EasySqlTableVersion> =
-            <$crate::EasySqlTables as $crate::Table<$driver>>::select(
-                $conn,
-                $crate::sql!(|$crate::EasySqlTables| table_id = { $table_id }),
-            )
+        let version: Option<EasySqlTableVersion> = $crate::query!($conn, SELECT Option<EasySqlTableVersion> FROM $crate::EasySqlTables WHERE $crate::EasySqlTables.table_id = { $table_id })
             .await?;
         version.map(|v| v.version)
     }};
@@ -162,10 +154,16 @@ where
 
         let table_name = <EasySqlTables as Table<D>>::table_name();
 
-        let table_exists = D::table_exists(conn, table_name).await?;
+        let table_exists = D::table_exists(
+            #[context(no)]
+            conn,
+            table_name,
+        )
+        .await?;
 
         if !table_exists {
             D::create_table(
+                #[context(no)]
                 conn,
                 table_name,
                 vec![

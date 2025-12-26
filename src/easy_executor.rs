@@ -1,31 +1,15 @@
-use std::{fmt::Debug, ops::DerefMut};
-
 use easy_macros::always_context;
 
-use crate::{
-    Driver, DriverArguments, DriverConnection, DriverRow, Output, QueryBuilder, Table, ToConvert,
-    query::Sql,
-};
-
-pub struct Break;
+use crate::{Driver, DriverConnection};
 
 #[always_context]
-pub trait EasyExecutor<D: Driver>: Debug {
-    // async fn query(&mut self, sql: &Sql) -> anyhow::Result<()>;
-    async fn query<
-        Y: ToConvert<D> + Send + Sync + 'static,
-        T: Table<D>,
-        O: Output<T, D, DataToConvert = Y>,
-    >(
-        &mut self,
-        sql: Sql,
-        builder: QueryBuilder<'_, D>,
-    ) -> anyhow::Result<O>
+pub trait EasyExecutor<D: Driver> {
+    type InternalExecutor<'b>: sqlx::Executor<'b, Database = D::InternalDriver>
     where
-        DriverConnection<D>: Send + Sync,
-        for<'b> &'b mut DriverConnection<D>:
-            sqlx::Executor<'b, Database = D::InternalDriver> + Send + Sync,
-        for<'b> DriverArguments<'b, D>: Debug;
+        Self: 'b;
+    type IntoInternalExecutor<'b>: sqlx::Executor<'b, Database = D::InternalDriver>
+    where
+        Self: 'b;
 
     async fn query_setup<O: SetupSql<D> + Send + Sync>(
         &mut self,
@@ -34,39 +18,116 @@ pub trait EasyExecutor<D: Driver>: Debug {
     where
         DriverConnection<D>: Send + Sync;
 
-    // async fn fetch_all<T, O: Output<T, Row>>(&mut self, sql: &Sql) -> anyhow::Result<Vec<O>>;
+    fn executor<'a>(&'a mut self) -> Self::InternalExecutor<'a>;
 
-    ///# How to Async inside of closure
-    /// (tokio example)
-    /// ```rust
-    /// //Outside of closure
-    /// let handle = tokio::runtime::Handle::current();
-    /// //Inside of closure
-    /// handle.block_on(async { ... } )
-    /// ```
-    async fn fetch_lazy<T, O: Output<T, D, DataToConvert = DriverRow<D>>>(
-        &mut self,
-        sql: Sql,
-        builder: QueryBuilder<'_, D>,
-        perform: impl FnMut(O) -> anyhow::Result<Option<Break>> + Send + Sync,
-    ) -> anyhow::Result<()>
+    fn into_executor<'a>(self) -> Self::IntoInternalExecutor<'a>
     where
-        DriverRow<D>: ToConvert<D> + 'static,
-        for<'b> &'b mut DriverConnection<D>:
-            sqlx::Executor<'b, Database = D::InternalDriver> + Send + Sync,
-        for<'b> DriverArguments<'b, D>: sqlx::IntoArguments<'b, D::InternalDriver> + Debug;
+        Self: 'a;
+}
+
+#[always_context(skip(!))]
+impl<T, D: Driver> EasyExecutor<D> for &T
+where
+    for<'b> &'b T: sqlx::Executor<'b, Database = D::InternalDriver> + Send + Sync,
+{
+    type InternalExecutor<'b>
+        = &'b T
+    where
+        Self: 'b;
+    type IntoInternalExecutor<'b>
+        = &'b T
+    where
+        Self: 'b;
+
+    async fn query_setup<O: SetupSql<D> + Send + Sync>(
+        &mut self,
+        sql: O,
+    ) -> anyhow::Result<O::Output>
+    where
+        DriverConnection<D>: Send + Sync,
+    {
+        sql.query(self).await
+    }
+
+    fn executor<'a>(&'a mut self) -> Self::InternalExecutor<'a> {
+        self
+    }
+
+    fn into_executor<'a>(self) -> Self::IntoInternalExecutor<'a>
+    where
+        Self: 'a,
+    {
+        self
+    }
+}
+
+#[always_context(skip(!))]
+impl<T, D: Driver> EasyExecutor<D> for &mut T
+where
+    for<'b> &'b mut T: sqlx::Executor<'b, Database = D::InternalDriver> + Send + Sync,
+{
+    type InternalExecutor<'b>
+        = &'b mut T
+    where
+        Self: 'b;
+    type IntoInternalExecutor<'b>
+        = &'b mut T
+    where
+        Self: 'b;
+
+    async fn query_setup<O: SetupSql<D> + Send + Sync>(
+        &mut self,
+        sql: O,
+    ) -> anyhow::Result<O::Output>
+    where
+        DriverConnection<D>: Send + Sync,
+    {
+        sql.query(self).await
+    }
+
+    fn executor<'a>(&'a mut self) -> Self::InternalExecutor<'a> {
+        self
+    }
+
+    fn into_executor<'a>(self) -> Self::IntoInternalExecutor<'a>
+    where
+        Self: 'a,
+    {
+        self
+    }
 }
 
 #[always_context]
 pub trait SetupSql<D: Driver> {
     type Output;
 
-    async fn query(
-        self,
-        exec: &mut (
-                 impl DerefMut<Target = <D::InternalDriver as sqlx::database::Database>::Connection>
-                 + Send
-                 + Sync
-             ),
-    ) -> anyhow::Result<Self::Output>;
+    async fn query(self, exec: &mut impl EasyExecutor<D>) -> anyhow::Result<Self::Output>;
+}
+
+#[cfg(test)]
+#[allow(dead_code)]
+mod impl_test {
+    use crate::Driver;
+
+    use super::EasyExecutor;
+
+    #[cfg(feature = "postgres")]
+    type CurrentDriver = sqlx::Postgres;
+    #[cfg(feature = "postgres")]
+    type CurrentCDriver = crate::Postgres;
+    #[cfg(feature = "sqlite")]
+    type CurrentDriver = sqlx::Sqlite;
+    #[cfg(feature = "sqlite")]
+    type CurrentCDriver = crate::Sqlite;
+
+    /// Both sqlx pool and connection should have this trait auto implemented
+    fn impl_test_base<D: Driver>(_exe: impl EasyExecutor<D>) {}
+
+    fn impl_test(
+        pool: sqlx::Pool<CurrentDriver>,
+        mut conn: <CurrentDriver as sqlx::Database>::Connection,
+    ) {
+        impl_test_base::<CurrentCDriver>(&pool);
+        impl_test_base::<CurrentCDriver>(&mut conn);
+    }
 }

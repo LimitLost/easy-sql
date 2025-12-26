@@ -341,7 +341,7 @@ pub fn table(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::TokenS
             ) -> #macro_support::Result<()> {
                 use #macro_support::Context;
 
-                let current_version_number = #sql_crate::EasySqlTables_get_version!(#driver, conn,#unique_id);
+                let current_version_number = #sql_crate::EasySqlTables_get_version!(#driver, *conn,#unique_id);
 
                 if let Some(current_version_number) = current_version_number{
                     use #sql_crate::EasyExecutor;
@@ -371,7 +371,7 @@ pub fn table(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::TokenS
                             .collect()
                         },
                     ).await?;
-                    #sql_crate::EasySqlTables_create!(#driver, conn, #unique_id.to_string(), #table_version_i64);
+                    #sql_crate::EasySqlTables_create!(#driver, *conn, #unique_id.to_string(), #table_version_i64);
                 }
 
                 Ok(())

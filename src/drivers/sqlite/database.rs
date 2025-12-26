@@ -1,30 +1,38 @@
-use std::sync::Arc;
-
 use anyhow::Context;
 use easy_macros::always_context;
 
 use std::path::Path;
-use tokio::sync::Mutex;
+#[cfg(test)]
+use std::path::PathBuf;
 
-use crate::{Connection, DatabaseInternal, DatabaseSetup, EasySqlTables, Transaction};
+use crate::{Connection, DatabaseSetup, EasySqlTables, Transaction};
 
 use super::Db;
 
 pub use sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode};
 
-use super::{DatabaseInternalDefault, Sqlite};
+use super::Sqlite;
 
 #[derive(Debug)]
-pub struct Database<DI: DatabaseInternal<Driver = Sqlite> + Send + Sync = DatabaseInternalDefault> {
+pub struct Database {
     connection_pool: sqlx::Pool<Db>,
-    internal: Arc<Mutex<DI>>,
+    #[cfg(test)]
+    pub test_db_file_path: Option<PathBuf>,
+}
+
+#[cfg(test)]
+impl Drop for Database {
+    fn drop(&mut self) {
+        if let Some(path) = &self.test_db_file_path {
+            let _ = std::fs::remove_file(path);
+        }
+    }
 }
 
 #[always_context]
-impl<DI: DatabaseInternal<Driver = Sqlite> + Send + Sync> Database<DI> {
+impl Database {
     pub async fn setup<T: DatabaseSetup<Sqlite>>(
         db_file_path: impl AsRef<Path>,
-        internal: Arc<Mutex<DI>>,
     ) -> anyhow::Result<Self> {
         let connection_pool = sqlx::Pool::<Db>::connect_with(
             SqliteConnectOptions::default()
@@ -33,66 +41,64 @@ impl<DI: DatabaseInternal<Driver = Sqlite> + Send + Sync> Database<DI> {
         )
         .await?;
 
-        let mut conn = Connection::new(connection_pool.acquire().await?, internal.clone());
+        let mut conn = Connection::new(connection_pool.acquire().await?);
 
-        EasySqlTables::setup(&mut conn).await?;
-        T::setup(&mut conn).await?;
+        EasySqlTables::setup(&mut &mut conn).await?;
+        T::setup(&mut &mut conn).await?;
 
         Ok(Database {
             connection_pool,
-            internal,
+            #[cfg(test)]
+            test_db_file_path: Some(db_file_path.as_ref().to_path_buf()),
         })
     }
 
     pub async fn setup_with_options<T: DatabaseSetup<Sqlite>>(
         options: SqliteConnectOptions,
-        internal: Arc<Mutex<DI>>,
     ) -> anyhow::Result<Self> {
         let connection_pool = sqlx::Pool::<Db>::connect_with(options.clone()).await?;
 
-        let mut conn = Connection::new(connection_pool.acquire().await?, internal.clone());
+        let mut conn = Connection::new(connection_pool.acquire().await?);
 
-        EasySqlTables::setup(&mut conn).await?;
-        T::setup(&mut conn).await?;
+        EasySqlTables::setup(&mut &mut conn).await?;
+        T::setup(&mut &mut conn).await?;
 
         Ok(Database {
             connection_pool,
-            internal,
+            #[cfg(test)]
+            test_db_file_path: Some(options.get_filename().to_owned()),
         })
     }
 
-    pub async fn setup_in_memory<T: DatabaseSetup<Sqlite>>(
-        internal: Arc<Mutex<DI>>,
-    ) -> anyhow::Result<Self> {
+    pub async fn setup_in_memory<T: DatabaseSetup<Sqlite>>() -> anyhow::Result<Self> {
         let connection_pool =
             sqlx::Pool::<Db>::connect_with(SqliteConnectOptions::default().in_memory(true)).await?;
 
-        let mut conn = Connection::new(connection_pool.acquire().await?, internal.clone());
+        let mut conn = Connection::new(connection_pool.acquire().await?);
 
-        EasySqlTables::setup(&mut conn).await?;
-        T::setup(&mut conn).await?;
+        EasySqlTables::setup(&mut &mut conn).await?;
+        T::setup(&mut &mut conn).await?;
 
         Ok(Database {
             connection_pool,
-            internal,
+            #[cfg(test)]
+            test_db_file_path: None,
         })
     }
 
-    pub async fn conn(&self) -> anyhow::Result<Connection<Sqlite, DI>> {
+    pub async fn conn(&self) -> anyhow::Result<Connection<Sqlite>> {
         let conn = self.connection_pool.acquire().await?;
-        Ok(Connection::new(conn, self.internal.clone()))
+        Ok(Connection::new(conn))
     }
 
-    pub async fn transaction(&self) -> anyhow::Result<Transaction<'_, Sqlite, DI>> {
+    pub async fn transaction(&self) -> anyhow::Result<Transaction<'_, Sqlite>> {
         let conn = self.connection_pool.begin().await?;
-        Ok(Transaction::new(conn, self.internal.clone()))
+        Ok(Transaction::new(conn))
     }
-}
-
-#[always_context]
-impl Database<DatabaseInternalDefault> {
     #[cfg(test)]
     pub async fn setup_for_testing<T: DatabaseSetup<Sqlite>>() -> anyhow::Result<Self> {
+        use tokio::sync::Mutex;
+
         lazy_static::lazy_static! {
             static ref CURRENT_NAME_N:Mutex<usize>=Default::default();
         }
@@ -108,19 +114,14 @@ impl Database<DatabaseInternalDefault> {
         )
         .await?;
 
-        let internal: Arc<Mutex<DatabaseInternalDefault>> =
-            Arc::new(Mutex::new(DatabaseInternalDefault {
-                test_db_file_path: Some(test_db_path.clone()),
-            }));
+        let mut conn = Connection::new(connection_pool.acquire().await?);
 
-        let mut conn = Connection::new(connection_pool.acquire().await?, internal.clone());
-
-        EasySqlTables::setup(&mut conn).await?;
-        T::setup(&mut conn).await?;
+        EasySqlTables::setup(&mut &mut conn).await?;
+        T::setup(&mut &mut conn).await?;
 
         Ok(Database {
             connection_pool,
-            internal,
+            test_db_file_path: Some(test_db_path),
         })
     }
 }

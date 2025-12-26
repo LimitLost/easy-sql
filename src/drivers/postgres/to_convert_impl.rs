@@ -82,6 +82,7 @@ where
     T: Output<Table, CDriver, DataToConvert = Row>,
 {
     type DataToConvert = Vec<Row>;
+    type UsedForChecks = T::UsedForChecks;
     fn sql_to_query<'a>(
         sql: Sql,
         builder: QueryBuilder<'a, CDriver>,
@@ -109,6 +110,7 @@ where
     T: Output<Table, CDriver, DataToConvert = Row>,
 {
     type DataToConvert = Option<Row>;
+    type UsedForChecks = T::UsedForChecks;
     fn sql_to_query<'a>(
         sql: Sql,
         builder: QueryBuilder<'a, CDriver>,
@@ -133,6 +135,7 @@ where
 #[always_context]
 impl<Table> Output<Table, CDriver> for () {
     type DataToConvert = ();
+    type UsedForChecks = ();
     fn sql_to_query<'a>(
         sql: Sql,
         builder: QueryBuilder<'a, CDriver>,
@@ -152,6 +155,7 @@ impl<Table> Output<Table, CDriver> for () {
 #[always_context]
 impl<Table> Output<Table, CDriver> for bool {
     type DataToConvert = Row;
+    type UsedForChecks = bool;
     fn sql_to_query<'a>(
         sql: Sql,
         builder: QueryBuilder<'a, CDriver>,

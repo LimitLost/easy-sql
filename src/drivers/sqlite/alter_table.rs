@@ -1,12 +1,9 @@
-use std::ops::DerefMut;
-
 use super::Sqlite;
 use anyhow::Context;
 use easy_macros::{always_context, context};
-use sqlx::SqliteConnection;
 
 use super::table_field_definition;
-use crate::{SetupSql, TableField};
+use crate::{EasyExecutor, SetupSql, TableField};
 
 pub enum AlterTableSingle {
     RenameTable {
@@ -30,10 +27,7 @@ pub struct AlterTable {
 impl SetupSql<Sqlite> for AlterTable {
     type Output = ();
 
-    async fn query(
-        self,
-        exec: &mut (impl DerefMut<Target = SqliteConnection> + Send + Sync),
-    ) -> anyhow::Result<Self::Output> {
+    async fn query(self, exec: &mut impl EasyExecutor<Sqlite>) -> anyhow::Result<Self::Output> {
         let mut queries_done = Vec::new();
 
         for alter in self.alters {
@@ -46,7 +40,7 @@ impl SetupSql<Sqlite> for AlterTable {
 
                     #[no_context]
                     sqlx::query(&query)
-                        .execute(exec.deref_mut())
+                        .execute(exec.executor())
                         .await
                         .with_context(context!(
                             "table_name: {:?} | query: {:?} | queries_before: {:?}",
@@ -68,7 +62,7 @@ impl SetupSql<Sqlite> for AlterTable {
 
                     #[no_context]
                     sqlx_query
-                        .execute(exec.deref_mut())
+                        .execute(exec.executor())
                         .await
                         .with_context(context!(
                             "table_name: {:?} | query: {:?} | queries_before: {:?}",
@@ -90,7 +84,7 @@ impl SetupSql<Sqlite> for AlterTable {
 
                     #[no_context]
                     sqlx::query(&query)
-                        .execute(exec.deref_mut())
+                        .execute(exec.executor())
                         .await
                         .with_context(context!(
                             "table_name: {:?} | query: {:?} | queries_before: {:?}",

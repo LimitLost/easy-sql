@@ -15,7 +15,10 @@ fn sql_expr_clause(
     driver: &TokenStream,
     param_counter: &mut usize,
     clause_name: &'static str,
-    before_param_n: &TokenStream,
+    before_param_n: &mut TokenStream,
+    before_format: &mut Vec<TokenStream>,
+    output_ty: Option<&TokenStream>,
+    main_table_type: &TokenStream,
 ) {
     let sql_template = expr.into_query_string(
         binds,
@@ -25,6 +28,11 @@ fn sql_expr_clause(
         param_counter,
         format_params,
         before_param_n,
+        before_format,
+        false,
+        false, // for_custom_select
+        output_ty,
+        main_table_type,
     );
     format_str.push_str(&format!(" {clause_name} {sql_template}"));
 }
@@ -38,7 +46,10 @@ pub fn where_clause(
     sql_crate: &TokenStream,
     driver: &TokenStream,
     param_counter: &mut usize,
-    before_param_n: &TokenStream,
+    before_param_n: &mut TokenStream,
+    before_format: &mut Vec<TokenStream>,
+    output_ty: Option<&TokenStream>,
+    main_table_type: &TokenStream,
 ) {
     sql_expr_clause(
         where_expr,
@@ -51,6 +62,9 @@ pub fn where_clause(
         param_counter,
         "WHERE",
         before_param_n,
+        before_format,
+        output_ty,
+        main_table_type,
     )
 }
 
@@ -63,7 +77,10 @@ pub fn having_clause(
     sql_crate: &TokenStream,
     driver: &TokenStream,
     param_counter: &mut usize,
-    before_param_n: &TokenStream,
+    before_param_n: &mut TokenStream,
+    before_format: &mut Vec<TokenStream>,
+    output_ty: Option<&TokenStream>,
+    main_table_type: &TokenStream,
 ) {
     sql_expr_clause(
         having_expr,
@@ -76,6 +93,9 @@ pub fn having_clause(
         param_counter,
         "HAVING",
         before_param_n,
+        before_format,
+        output_ty,
+        main_table_type,
     )
 }
 
@@ -101,10 +121,30 @@ pub fn order_by_clause(
     format_params: &mut Vec<TokenStream>,
     sql_crate: &TokenStream,
     checks: &mut Vec<TokenStream>,
+    binds: &mut Vec<TokenStream>,
+    driver: &TokenStream,
+    param_counter: &mut usize,
+    before_param_n: &mut TokenStream,
+    before_format: &mut Vec<TokenStream>,
+    output_ty: Option<&TokenStream>,
+    main_table_type: &TokenStream,
 ) {
     let clause_args = order_by_list
         .into_iter()
-        .map(|ob| ob.into_query_string(checks, sql_crate, format_params))
+        .map(|ob| {
+            ob.into_query_string(
+                checks,
+                binds,
+                sql_crate,
+                driver,
+                param_counter,
+                format_params,
+                before_param_n,
+                before_format,
+                output_ty,
+                main_table_type,
+            )
+        })
         .collect::<Vec<_>>()
         .join(", ");
 
@@ -116,8 +156,21 @@ pub fn limit_clause(
     format_str: &mut String,
     format_params: &mut Vec<TokenStream>,
     checks: &mut Vec<TokenStream>,
+    binds: &mut Vec<TokenStream>,
+    sql_crate: &TokenStream,
+    driver: &TokenStream,
+    param_counter: &mut usize,
+    before_param_n: &TokenStream,
 ) {
-    let clause_args = limit.into_query_string(checks, format_params);
+    let clause_args = limit.into_query_string(
+        checks,
+        format_params,
+        binds,
+        sql_crate,
+        driver,
+        param_counter,
+        before_param_n,
+    );
 
     format_str.push_str(&format!(" LIMIT {}", clause_args));
 }
@@ -131,18 +184,20 @@ pub fn set_clause(
     param_counter: &mut usize,
     all_binds: &mut Vec<TokenStream>,
     checks: &mut Vec<TokenStream>,
-) -> (TokenStream, Option<TokenStream>) {
+    before_param_n: &mut TokenStream,
+    before_format: &mut Vec<TokenStream>,
+    output_ty: Option<&TokenStream>,
+    main_table_type: &TokenStream,
+) -> TokenStream {
     match clause {
         SetClause::FromType(type_expr) => {
             format_str.push_str(" SET ");
-            let result = (
-                quote! {
-                    // Use Update trait's updates_sqlx method to add SET arguments
-                    let mut current_arg_n = #param_counter;
-                    _easy_sql_args = {#type_expr}.updates_sqlx(_easy_sql_args, &mut query, &mut current_arg_n).context("Update::updates_sqlx failed")?;
-                },
-                Some(quote! { current_arg_n + }),
-            );
+            let result = quote! {
+                // Use Update trait's updates_sqlx method to add SET arguments
+                let mut current_arg_n = #param_counter;
+                _easy_sql_args = {#type_expr}.updates_sqlx(_easy_sql_args, &mut query, &mut current_arg_n).context("Update::updates_sqlx failed")?;
+            };
+            *before_param_n = quote! { current_arg_n + #before_param_n};
             *param_counter = 0;
             result
         }
@@ -159,7 +214,12 @@ pub fn set_clause(
                     driver,
                     param_counter,
                     format_params,
-                    &quote! {},
+                    before_param_n,
+                    before_format,
+                    false,
+                    false, // for_custom_select
+                    output_ty,
+                    main_table_type,
                 );
                 set_sql_parts.push(format!(
                     "{{_easy_sql_d}}{}{{_easy_sql_d}} = {}",
@@ -172,7 +232,7 @@ pub fn set_clause(
 
             format_str.push_str(&format!(" SET {}", set_sql_template));
 
-            (quote! {}, None)
+            quote! {}
         }
     }
 }

@@ -57,11 +57,15 @@ pub struct DeleteQuery {
     pub returning: Option<syn::Type>,
 }
 
-/// EXISTS TableType [WHERE ...]
+/// EXISTS TableType [WHERE ...] [GROUP BY ...] [HAVING ...] [ORDER BY ...] [LIMIT ...]
 #[derive(Debug, Clone)]
 pub struct ExistsQuery {
     pub table_type: syn::Type,
     pub where_clause: Option<Expr>,
+    pub group_by: Option<Vec<Column>>,
+    pub having: Option<Expr>,
+    pub order_by: Option<Vec<OrderBy>>,
+    pub limit: Option<Limit>,
 }
 
 #[always_context]
@@ -286,13 +290,51 @@ impl Parse for ExistsQuery {
         let table_type = input.parse::<syn::Type>()?;
 
         let mut where_clause = None;
+        let mut group_by = None;
+        let mut having = None;
+        let mut order_by = None;
+        let mut limit = None;
 
-        if !input.is_empty() {
+        while !input.is_empty() {
             let lookahead = input.lookahead1();
 
-            if lookahead.peek(keyword::where_) {
+            if where_clause.is_none() && lookahead.peek(keyword::where_) {
                 input.parse::<keyword::where_>()?;
                 where_clause = Some(input.parse()?);
+            } else if group_by.is_none() && lookahead.peek(keyword::group) {
+                input.parse::<keyword::group>()?;
+                input.parse::<keyword::by>()?;
+                let mut group_by_list = Vec::new();
+                loop {
+                    let group_by_item: Column = input.parse()?;
+                    group_by_list.push(group_by_item);
+                    if input.peek(syn::Token![,]) {
+                        input.parse::<syn::Token![,]>()?;
+                    } else {
+                        break;
+                    }
+                }
+                group_by = Some(group_by_list);
+            } else if having.is_none() && lookahead.peek(keyword::having) {
+                input.parse::<keyword::having>()?;
+                having = Some(input.parse()?);
+            } else if order_by.is_none() && lookahead.peek(keyword::order) {
+                input.parse::<keyword::order>()?;
+                input.parse::<keyword::by>()?;
+                let mut order_by_list = Vec::new();
+                loop {
+                    let order_by_item: OrderBy = input.parse()?;
+                    order_by_list.push(order_by_item);
+                    if input.peek(syn::Token![,]) {
+                        input.parse::<syn::Token![,]>()?;
+                    } else {
+                        break;
+                    }
+                }
+                order_by = Some(order_by_list);
+            } else if limit.is_none() && lookahead.peek(keyword::limit) {
+                input.parse::<keyword::limit>()?;
+                limit = Some(input.parse()?);
             } else {
                 return Err(lookahead.error());
             }
@@ -301,6 +343,10 @@ impl Parse for ExistsQuery {
         Ok(ExistsQuery {
             table_type,
             where_clause,
+            group_by,
+            having,
+            order_by,
+            limit,
         })
     }
 }

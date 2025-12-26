@@ -4,8 +4,6 @@ mod create_table;
 pub use create_table::*;
 mod database;
 pub use database::*;
-mod database_internal_default;
-pub use database_internal_default::*;
 
 mod to_convert_impl;
 mod to_default_impl;

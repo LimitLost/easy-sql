@@ -23,7 +23,7 @@ impl Column {
                     fn has_table<T:#sql_crate::HasTable<#path>>(test:&T){}
                     has_table(&___t___);
                     //TODO "RealColumns" trait with type leading to the struct with actual database columns
-                    let mut table_instance = #sql_crate::never::never_any::<#path>();
+                    let mut table_instance = #sql_crate::macro_support::never_any::<#path>();
                     let _ = table_instance.#ident;
                 });
 
@@ -56,7 +56,7 @@ impl Column {
                     fn has_table<T:#sql_crate::HasTable<#path>>(test:&T){}
                     has_table(&___t___);
                     //TODO "RealColumns" trait with type leading to the struct with actual database columns
-                    let mut table_instance = #sql_crate::never::never_any::<#path>();
+                    let mut table_instance = #sql_crate::macro_support::never_any::<#path>();
                     let _ = table_instance.#ident;
                 });
 

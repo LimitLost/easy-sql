@@ -1,6 +1,6 @@
 use easy_macros::always_context;
 use proc_macro2::TokenStream;
-use quote::quote;
+use quote::{ToTokens, quote};
 
 use super::{
     DeleteQuery, ExistsQuery, InsertQuery, SelectQuery, UpdateQuery, group_by_clause,
@@ -17,6 +17,7 @@ pub fn generate_select(
 ) -> anyhow::Result<TokenStream> {
     let output_type = select.output_type;
     let table_type = select.table_type;
+    let table_type_tokens = table_type.to_token_stream();
     let distinct = select.distinct;
 
     let macro_support = quote! {#sql_crate::macro_support};
@@ -37,6 +38,12 @@ pub fn generate_select(
     let mut format_params =
         vec![quote! { <#table_type as #sql_crate::Table<#driver>>::table_name() }];
 
+    let mut before_param_n = quote! {};
+    let mut before_format = Vec::new();
+
+    // Convert output_type to TokenStream for passing to validation functions
+    let output_type_ts = output_type.to_token_stream();
+
     // Generate runtime code for WHERE clause
     if let Some(where_expr) = select.where_clause {
         where_clause(
@@ -48,7 +55,10 @@ pub fn generate_select(
             sql_crate,
             driver,
             &mut param_counter,
-            &quote! {},
+            &mut before_param_n,
+            &mut before_format,
+            Some(&output_type_ts),
+            &table_type_tokens,
         )
     }
 
@@ -74,7 +84,10 @@ pub fn generate_select(
             sql_crate,
             driver,
             &mut param_counter,
-            &quote! {},
+            &mut before_param_n,
+            &mut before_format,
+            Some(&output_type_ts),
+            &table_type_tokens,
         )
     }
     // Build ORDER BY clause code if present
@@ -85,12 +98,29 @@ pub fn generate_select(
             &mut format_params,
             sql_crate,
             &mut checks,
+            &mut binds,
+            driver,
+            &mut param_counter,
+            &mut before_param_n,
+            &mut before_format,
+            Some(&output_type_ts),
+            &table_type_tokens,
         )
     };
 
     // Build LIMIT clause code if present
     if let Some(limit) = select.limit {
-        limit_clause(limit, &mut format_str, &mut format_params, &mut checks)
+        limit_clause(
+            limit,
+            &mut format_str,
+            &mut format_params,
+            &mut checks,
+            &mut binds,
+            sql_crate,
+            driver,
+            &mut param_counter,
+            &before_param_n,
+        )
     }
 
     let lazy_mode = connection.is_none();
@@ -99,8 +129,8 @@ pub fn generate_select(
         checks.push(quote! {
             {
                 fn to_convert_single_impl<
-                    Y: crate::ToConvertSingle<#driver>,
-                    T: crate::Output<#table_type, #driver, DataToConvert = Y>,
+                    Y: #sql_crate::ToConvertSingle<#driver>,
+                    T: #sql_crate::Output<#table_type, #driver, DataToConvert = Y>,
                 >(
                     _el: T,
                 ) {
@@ -138,11 +168,33 @@ pub fn generate_select(
                 Ok(result)
             }
 
-            execute(&mut *#connection, built_query)
+            execute(#sql_crate::EasyExecutor::executor(&mut #connection), built_query)
                 .await
                 .with_context(|| format!(#debug_format_str, #macro_input))
         }
     } else {
+        let fetch_internals = |executor: TokenStream| {
+            quote! {
+                    use #sql_crate::EasyExecutor as _;
+                self.builder.build().fetch(conn.#executor()).map(|r| {
+                                match r {
+                                    Ok(r) => {
+                                        let converted =
+                                            <#output_type as #sql_crate::Output<#table_type, #driver>>::convert(r)
+                                                .context("Output::convert failed")?;
+
+                                        Ok(converted)
+                                    }
+                                    Err(err) => Err(#macro_support::Error::from(err)),
+                                }
+                                .with_context(|| format!(#debug_format_str, #macro_input))
+                            })
+            }
+        };
+
+        let fetch_internals_normal = fetch_internals(quote! {into_executor});
+        let fetch_internals_mut = fetch_internals(quote! {executor});
+
         quote! {
             struct LazyQueryResult<'_easy_sql_a> {
                 builder: #macro_support::QueryBuilder<'_easy_sql_a, #sql_crate::InternalDriver<#driver>>,
@@ -151,29 +203,30 @@ pub fn generate_select(
             impl<'_easy_sql_q> LazyQueryResult<'_easy_sql_q> {
                 fn fetch<'_easy_sql_e, E>(
                     &'_easy_sql_e mut self,
-                    conn: E,
-                ) -> impl #macro_support::Stream<Item = #macro_support::Result<#output_type>> + '_easy_sql_e
+                    mut conn: &'_easy_sql_e mut E,
+                ) -> impl #macro_support::Stream<
+                    Item = #macro_support::Result<ExprTestData>,
+                > + '_easy_sql_e
                 where
-                    E: #macro_support::Executor<'_easy_sql_e, Database = #sql_crate::InternalDriver<#driver>>,
+                    &'_easy_sql_e mut E: #sql_crate::EasyExecutor<#driver> + '_easy_sql_e,
                     '_easy_sql_q: '_easy_sql_e,
                 {
-                    self.builder.build().fetch(conn).map(|r| {
-                        match r {
-                            Ok(r) => {
-                                let converted =
-                                    <#output_type as #sql_crate::Output<#table_type, #driver>>::convert(r)
-                                        .context("Output::convert failed")?;
-
-                                Ok(converted)
-                            }
-                            Err(err) => Err(#macro_support::Error::from(err)),
-                        }
-                        .with_context(|| format!(#debug_format_str, #macro_input))
-                    })
+                    #fetch_internals_normal
+                }
+                /// Useful when you're passing a generic `&mut impl EasyExecutor` as an argument
+                fn fetch_mut<'_easy_sql_e, E>(
+                    &'_easy_sql_e mut self,
+                    mut conn: &'_easy_sql_e mut E,
+                ) -> impl #macro_support::Stream<Item = #macro_support::Result<#output_type>> + '_easy_sql_e
+                where
+                    E: #sql_crate::EasyExecutor<#driver> + '_easy_sql_e,
+                    '_easy_sql_q: '_easy_sql_e,
+                {
+                    #fetch_internals_mut
                 }
             }
 
-            LazyQueryResult { builder }
+            #macro_support::Result::<LazyQueryResult>::Ok(LazyQueryResult { builder })
         }
     };
 
@@ -189,6 +242,7 @@ pub fn generate_select(
 
                 let mut _easy_sql_args = #sql_crate::DriverArguments::<#driver>::default();
                 let _easy_sql_d = <#driver as #sql_crate::Driver>::identifier_delimiter();
+                #(#before_format)*
                 let mut query = String::from(#query_base_str);
 
                 // Add output columns
@@ -234,9 +288,9 @@ pub fn generate_insert(
     let (exec_input_param, exec_input_value) = if let Some(conn) = connection {
         (
             quote! {
-                exec: impl #macro_support::Executor<'a, Database = #sql_crate::InternalDriver<#driver>>,
+                exec: &mut impl #sql_crate::EasyExecutor<#driver>,
             },
-            quote! {&mut *#conn,},
+            quote! {&mut (#conn),},
         )
     } else {
         (quote! {}, quote! {})
@@ -247,20 +301,42 @@ pub fn generate_insert(
     ) = insert.returning
     {
         if lazy_mode {
+            let fetch_internals = |executor: TokenStream| {
+                quote! {
+                        use #sql_crate::EasyExecutor as _;
+                    self.builder.build().fetch(conn.#executor()).map(|r| {
+                                    match r {
+                                        Ok(r) => {
+                                            let converted =
+                                                <#returning_type as #sql_crate::Output<#table_type, #driver>>::convert(r)
+                                                    .context("Output::convert failed")?;
+
+                                            Ok(converted)
+                                        }
+                                        Err(err) => Err(#macro_support::Error::from(err)),
+                                    }
+                                    .with_context(|| format!(#debug_format_str, #macro_input))
+                                })
+                }
+            };
+
+            let fetch_internals_normal = fetch_internals(quote! {into_executor});
+            let fetch_internals_mut = fetch_internals(quote! {executor});
+
             (
                 quote! {
                     query.push_str(" RETURNING ");
                     <#returning_type as #sql_crate::Output<#table_type, #driver>>::select_sqlx(&mut query);
                 },
-                quote! {LazyQueryResult<'_>},
+                quote! {LazyQueryResult<'a>},
                 quote! {
                     let result = LazyQueryResult { builder };
                 },
                 quote! {
                     let _ = || {
                         fn to_convert_single_impl<
-                            Y: crate::ToConvertSingle<#driver>,
-                            T: crate::Output<#table_type, #driver, DataToConvert = Y>,
+                            Y: #sql_crate::ToConvertSingle<#driver>,
+                            T: #sql_crate::Output<#table_type, #driver, DataToConvert = Y>,
                         >(
                             _el: T,
                         ) {
@@ -274,25 +350,27 @@ pub fn generate_insert(
                     impl<'_easy_sql_q> LazyQueryResult<'_easy_sql_q> {
                         fn fetch<'_easy_sql_e, E>(
                             &'_easy_sql_e mut self,
-                            conn: E,
-                        ) -> impl #macro_support::Stream<Item = #macro_support::Result<#returning_type>> + '_easy_sql_e
+                            mut conn: &'_easy_sql_e mut E,
+                        ) -> impl #macro_support::Stream<
+                            Item = #macro_support::Result<#returning_type>,
+                        > + '_easy_sql_e
                         where
-                            E: #macro_support::Executor<'_easy_sql_e, Database = #sql_crate::InternalDriver<#driver>>,
+                            &'_easy_sql_e mut E: #sql_crate::EasyExecutor<#driver> + '_easy_sql_e,
                             '_easy_sql_q: '_easy_sql_e,
                         {
-                            self.builder.build().fetch(conn).map(|r| {
-                                match r {
-                                    Ok(r) => {
-                                        let converted =
-                                            <#returning_type as #sql_crate::Output<#table_type, #driver>>::convert(r)
-                                                .context("Output::convert failed")?;
+                            #fetch_internals_normal
+                        }
 
-                                        Ok(converted)
-                                    }
-                                    Err(err) => Err(#macro_support::Error::from(err)),
-                                }
-                                .with_context(|| format!(#debug_format_str, #macro_input))
-                            })
+                        /// Useful when you're passing a generic `&mut impl EasyExecutor` as an argument
+                        fn fetch_mut<'_easy_sql_e, E>(
+                            &'_easy_sql_e mut self,
+                            mut conn: &'_easy_sql_e mut E,
+                        ) -> impl #macro_support::Stream<Item = #macro_support::Result<#returning_type>> + '_easy_sql_e
+                        where
+                            E: #sql_crate::EasyExecutor<#driver> + '_easy_sql_e,
+                            '_easy_sql_q: '_easy_sql_e,
+                        {
+                            #fetch_internals_mut
                         }
                     }
                 },
@@ -307,7 +385,7 @@ pub fn generate_insert(
                 quote! {
                     let built_query = builder.build();
                     let raw_data = <#returning_type as #sql_crate::Output<#table_type, #driver>>::DataToConvert::get(
-                        exec, built_query
+                        exec.executor(), built_query
                     ).await.context("DataToConvert::get failed")?;
 
                     let result = <#returning_type as #sql_crate::Output<#table_type, #driver>>::convert(raw_data).context("Output::convert failed")?;
@@ -326,7 +404,7 @@ pub fn generate_insert(
             quote! { #sql_crate::DriverQueryResult<#driver> },
             quote! {
                 let built_query = builder.build();
-                let result = built_query.execute(exec).await.context("QueryBuilder::build.execute failed")?;
+                let result = built_query.execute(exec.executor()).await.context("QueryBuilder::build.execute failed")?;
             },
             quote! {},
         )
@@ -404,6 +482,7 @@ pub fn generate_update(
     macro_input: &str,
 ) -> anyhow::Result<TokenStream> {
     let table_type: syn::Type = update.table_type;
+    let table_type_tokens = table_type.to_token_stream();
     let set_clause_data = update.set_clause;
 
     let macro_support = quote! {#sql_crate::macro_support};
@@ -416,8 +495,11 @@ pub fn generate_update(
     let mut format_params =
         vec![quote! { <#table_type as #sql_crate::Table<#driver>>::table_name() }];
 
+    let mut before_param_n = quote! {};
+    let mut before_format = Vec::new();
+
     // Process SET clause first
-    let (set_code, before_param_n) = set_clause(
+    let set_code = set_clause(
         set_clause_data,
         &mut format_str,
         &mut format_params,
@@ -426,11 +508,15 @@ pub fn generate_update(
         &mut param_counter,
         &mut all_binds,
         &mut checks,
+        &mut before_param_n,
+        &mut before_format,
+        None, // No output type in UPDATE
+        &table_type_tokens,
     );
 
     // Process WHERE clause with compile-time SQL generation
     let where_code = if let Some(where_expr) = update.where_clause {
-        if let Some(before_param_n) = before_param_n {
+        if !before_param_n.is_empty() {
             let mut clause_format_str = String::new();
             let mut clause_format_params = Vec::new();
             where_clause(
@@ -442,7 +528,10 @@ pub fn generate_update(
                 sql_crate,
                 driver,
                 &mut param_counter,
-                &before_param_n,
+                &mut before_param_n,
+                &mut before_format,
+                None, // Returning handling happens after the value is SET in the Sql engines
+                &table_type_tokens,
             );
 
             quote! {
@@ -460,7 +549,10 @@ pub fn generate_update(
                 sql_crate,
                 driver,
                 &mut param_counter,
-                &quote! {},
+                &mut before_param_n,
+                &mut before_format,
+                None, // Returning handling happens after the value is SET in the Sql engines
+                &table_type_tokens,
             );
             quote! {}
         }
@@ -485,7 +577,7 @@ pub fn generate_update(
                 },
                 quote! {
                     async fn execute<'a>(
-                        exec: impl #macro_support::Executor<'a, Database = #sql_crate::InternalDriver<#driver>>,
+                        exec: &mut impl #sql_crate::EasyExecutor<#driver>,
                         query_string: String,
                         args: #sql_crate::DriverArguments<'a, #driver>,
                     ) -> #macro_support::Result<#returning_type> {
@@ -493,23 +585,45 @@ pub fn generate_update(
                         let _easy_sql_query = _easy_sql_builder.build();
 
                         let raw_data = <#returning_type as #sql_crate::Output<#table_type, #driver>>::DataToConvert::get(
-                            exec, _easy_sql_query
+                            exec.executor(), _easy_sql_query
                         ).await.context("Output::DataToConvert::get failed")?;
 
                         <#returning_type as #sql_crate::Output<#table_type, #driver>>::convert(raw_data).context("Output::convert failed")
                     }
 
-                    execute(&mut *#connection, query, _easy_sql_args)
+                    execute(&mut #connection, query, _easy_sql_args)
                         .await
                         .with_context(|| format!(#debug_format_str, #macro_input))
                 },
             )
         } else {
+            let fetch_internals = |executor: TokenStream| {
+                quote! {
+                        use #sql_crate::EasyExecutor as _;
+                    self.builder.build().fetch(conn.#executor()).map(|r| {
+                                    match r {
+                                        Ok(r) => {
+                                            let converted =
+                                                <#returning_type as #sql_crate::Output<#table_type, #driver>>::convert(r)
+                                                    .context("Output::convert failed")?;
+
+                                            Ok(converted)
+                                        }
+                                        Err(err) => Err(#macro_support::Error::from(err)),
+                                    }
+                                    .with_context(|| format!(#debug_format_str, #macro_input))
+                                })
+                }
+            };
+
+            let fetch_internals_normal = fetch_internals(quote! {into_executor});
+            let fetch_internals_mut = fetch_internals(quote! {executor});
+
             checks.push(quote! {
                 {
                     fn to_convert_single_impl<
-                        Y: crate::ToConvertSingle<#driver>,
-                        T: crate::Output<#table_type, #driver, DataToConvert = Y>,
+                        Y: #sql_crate::ToConvertSingle<#driver>,
+                        T: #sql_crate::Output<#table_type, #driver, DataToConvert = Y>,
                     >(
                         _el: T,
                     ) {
@@ -523,7 +637,7 @@ pub fn generate_update(
                     <#returning_type as #sql_crate::Output<#table_type, #driver>>::select_sqlx(&mut query);
                 },
                 quote! {
-                    let mut builder = #macro_support::QueryBuilder::with_arguments(query_string, args);
+                    let mut builder = #macro_support::QueryBuilder::with_arguments(query, _easy_sql_args);
 
                     struct LazyQueryResult<'_easy_sql_a> {
                         builder: #macro_support::QueryBuilder<'_easy_sql_a, #sql_crate::InternalDriver<#driver>>,
@@ -532,29 +646,31 @@ pub fn generate_update(
                     impl<'_easy_sql_q> LazyQueryResult<'_easy_sql_q> {
                         fn fetch<'_easy_sql_e, E>(
                             &'_easy_sql_e mut self,
-                            conn: E,
-                        ) -> impl #macro_support::Stream<Item = #macro_support::Result<#returning_type>> + '_easy_sql_e
+                            mut conn: &'_easy_sql_e mut E,
+                        ) -> impl #macro_support::Stream<
+                            Item = #macro_support::Result<#returning_type>,
+                        > + '_easy_sql_e
                         where
-                            E: #macro_support::Executor<'_easy_sql_e, Database = #sql_crate::InternalDriver<#driver>>,
+                            &'_easy_sql_e mut E: #sql_crate::EasyExecutor<#driver> + '_easy_sql_e,
                             '_easy_sql_q: '_easy_sql_e,
                         {
-                            self.builder.build().fetch(conn).map(|r| {
-                                match r {
-                                    Ok(r) => {
-                                        let converted =
-                                            <#returning_type as #sql_crate::Output<#table_type, #driver>>::convert(r)
-                                                .context("Output::convert failed")?;
+                            #fetch_internals_normal
+                        }
 
-                                        Ok(converted)
-                                    }
-                                    Err(err) => Err(#macro_support::Error::from(err)),
-                                }
-                                .with_context(|| format!(#debug_format_str, #macro_input))
-                            })
+                        /// Useful when you're passing a generic `&mut impl EasyExecutor` as an argument
+                        fn fetch_mut<'_easy_sql_e, E>(
+                            &'_easy_sql_e mut self,
+                            mut conn: &'_easy_sql_e mut E,
+                        ) -> impl #macro_support::Stream<Item = #macro_support::Result<#returning_type>> + '_easy_sql_e
+                        where
+                            E: #sql_crate::EasyExecutor<#driver> + '_easy_sql_e,
+                            '_easy_sql_q: '_easy_sql_e,
+                        {
+                            #fetch_internals_mut
                         }
                     }
 
-                    LazyQueryResult { builder }
+                    #macro_support::Result::<LazyQueryResult>::Ok(LazyQueryResult { builder })
                 },
             )
         }
@@ -570,16 +686,16 @@ pub fn generate_update(
             quote! {},
             quote! {
                 async fn execute<'a>(
-                    exec: impl #macro_support::Executor<'a, Database = #sql_crate::InternalDriver<#driver>>,
+                    exec: &mut impl #sql_crate::EasyExecutor<#driver>,
                     query_string: String,
                     args: #sql_crate::DriverArguments<'a, #driver>,
                 ) -> #macro_support::Result<#sql_crate::DriverQueryResult<#driver>> {
                     let mut builder = #macro_support::QueryBuilder::with_arguments(query_string, args);
                     let built_query = builder.build();
-                    built_query.execute(exec).await.context("QueryBuilder::build.execute failed")
+                    built_query.execute(exec.executor()).await.context("QueryBuilder::build.execute failed")
                 }
 
-                execute(&mut *#connection, query, _easy_sql_args)
+                execute(&mut #connection, query, _easy_sql_args)
                     .await
                     .with_context(|| format!(#debug_format_str, #macro_input))
             },
@@ -599,6 +715,7 @@ pub fn generate_update(
 
                 let mut _easy_sql_args = #sql_crate::DriverArguments::<#driver>::default();
                 let _easy_sql_d = <#driver as #sql_crate::Driver>::identifier_delimiter();
+                #(#before_format)*
                 let mut query = format!(#format_str, #(#format_params),*);
 
                 // Execute SET clause code
@@ -627,6 +744,7 @@ pub fn generate_delete(
     macro_input: &str,
 ) -> anyhow::Result<TokenStream> {
     let table_type = delete.table_type;
+    let table_type_tokens = table_type.to_token_stream();
 
     let macro_support = quote! {#sql_crate::macro_support};
 
@@ -637,6 +755,9 @@ pub fn generate_delete(
     let mut format_str = "DELETE FROM {}".to_string();
     let mut format_params =
         vec![quote! { <#table_type as #sql_crate::Table<#driver>>::table_name() }];
+
+    let mut before_param_n = quote! {};
+    let mut before_format = Vec::new();
 
     // Generate runtime code for WHERE clause
     if let Some(where_expr) = delete.where_clause {
@@ -649,7 +770,10 @@ pub fn generate_delete(
             sql_crate,
             driver,
             &mut param_counter,
-            &quote! {},
+            &mut before_param_n,
+            &mut before_format,
+            None, // Returning handling happens after the value is removed in the Sql engines
+            &table_type_tokens,
         )
     }
 
@@ -670,7 +794,7 @@ pub fn generate_delete(
                 },
                 quote! {
                     async fn execute<'a>(
-                        exec: impl #macro_support::Executor<'a, Database = #sql_crate::InternalDriver<#driver>>,
+                        exec: &mut impl #sql_crate::EasyExecutor<#driver>,
                         query_string: String,
                         args: #sql_crate::DriverArguments<'a, #driver>,
                     ) -> #macro_support::Result<#returning_type> {
@@ -678,23 +802,45 @@ pub fn generate_delete(
                         let _easy_sql_query = _easy_sql_builder.build();
 
                         let raw_data = <#returning_type as #sql_crate::Output<#table_type, #driver>>::DataToConvert::get(
-                            exec, _easy_sql_query
+                            exec.executor(), _easy_sql_query
                         ).await.context("Output::DataToConvert::get failed")?;
 
                         <#returning_type as #sql_crate::Output<#table_type, #driver>>::convert(raw_data).context("Output::convert failed")
                     }
 
-                    execute(&mut *#connection, query, _easy_sql_args)
+                    execute(&mut #connection, query, _easy_sql_args)
                         .await
                         .with_context(|| format!(#debug_format_str, #macro_input))
                 },
             )
         } else {
+            let fetch_internals = |executor: TokenStream| {
+                quote! {
+                        use #sql_crate::EasyExecutor as _;
+                    self.builder.build().fetch(conn.#executor()).map(|r| {
+                                    match r {
+                                        Ok(r) => {
+                                            let converted =
+                                                <#returning_type as #sql_crate::Output<#table_type, #driver>>::convert(r)
+                                                    .context("Output::convert failed")?;
+
+                                            Ok(converted)
+                                        }
+                                        Err(err) => Err(#macro_support::Error::from(err)),
+                                    }
+                                    .with_context(|| format!(#debug_format_str, #macro_input))
+                                })
+                }
+            };
+
+            let fetch_internals_normal = fetch_internals(quote! {into_executor});
+            let fetch_internals_mut = fetch_internals(quote! {executor});
+
             checks.push(quote! {
                 {
                     fn to_convert_single_impl<
-                        Y: crate::ToConvertSingle<#driver>,
-                        T: crate::Output<#table_type, #driver, DataToConvert = Y>,
+                        Y: #sql_crate::ToConvertSingle<#driver>,
+                        T: #sql_crate::Output<#table_type, #driver, DataToConvert = Y>,
                     >(
                         _el: T,
                     ) {
@@ -708,7 +854,7 @@ pub fn generate_delete(
                     <#returning_type as #sql_crate::Output<#table_type, #driver>>::select_sqlx(&mut query);
                 },
                 quote! {
-                    let mut builder = #macro_support::QueryBuilder::with_arguments(query_string, args);
+                    let mut builder = #macro_support::QueryBuilder::with_arguments(query, _easy_sql_args);
 
                     struct LazyQueryResult<'_easy_sql_a> {
                         builder: #macro_support::QueryBuilder<'_easy_sql_a, #sql_crate::InternalDriver<#driver>>,
@@ -717,29 +863,31 @@ pub fn generate_delete(
                     impl<'_easy_sql_q> LazyQueryResult<'_easy_sql_q> {
                         fn fetch<'_easy_sql_e, E>(
                             &'_easy_sql_e mut self,
-                            conn: E,
-                        ) -> impl #macro_support::Stream<Item = #macro_support::Result<#returning_type>> + '_easy_sql_e
+                            mut conn: &'_easy_sql_e mut E,
+                        ) -> impl #macro_support::Stream<
+                            Item = #macro_support::Result<#returning_type>,
+                        > + '_easy_sql_e
                         where
-                            E: #macro_support::Executor<'_easy_sql_e, Database = #sql_crate::InternalDriver<#driver>>,
+                            &'_easy_sql_e mut E: #sql_crate::EasyExecutor<#driver> + '_easy_sql_e,
                             '_easy_sql_q: '_easy_sql_e,
                         {
-                            self.builder.build().fetch(conn).map(|r| {
-                                match r {
-                                    Ok(r) => {
-                                        let converted =
-                                            <#returning_type as #sql_crate::Output<#table_type, #driver>>::convert(r)
-                                                .context("Output::convert failed")?;
+                            #fetch_internals_normal
+                        }
 
-                                        Ok(converted)
-                                    }
-                                    Err(err) => Err(#macro_support::Error::from(err)),
-                                }
-                                .with_context(|| format!(#debug_format_str, #macro_input))
-                            })
+                        /// Useful when you're passing a generic `&mut impl EasyExecutor` as an argument
+                        fn fetch_mut<'_easy_sql_e, E>(
+                            &'_easy_sql_e mut self,
+                            mut conn: &'_easy_sql_e mut E,
+                        ) -> impl #macro_support::Stream<Item = #macro_support::Result<#returning_type>> + '_easy_sql_e
+                        where
+                            E: #sql_crate::EasyExecutor<#driver> + '_easy_sql_e,
+                            '_easy_sql_q: '_easy_sql_e,
+                        {
+                            #fetch_internals_mut
                         }
                     }
 
-                    LazyQueryResult { builder }
+                    #macro_support::Result::<LazyQueryResult>::Ok(LazyQueryResult { builder })
                 },
             )
         }
@@ -755,16 +903,16 @@ pub fn generate_delete(
             quote! {},
             quote! {
                 async fn execute<'a>(
-                    exec: impl #macro_support::Executor<'a, Database = #sql_crate::InternalDriver<#driver>>,
+                    exec: &mut impl #sql_crate::EasyExecutor<#driver>,
                     query_string: String,
                     args: #sql_crate::DriverArguments<'a, #driver>,
                 ) -> #macro_support::Result<#sql_crate::DriverQueryResult<#driver>> {
                     let mut builder = #macro_support::QueryBuilder::with_arguments(query_string, args);
                     let built_query = builder.build();
-                    built_query.execute(exec).await.context("QueryBuilder::build.execute failed")
+                    built_query.execute(exec.executor()).await.context("QueryBuilder::build.execute failed")
                 }
 
-                execute(&mut *#connection, query, _easy_sql_args)
+                execute(&mut #connection, query, _easy_sql_args)
                     .await
                     .with_context(|| format!(#debug_format_str, #macro_input))
             },
@@ -784,6 +932,7 @@ pub fn generate_delete(
 
                 let mut _easy_sql_args = #sql_crate::DriverArguments::<#driver>::default();
                 let _easy_sql_d = <#driver as #sql_crate::Driver>::identifier_delimiter();
+                #(#before_format)*
                 let mut query = format!(#format_str,
                     #(#format_params),*
                 );
@@ -810,6 +959,7 @@ pub fn generate_exists(
     macro_input: &str,
 ) -> anyhow::Result<TokenStream> {
     let table_type = exists.table_type;
+    let table_type_tokens = table_type.to_token_stream();
 
     let macro_support = quote! {#sql_crate::macro_support};
 
@@ -820,6 +970,9 @@ pub fn generate_exists(
     let mut format_str = "SELECT EXISTS(SELECT 1 FROM {}".to_string();
     let mut format_params =
         vec![quote! { <#table_type as #sql_crate::Table<#driver>>::table_name() }];
+
+    let mut before_param_n = quote! {};
+    let mut before_format = Vec::new();
 
     // Generate runtime code for WHERE clause
     if let Some(where_expr) = exists.where_clause {
@@ -832,9 +985,74 @@ pub fn generate_exists(
             sql_crate,
             driver,
             &mut param_counter,
-            &quote! {},
+            &mut before_param_n,
+            &mut before_format,
+            None, // No output type in EXISTS
+            &table_type_tokens,
         )
-    };
+    }
+
+    // Build GROUP BY clause code if present
+    if let Some(group_by_list) = exists.group_by {
+        group_by_clause(
+            group_by_list,
+            &mut format_str,
+            &mut format_params,
+            sql_crate,
+            &mut checks,
+        )
+    }
+
+    // Generate runtime code for HAVING clause
+    if let Some(having_expr) = exists.having {
+        having_clause(
+            having_expr,
+            &mut format_str,
+            &mut format_params,
+            &mut binds,
+            &mut checks,
+            sql_crate,
+            driver,
+            &mut param_counter,
+            &mut before_param_n,
+            &mut before_format,
+            None, // No output type in EXISTS
+            &table_type_tokens,
+        )
+    }
+
+    // Build ORDER BY clause code if present
+    if let Some(order_by_list) = exists.order_by {
+        order_by_clause(
+            order_by_list,
+            &mut format_str,
+            &mut format_params,
+            sql_crate,
+            &mut checks,
+            &mut binds,
+            driver,
+            &mut param_counter,
+            &mut before_param_n,
+            &mut before_format,
+            None, // EXISTS queries don't have output types
+            &table_type_tokens,
+        )
+    }
+
+    // Build LIMIT clause code if present
+    if let Some(limit) = exists.limit {
+        limit_clause(
+            limit,
+            &mut format_str,
+            &mut format_params,
+            &mut checks,
+            &mut binds,
+            sql_crate,
+            driver,
+            &mut param_counter,
+            &before_param_n,
+        )
+    }
 
     format_str.push(')');
 
@@ -850,11 +1068,12 @@ pub fn generate_exists(
 
                 let mut _easy_sql_args = #sql_crate::DriverArguments::<#driver>::default();
                 let _easy_sql_d = <#driver as #sql_crate::Driver>::identifier_delimiter();
+                #(#before_format)*
                 let mut query = format!(#format_str,
                     #(#format_params),*
                 );
 
-                // Add WHERE parameter values
+                // Add WHERE, HAVING, and LIMIT parameter values
                 {
                     #(#binds)*
                 }
@@ -863,20 +1082,20 @@ pub fn generate_exists(
                 let built_query = builder.build();
 
                 async fn execute<'a>(
-                    exec: impl #macro_support::Executor<'a, Database = #sql_crate::InternalDriver<#driver>>,
+                    exec: &mut impl #sql_crate::EasyExecutor<#driver>,
                     query: #macro_support::Query<
                         'a,
                         #sql_crate::InternalDriver<#driver>,
                         #sql_crate::DriverArguments<'a, #driver>,
                     >,
                 ) -> #macro_support::Result<bool> {
-                    let row = query.fetch_one(exec).await.context("sqlx::Query::fetch_one failed")?;
+                    let row = query.fetch_one(exec.executor()).await.context("sqlx::Query::fetch_one failed")?;
                     let exists: bool = <#sql_crate::DriverRow<#driver> as #sql_crate::SqlxRow>::try_get(&row, 0).context("SqlxRow::try_get failed")?;
 
                     Ok(exists)
                 }
 
-                execute(&mut *#connection, built_query)
+                execute(&mut #connection, built_query)
                     .await
                     .with_context(|| format!("sql query! macro input: {}", #macro_input))
             }

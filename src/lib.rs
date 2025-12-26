@@ -1,5 +1,3 @@
-#![doc = include_str!("../README.md")]
-
 #[cfg(feature = "not_build")]
 mod database_structs;
 #[cfg(feature = "not_build")]

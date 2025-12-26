@@ -14,8 +14,9 @@ mod has_table_traits;
 pub use has_table_traits::*;
 mod driver;
 pub use driver::*;
-mod database_internal;
-pub use database_internal::*;
+
+mod select_type;
+pub use select_type::*;
 
 mod to_default;
 pub use to_default::*;

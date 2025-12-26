@@ -1,3 +1,4 @@
+use crate::builtin_functions;
 use crate::macros_components::keyword::DoubleArrow;
 
 use super::{column::Column, next_clause::next_clause_token};
@@ -5,15 +6,14 @@ use super::{column::Column, next_clause::next_clause_token};
 use super::keyword;
 use ::{
     proc_macro2::{self, TokenStream},
-    syn::{
-        self,
-        parse::{Lookahead1, Parse},
-        spanned::Spanned,
-    },
+    syn::{self, parse::Parse, spanned::Spanned},
 };
 use easy_macros::always_context;
 use easy_macros::readable_token_stream;
-use quote::{ToTokens, quote, quote_spanned};
+use quote::{ToTokens, format_ident, quote, quote_spanned};
+use syn::ext::IdentExt;
+
+syn::custom_punctuation!(NotEqualsMicrosoft,<>);
 
 #[derive(Debug, Clone)]
 pub enum Operator {
@@ -43,6 +43,20 @@ pub enum Operator {
     BitShiftLeft,
     /// >>
     BitShiftRight,
+    /// = or ==
+    Equal,
+    /// != or <>
+    NotEqual,
+    /// >
+    GreaterThan,
+    /// >=
+    GreaterThanOrEqual,
+    /// <
+    LessThan,
+    /// <=
+    LessThanOrEqual,
+    /// LIKE
+    Like,
 }
 
 #[always_context]
@@ -91,9 +105,66 @@ impl Parse for Operator {
         } else if lookahead.peek(syn::Token![>>]) {
             input.parse::<syn::Token![>>]>()?;
             Ok(Operator::BitShiftRight)
+        } else if lookahead.peek(syn::Token![=]) {
+            input.parse::<syn::Token![=]>()?;
+            Ok(Operator::Equal)
+        } else if lookahead.peek(syn::Token![==]) {
+            input.parse::<syn::Token![==]>()?;
+            Ok(Operator::Equal)
+        } else if lookahead.peek(syn::Token![!=]) {
+            input.parse::<syn::Token![!=]>()?;
+            Ok(Operator::NotEqual)
+        } else if lookahead.peek(NotEqualsMicrosoft) {
+            input.parse::<NotEqualsMicrosoft>()?;
+            Ok(Operator::NotEqual)
+        } else if lookahead.peek(syn::Token![>=]) {
+            input.parse::<syn::Token![>=]>()?;
+            Ok(Operator::GreaterThanOrEqual)
+        } else if lookahead.peek(syn::Token![<=]) {
+            input.parse::<syn::Token![<=]>()?;
+            Ok(Operator::LessThanOrEqual)
+        } else if lookahead.peek(syn::Token![<]) {
+            input.parse::<syn::Token![<]>()?;
+            Ok(Operator::LessThan)
+        } else if lookahead.peek(syn::Token![>]) {
+            input.parse::<syn::Token![>]>()?;
+            Ok(Operator::GreaterThan)
+        } else if lookahead.peek(keyword::like) {
+            input.parse::<keyword::like>()?;
+            Ok(Operator::Like)
         } else {
             Err(lookahead.error())
         }
+    }
+}
+#[derive(Debug, Clone, Copy)]
+pub struct NotChain {
+    pub not_count: usize,
+}
+
+impl syn::parse::Parse for NotChain {
+    fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
+        let mut not_count = 0;
+        while !input.is_empty() {
+            let lookahead = input.lookahead1();
+            if lookahead.peek(keyword::not) {
+                input.parse::<keyword::not>()?;
+                not_count += 1;
+            } else {
+                break;
+            }
+        }
+        Ok(NotChain { not_count })
+    }
+}
+
+impl NotChain {
+    pub fn into_query_string(&self) -> String {
+        let mut current_query = String::new();
+        for _ in 0..self.not_count {
+            current_query.push_str("NOT ");
+        }
+        current_query
     }
 }
 
@@ -101,17 +172,9 @@ impl Parse for Operator {
 pub enum Expr {
     Value(Value),
     Parenthesized(Box<Expr>),
-    OperatorChain(Box<Expr>, Vec<(Operator, Expr)>),
-    Not(Box<Expr>),
+    OperatorChain(NotChain, Box<Expr>, Vec<(NotChain, Operator, Expr)>),
     IsNull(Value),
     IsNotNull(Value),
-    Equal(Value, Value),
-    NotEqual(Value, Value),
-    GreaterThan(Value, Value),
-    GreaterThanOrEqual(Value, Value),
-    LessThan(Value, Value),
-    LessThanOrEqual(Value, Value),
-    Like(Value, Value),
     In(Value, ValueIn),
     Between(Value, Value, Value),
 }
@@ -126,7 +189,12 @@ impl Expr {
         driver: &proc_macro2::TokenStream,
         current_param_n: &mut usize,
         current_format_params: &mut Vec<proc_macro2::TokenStream>,
-        before_param_n: &proc_macro2::TokenStream,
+        before_param_n: &mut proc_macro2::TokenStream,
+        before_format: &mut Vec<proc_macro2::TokenStream>,
+        inside_count_fn: bool,
+        for_custom_select: bool,
+        output_ty: Option<&proc_macro2::TokenStream>,
+        main_table_type: &proc_macro2::TokenStream,
     ) -> String {
         match self {
             Expr::Value(val) => val.into_query_string(
@@ -137,154 +205,12 @@ impl Expr {
                 current_param_n,
                 current_format_params,
                 before_param_n,
+                before_format,
+                inside_count_fn,
+                for_custom_select,
+                output_ty,
+                main_table_type,
             ),
-            Expr::Equal(left, right) => {
-                let left_sql = left.into_query_string(
-                    binds,
-                    checks,
-                    sql_crate,
-                    driver,
-                    current_param_n,
-                    current_format_params,
-                    before_param_n,
-                );
-                let right_sql = right.into_query_string(
-                    binds,
-                    checks,
-                    sql_crate,
-                    driver,
-                    current_param_n,
-                    current_format_params,
-                    before_param_n,
-                );
-                format!("({} = {})", left_sql, right_sql)
-            }
-            Expr::NotEqual(left, right) => {
-                let left_sql = left.into_query_string(
-                    binds,
-                    checks,
-                    sql_crate,
-                    driver,
-                    current_param_n,
-                    current_format_params,
-                    before_param_n,
-                );
-                let right_sql = right.into_query_string(
-                    binds,
-                    checks,
-                    sql_crate,
-                    driver,
-                    current_param_n,
-                    current_format_params,
-                    before_param_n,
-                );
-                format!("({} != {})", left_sql, right_sql)
-            }
-            Expr::GreaterThan(left, right) => {
-                let left_sql = left.into_query_string(
-                    binds,
-                    checks,
-                    sql_crate,
-                    driver,
-                    current_param_n,
-                    current_format_params,
-                    before_param_n,
-                );
-                let right_sql = right.into_query_string(
-                    binds,
-                    checks,
-                    sql_crate,
-                    driver,
-                    current_param_n,
-                    current_format_params,
-                    before_param_n,
-                );
-                format!("({} > {})", left_sql, right_sql)
-            }
-            Expr::GreaterThanOrEqual(left, right) => {
-                let left_sql = left.into_query_string(
-                    binds,
-                    checks,
-                    sql_crate,
-                    driver,
-                    current_param_n,
-                    current_format_params,
-                    before_param_n,
-                );
-                let right_sql = right.into_query_string(
-                    binds,
-                    checks,
-                    sql_crate,
-                    driver,
-                    current_param_n,
-                    current_format_params,
-                    before_param_n,
-                );
-                format!("({} >= {})", left_sql, right_sql)
-            }
-            Expr::LessThan(left, right) => {
-                let left_sql = left.into_query_string(
-                    binds,
-                    checks,
-                    sql_crate,
-                    driver,
-                    current_param_n,
-                    current_format_params,
-                    before_param_n,
-                );
-                let right_sql = right.into_query_string(
-                    binds,
-                    checks,
-                    sql_crate,
-                    driver,
-                    current_param_n,
-                    current_format_params,
-                    before_param_n,
-                );
-                format!("({} < {})", left_sql, right_sql)
-            }
-            Expr::LessThanOrEqual(left, right) => {
-                let left_sql = left.into_query_string(
-                    binds,
-                    checks,
-                    sql_crate,
-                    driver,
-                    current_param_n,
-                    current_format_params,
-                    before_param_n,
-                );
-                let right_sql = right.into_query_string(
-                    binds,
-                    checks,
-                    sql_crate,
-                    driver,
-                    current_param_n,
-                    current_format_params,
-                    before_param_n,
-                );
-                format!("({} <= {})", left_sql, right_sql)
-            }
-            Expr::Like(left, right) => {
-                let left_sql = left.into_query_string(
-                    binds,
-                    checks,
-                    sql_crate,
-                    driver,
-                    current_param_n,
-                    current_format_params,
-                    before_param_n,
-                );
-                let right_sql = right.into_query_string(
-                    binds,
-                    checks,
-                    sql_crate,
-                    driver,
-                    current_param_n,
-                    current_format_params,
-                    before_param_n,
-                );
-                format!("({} LIKE {})", left_sql, right_sql)
-            }
             Expr::IsNull(val) => {
                 let val_sql = val.into_query_string(
                     binds,
@@ -294,8 +220,13 @@ impl Expr {
                     current_param_n,
                     current_format_params,
                     before_param_n,
+                    before_format,
+                    false,
+                    for_custom_select,
+                    output_ty,
+                    main_table_type,
                 );
-                format!("({} IS NULL)", val_sql)
+                format!("{} IS NULL", val_sql)
             }
             Expr::IsNotNull(val) => {
                 let val_sql = val.into_query_string(
@@ -306,20 +237,13 @@ impl Expr {
                     current_param_n,
                     current_format_params,
                     before_param_n,
+                    before_format,
+                    false,
+                    for_custom_select,
+                    output_ty,
+                    main_table_type,
                 );
-                format!("({} IS NOT NULL)", val_sql)
-            }
-            Expr::Not(inner) => {
-                let inner_sql = inner.into_query_string(
-                    binds,
-                    checks,
-                    sql_crate,
-                    driver,
-                    current_param_n,
-                    current_format_params,
-                    before_param_n,
-                );
-                format!("(NOT {})", inner_sql)
+                format!("{} IS NOT NULL", val_sql)
             }
             Expr::Parenthesized(inner) => {
                 let inner_sql = inner.into_query_string(
@@ -330,12 +254,18 @@ impl Expr {
                     current_param_n,
                     current_format_params,
                     before_param_n,
+                    before_format,
+                    inside_count_fn,
+                    for_custom_select,
+                    output_ty,
+                    main_table_type,
                 );
                 format!("({})", inner_sql)
             }
-            Expr::OperatorChain(first, rest) => {
+            Expr::OperatorChain(not_chain, first, rest) => {
                 let mut result = format!(
-                    "({}",
+                    "{}{}",
+                    not_chain.into_query_string(),
                     first.into_query_string(
                         binds,
                         checks,
@@ -344,9 +274,14 @@ impl Expr {
                         current_param_n,
                         current_format_params,
                         before_param_n,
+                        before_format,
+                        false,
+                        for_custom_select,
+                        output_ty,
+                        main_table_type,
                     )
                 );
-                for (op, expr) in rest {
+                for (not_chain, op, expr) in rest {
                     let op_str = match op {
                         Operator::And => " AND ",
                         Operator::Or => " OR ",
@@ -361,8 +296,16 @@ impl Expr {
                         Operator::BitOr => " | ",
                         Operator::BitShiftLeft => " << ",
                         Operator::BitShiftRight => " >> ",
+                        Operator::Equal => " = ",
+                        Operator::NotEqual => " != ",
+                        Operator::GreaterThan => " > ",
+                        Operator::GreaterThanOrEqual => " >= ",
+                        Operator::LessThan => " < ",
+                        Operator::LessThanOrEqual => " <= ",
+                        Operator::Like => " LIKE ",
                     };
                     result.push_str(op_str);
+                    result.push_str(&not_chain.into_query_string());
                     result.push_str(&expr.into_query_string(
                         binds,
                         checks,
@@ -371,9 +314,14 @@ impl Expr {
                         current_param_n,
                         current_format_params,
                         before_param_n,
+                        before_format,
+                        false,
+                        for_custom_select,
+                        output_ty,
+                        main_table_type,
                     ));
                 }
-                result.push(')');
+
                 result
             }
             Expr::In(val, values) => {
@@ -385,11 +333,16 @@ impl Expr {
                     current_param_n,
                     current_format_params,
                     before_param_n,
+                    before_format,
+                    false,
+                    for_custom_select,
+                    output_ty,
+                    main_table_type,
                 );
                 match values {
                     ValueIn::Multiple(vals) => {
                         let mut in_items = Vec::new();
-                        for v in vals {
+                        for v in vals.iter() {
                             in_items.push(v.into_query_string(
                                 binds,
                                 checks,
@@ -398,13 +351,77 @@ impl Expr {
                                 current_param_n,
                                 current_format_params,
                                 before_param_n,
+                                before_format,
+                                false,
+                                for_custom_select,
+                                output_ty,
+                                main_table_type,
                             ));
                         }
-                        format!("({} IN ({}))", val_sql, in_items.join(", "))
+                        format!("{} IN ({})", val_sql, in_items.join(", "))
                     }
-                    ValueIn::Single(_) => {
-                        // Iterator case - not supported in compile-time generation yet
-                        format!("({} IN ({{ITERATOR}}))", val_sql)
+                    ValueIn::SingleColumn(col) => {
+                        // Single column reference - convert to Value and process
+                        let col_value = Value::Column(col.clone());
+                        let col_sql = col_value.into_query_string(
+                            binds,
+                            checks,
+                            sql_crate,
+                            driver,
+                            current_param_n,
+                            current_format_params,
+                            before_param_n,
+                            before_format,
+                            false,
+                            for_custom_select,
+                            output_ty,
+                            main_table_type,
+                        );
+                        format!("{} IN ({})", val_sql, col_sql)
+                    }
+                    ValueIn::SingleVar(v) => {
+                        // Generate dynamic placeholder list based on the runtime length of the collection
+                        let debug_str = format!(
+                            "Failed to bind items from `{}` to query parameters",
+                            v.to_token_stream().to_string()
+                        );
+
+                        let param_start = *current_param_n;
+
+                        // Create a runtime binding and placeholder generation for the collection
+                        binds.push(quote::quote_spanned! {v.span()=>
+                            #[allow(unused_parens)]
+                            for __easy_sql_in_item in (#v) {
+                                _easy_sql_args.add(__easy_sql_in_item).map_err(anyhow::Error::from_boxed).context(#debug_str)?;
+                            }
+                        });
+
+                        let format_param_n = current_format_params.len();
+
+                        let before_param_n_name =
+                            format_ident!("__easy_sql_before_param_n_{}", format_param_n);
+
+                        before_format.push(quote! {
+                            let #before_param_n_name:usize;
+                        });
+
+                        // Create format parameter that generates placeholders at runtime
+                        current_format_params.push(quote! {
+                            {
+                                #before_param_n_name = (#v).len();
+                                let mut __easy_sql_in_placeholders = Vec::with_capacity(#before_param_n_name);
+                                for __easy_sql_in_i in 0..#before_param_n_name {
+                                    __easy_sql_in_placeholders.push(
+                                        <#driver as #sql_crate::Driver>::parameter_placeholder(#before_param_n #param_start + __easy_sql_in_i)
+                                    );
+                                }
+                                __easy_sql_in_placeholders.join(", ")
+                            }
+                        });
+
+                        *before_param_n = quote! {#before_param_n_name + #before_param_n};
+
+                        format!("{} IN ({{}})", val_sql)
                     }
                 }
             }
@@ -417,6 +434,11 @@ impl Expr {
                     current_param_n,
                     current_format_params,
                     before_param_n,
+                    before_format,
+                    false,
+                    for_custom_select,
+                    output_ty,
+                    main_table_type,
                 );
                 let min_sql = min.into_query_string(
                     binds,
@@ -426,6 +448,11 @@ impl Expr {
                     current_param_n,
                     current_format_params,
                     before_param_n,
+                    before_format,
+                    false,
+                    for_custom_select,
+                    output_ty,
+                    main_table_type,
                 );
                 let max_sql = max.into_query_string(
                     binds,
@@ -435,12 +462,50 @@ impl Expr {
                     current_param_n,
                     current_format_params,
                     before_param_n,
+                    before_format,
+                    false,
+                    for_custom_select,
+                    output_ty,
+                    main_table_type,
                 );
                 format!("({} BETWEEN {} AND {})", val_sql, min_sql, max_sql)
             }
         }
     }
 
+    /// Check if this expression contains any outside variables ({arg0}, {arg1}, etc.)
+    /// Returns a set of argument indices found in the expression.
+    pub fn collect_indices_impl(&self, indices: &mut std::collections::BTreeSet<usize>) {
+        match self {
+            Expr::Value(v) => v.collect_indices_impl(indices),
+            Expr::Parenthesized(inner) => inner.collect_indices_impl(indices),
+            Expr::OperatorChain(_, first, chain) => {
+                first.collect_indices_impl(indices);
+                for (_, _, expr) in chain {
+                    expr.collect_indices_impl(indices);
+                }
+            }
+            Expr::IsNull(v) | Expr::IsNotNull(v) => v.collect_indices_impl(indices),
+            Expr::In(v, value_in) => {
+                v.collect_indices_impl(indices);
+                match value_in {
+                    ValueIn::SingleVar(_) | ValueIn::SingleColumn(_) => {}
+                    ValueIn::Multiple(exprs) => {
+                        for e in exprs.iter() {
+                            e.collect_indices_impl(indices);
+                        }
+                    }
+                }
+            }
+            Expr::Between(v, low, high) => {
+                v.collect_indices_impl(indices);
+                low.collect_indices_impl(indices);
+                high.collect_indices_impl(indices);
+            }
+        }
+    }
+
+    // TODO Will be removed, don't waste your time on this, unimplemented features replace with panic
     pub fn into_tokens_with_checks(
         self,
         checks: &mut Vec<TokenStream>,
@@ -471,7 +536,7 @@ impl Expr {
                                 fn has_table<T:#sql_crate::HasTable<#path>>(_test:&T){}
                                 has_table(&___t___);
                                 //TODO "RealColumns" trait with type leading to the struct with actual database columns
-                                let table_instance = #sql_crate::never::never_any::<#path>();
+                                let table_instance = #sql_crate::macro_support::never_any::<#path>();
                                 #bool_check
                             }
                         });
@@ -560,6 +625,32 @@ impl Expr {
                         #sql_crate::Expr::Value
                     }
                 }
+                Value::FunctionCall { name, args: _ } => {
+                    // Function calls are not supported in the old API (this will be removed)
+                    let error_msg = format!(
+                        "Function calls are not yet supported in this API context. Function: {}",
+                        name
+                    );
+                    checks.push(quote_spanned! {name.span()=>
+                        {
+                            compile_error!(#error_msg);
+                        }
+                    });
+                    quote! {
+                        #sql_crate::Expr::Error
+                    }
+                }
+                Value::Star(_) => {
+                    // Star is not supported in the old API (this will be removed)
+                    checks.push(quote! {
+                        {
+                            compile_error!("Star (*) is not supported in this deprecated API context. Use the new query! macro.");
+                        }
+                    });
+                    quote! {
+                        #sql_crate::Expr::Error
+                    }
+                }
             },
             Expr::Parenthesized(where_expr) => {
                 let inside_parsed = where_expr.into_tokens_with_checks(
@@ -573,10 +664,10 @@ impl Expr {
                     #sql_crate::Expr::Parenthesized(Box::new(#inside_parsed))
                 }
             }
-            Expr::OperatorChain(where_expr, items) => {
+            Expr::OperatorChain(_, where_expr, items) => {
                 let first_bool_check = items
                     .iter()
-                    .any(|(op, _)| matches!(op, Operator::And | Operator::Or));
+                    .any(|(_, op, _)| matches!(op, Operator::And | Operator::Or));
 
                 let first_parsed = where_expr.into_tokens_with_checks(
                     checks,
@@ -589,12 +680,13 @@ impl Expr {
                 let next_item_bool = items
                     .iter()
                     .skip(1)
-                    .map(|(op, _)| matches!(op, Operator::And | Operator::Or))
+                    .map(|(_, op, _)| matches!(op, Operator::And | Operator::Or))
                     .chain(std::iter::once(false))
                     .collect::<Vec<_>>();
 
                 let mut items_parsed = Vec::new();
-                for ((and_or, where_expr), next_item_bool) in items.into_iter().zip(next_item_bool)
+                for ((_, and_or, where_expr), next_item_bool) in
+                    items.into_iter().zip(next_item_bool)
                 {
                     let current_expected_bool = matches!(and_or, Operator::And | Operator::Or);
 
@@ -625,19 +717,13 @@ impl Expr {
                         Operator::BitShiftRight => {
                             quote! {(#sql_crate::Operator::BitShiftRight, #inside_parsed)}
                         }
+                        _ => panic!("This will be removed in the future"),
                     };
                     items_parsed.push(and_or_parsed);
                 }
 
                 quote! {
                     #sql_crate::Expr::OperatorChain(Box::new(#first_parsed), vec![#(#items_parsed),*])
-                }
-            }
-            Expr::Not(where_expr) => {
-                let parsed =
-                    where_expr.into_tokens_with_checks(checks, binds, sql_crate, true, driver);
-                quote! {
-                    #sql_crate::Expr::Not(Box::new(#parsed))
                 }
             }
             Expr::IsNull(sql_value) => {
@@ -652,104 +738,9 @@ impl Expr {
                     #sql_crate::Expr::IsNotNull(Box::new(#parsed))
                 }
             }
-            Expr::Equal(sql_value, sql_value1) => {
-                let parsed = convert_value(sql_value, checks, binds);
-                let parsed1 = convert_value(sql_value1, checks, binds);
-                quote! {
-                    #sql_crate::Expr::Eq(Box::new(#parsed), Box::new(#parsed1))
-                }
-            }
-            Expr::NotEqual(sql_value, sql_value1) => {
-                let parsed = convert_value(sql_value, checks, binds);
-                let parsed1 = convert_value(sql_value1, checks, binds);
-                quote! {
-                    #sql_crate::Expr::NotEq(Box::new(#parsed), Box::new(#parsed1))
-                }
-            }
-            Expr::GreaterThan(sql_value, sql_value1) => {
-                let parsed = convert_value(sql_value, checks, binds);
-                let parsed1 = convert_value(sql_value1, checks, binds);
-                quote! {
-                    #sql_crate::Expr::Gt(Box::new(#parsed), Box::new(#parsed1))
-                }
-            }
-            Expr::GreaterThanOrEqual(sql_value, sql_value1) => {
-                let parsed = convert_value(sql_value, checks, binds);
-                let parsed1 = convert_value(sql_value1, checks, binds);
-                quote! {
-                    #sql_crate::Expr::GtEq(Box::new(#parsed), Box::new(#parsed1))
-                }
-            }
-            Expr::LessThan(sql_value, sql_value1) => {
-                let parsed = convert_value(sql_value, checks, binds);
-                let parsed1 = convert_value(sql_value1, checks, binds);
-                quote! {
-                    #sql_crate::Expr::Lt(Box::new(#parsed), Box::new(#parsed1))
-                }
-            }
-            Expr::LessThanOrEqual(sql_value, sql_value1) => {
-                let parsed = convert_value(sql_value, checks, binds);
-                let parsed1 = convert_value(sql_value1, checks, binds);
-                quote! {
-                    #sql_crate::Expr::LtEq(Box::new(#parsed), Box::new(#parsed1))
-                }
-            }
-            Expr::Like(sql_value, sql_value1) => {
-                let parsed = convert_value(sql_value, checks, binds);
-                let parsed1 = convert_value(sql_value1, checks, binds);
-                quote! {
-                    #sql_crate::Expr::Like(Box::new(#parsed), Box::new(#parsed1))
-                }
-            }
+
             Expr::In(sql_value, sql_value_in) => {
-                let parsed = convert_value(sql_value, checks, binds);
-
-                match sql_value_in {
-                    ValueIn::Single(sql_value) => {
-                        //Iterator expected
-                        match sql_value {
-                            Value::OutsideVariable(expr) => {
-                                quote_spanned! {expr.span()=>
-                                    {
-                                        fn ___collect_iterator<'a,D:#sql_crate::Driver,Y:Into<D::Value<'a>>,T:Iterator<Item=Y>>(i:T)->Vec<D::Value<'a>>{
-                                            let collected=Vec::new();
-                                            for item in i{
-                                                collected.push(item.into());
-                                            }
-                                            collected
-                                        }
-
-                                        #sql_crate::Expr::In(Box::new(#parsed),___collect_iterator({#expr}))
-                                    }
-                                }
-                            }
-                            v => {
-                                let err_message = format!("Expected a list of values, got {:?}", v);
-
-                                checks.push(quote_spanned! {v.span()=>
-
-                                    {
-                                        compile_error!(#err_message)
-                                    }
-                                });
-
-                                quote! {
-                                    #sql_crate::Expr::Error
-                                }
-                            }
-                        }
-                    }
-                    ValueIn::Multiple(sql_values) => {
-                        let mut parsed_values = Vec::new();
-                        for sql_value in sql_values {
-                            let parsed_value = convert_value(sql_value, checks, binds);
-                            parsed_values.push(parsed_value);
-                        }
-                        quote! {
-                            #sql_crate::Expr::In(Box::new(#parsed), vec![#(#parsed_values),*])
-                        }
-                    }
-                }
+                unreachable!("This function is Marked for removal")
             }
             Expr::Between(sql_value, sql_value1, sql_value2) => {
                 let parsed = convert_value(sql_value, checks, binds);
@@ -767,18 +758,28 @@ pub enum Value {
     Column(Column),
     Lit(syn::Lit),
     OutsideVariable(syn::Expr),
+    FunctionCall { name: syn::Ident, args: Vec<Expr> },
+    Star(syn::Token![*]), // Special case for COUNT(*) and similar
 }
 
 #[always_context]
 impl Value {
-    fn span(&self) -> proc_macro2::Span {
-        match self {
-            Value::Column(sql_column) => match sql_column {
-                Column::SpecificTableColumn(path, _) => path.span(),
-                Column::Column(ident) => ident.span(),
-            },
-            Value::Lit(lit) => lit.span(),
-            Value::OutsideVariable(expr) => expr.span(),
+    fn lookahead(input: &syn::parse::ParseStream) -> bool {
+        // Check for literals and braces using lookahead
+        let lookahead = input.lookahead1();
+        lookahead.peek(syn::Lit)
+            || lookahead.peek(syn::token::Brace)
+            || lookahead.peek(syn::Ident::peek_any)
+    }
+
+    fn function_call_start(
+        input: &syn::parse::ParseStream,
+    ) -> syn::Result<Option<proc_macro2::Ident>> {
+        if input.peek(syn::Ident::peek_any) && input.peek2(syn::token::Paren) {
+            let ident = input.call(syn::Ident::parse_any)?;
+            Ok(Some(ident))
+        } else {
+            Ok(None)
         }
     }
 
@@ -790,37 +791,210 @@ impl Value {
         driver: &proc_macro2::TokenStream,
         current_param_n: &mut usize,
         current_format_params: &mut Vec<proc_macro2::TokenStream>,
-        before_param_n: &proc_macro2::TokenStream,
+        before_param_n: &mut proc_macro2::TokenStream,
+        before_format: &mut Vec<proc_macro2::TokenStream>,
+        inside_count: bool,
+        for_custom_select: bool,
+        output_ty: Option<&proc_macro2::TokenStream>,
+        main_table_type: &proc_macro2::TokenStream,
     ) -> String {
         match self {
             Value::Column(col) => match col {
                 Column::SpecificTableColumn(table_type, col_name) => {
+                    // When output_ty matches table_type,
+                    // validate against Output type fields instead of Table
+
+                    fn output_matches_type(
+                        output_ty: &proc_macro2::TokenStream,
+                        table_type: &proc_macro2::TokenStream,
+                    ) -> bool {
+                        use syn::Type;
+
+                        // Parse both types
+                        let output_type: Type = match syn::parse2(output_ty.clone()) {
+                            Ok(ty) => ty,
+                            Err(_) => return false,
+                        };
+                        let table_type: Type = match syn::parse2(table_type.clone()) {
+                            Ok(ty) => ty,
+                            Err(_) => return false,
+                        };
+
+                        fn types_equal(a: &Type, b: &Type) -> bool {
+                            // Direct comparison of token streams
+                            a.to_token_stream().to_string() == b.to_token_stream().to_string()
+                        }
+
+                        fn contains_type_recursively(haystack: &Type, needle: &Type) -> bool {
+                            // Direct match
+                            if types_equal(haystack, needle) {
+                                return true;
+                            }
+
+                            // Recursively check generic arguments
+                            match haystack {
+                                Type::Path(type_path) => {
+                                    for segment in &type_path.path.segments {
+                                        if let syn::PathArguments::AngleBracketed(args) =
+                                            &segment.arguments
+                                        {
+                                            for arg in &args.args {
+                                                if let syn::GenericArgument::Type(inner_ty) = arg {
+                                                    if contains_type_recursively(inner_ty, needle) {
+                                                        return true;
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                                Type::Reference(type_ref) => {
+                                    return contains_type_recursively(&type_ref.elem, needle);
+                                }
+                                Type::Paren(type_paren) => {
+                                    return contains_type_recursively(&type_paren.elem, needle);
+                                }
+                                Type::Group(type_group) => {
+                                    return contains_type_recursively(&type_group.elem, needle);
+                                }
+                                Type::Tuple(type_tuple) => {
+                                    for elem in &type_tuple.elems {
+                                        if contains_type_recursively(elem, needle) {
+                                            return true;
+                                        }
+                                    }
+                                }
+                                Type::Array(type_array) => {
+                                    return contains_type_recursively(&type_array.elem, needle);
+                                }
+                                Type::Slice(type_slice) => {
+                                    return contains_type_recursively(&type_slice.elem, needle);
+                                }
+                                _ => {}
+                            }
+
+                            false
+                        }
+
+                        contains_type_recursively(&output_type, &table_type)
+                    }
+
+                    if let Some(output_type) = output_ty
+                        && output_matches_type(output_type, &table_type.to_token_stream())
+                    {
+                        // User specified OutputType.column - validate against Output type fields
+                        // and generate unqualified column reference (just the column name)
+                        checks.push(quote::quote_spanned! {col_name.span()=>
+                                {
+                                    let output_instance : <#output_ty as #sql_crate::Output<#main_table_type, #driver>>::UsedForChecks = #sql_crate::macro_support::never_any::<#table_type>();
+                                    let _ = output_instance.#col_name;
+                                }
+                            });
+
+                        // Generate unqualified column name (Output fields map to table columns)
+                        return if for_custom_select {
+                            format!("{{delimeter}}{col_name}{{delimeter}}")
+                        } else {
+                            format!("{{_easy_sql_d}}{}{{_easy_sql_d}}", col_name)
+                        };
+                    }
+
+                    // Standard behavior: validate against Table type
+                    // User specified a different table - validate normally
                     checks.push(quote::quote_spanned! {col_name.span()=>
                         {
                             fn has_table<T:#sql_crate::HasTable<#table_type>>(_test:&T){}
                             has_table(&___t___);
-                            let table_instance = #sql_crate::never::never_any::<#table_type>();
+                            let table_instance = #sql_crate::macro_support::never_any::<#table_type>();
                             let _ = table_instance.#col_name;
                         }
                     });
-                    current_format_params.push(quote! {
-                        <#table_type as #sql_crate::Table<#driver>>::table_name()
-                    });
-                    format!(
-                        "{{_easy_sql_d}}{{}}{{_easy_sql_d}}.{{_easy_sql_d}}{}{{_easy_sql_d}}",
-                        col_name
-                    )
+
+                    if for_custom_select {
+                        // For custom select, use delimeter directly in format string
+                        // Format: {delim}{table_name}{delim}.{delim}col_name{delim}
+                        let col_str = col_name.to_string();
+                        current_format_params.push(quote! {
+                            <#table_type as #sql_crate::Table<#driver>>::table_name()
+                        });
+                        format!(
+                            "{{delimeter}}{{}}{{delimeter}}.{{delimeter}}{}{{delimeter}}",
+                            col_str
+                        )
+                    } else {
+                        current_format_params.push(quote! {
+                            <#table_type as #sql_crate::Table<#driver>>::table_name()
+                        });
+                        format!(
+                            "{{_easy_sql_d}}{{}}{{_easy_sql_d}}.{{_easy_sql_d}}{}{{_easy_sql_d}}",
+                            col_name
+                        )
+                    }
                 }
                 Column::Column(ident) => {
+                    #[cfg(feature = "use_output_columns")]
+                    {
+                        // Feature enabled: validate against Output type if provided
+                        if let Some(output_type) = output_ty {
+                            checks.push(quote::quote_spanned! {ident.span()=>
+                                {
+                                    let output_instance = #sql_crate::macro_support::never_any::<<#output_type as #sql_crate::Output<#main_table_type, #driver>>::UsedForChecks>();
+                                    let _ = output_instance.#ident;
+                                }
+                            });
+
+                            return if for_custom_select {
+                                format!("{{delimeter}}{ident}{{delimeter}}")
+                            } else {
+                                format!("{{_easy_sql_d}}{}{{_easy_sql_d}}", ident.to_string())
+                            };
+                        }
+                    }
+
+                    // Standard behavior: validate against Table type
+                    // This runs when:
+                    // - Feature is disabled (always validates against Table)
+                    // - Feature is enabled but no output_ty provided (fallback to Table validation)
                     checks.push(quote::quote_spanned! {ident.span()=>
                         {
                             let _= ___t___.#ident;
                         }
                     });
-                    format!("{{_easy_sql_d}}{}{{_easy_sql_d}}", ident.to_string())
+
+                    if for_custom_select {
+                        format!("{{delimeter}}{ident}{{delimeter}}")
+                    } else {
+                        format!("{{_easy_sql_d}}{}{{_easy_sql_d}}", ident.to_string())
+                    }
                 }
             },
             Value::Lit(lit) => {
+                // In custom select mode, embed literals directly in the SQL string
+                if for_custom_select {
+                    match lit {
+                        syn::Lit::Str(lit_str) => {
+                            // SQL string literals use single quotes and need escaping
+                            let value = lit_str.value();
+                            let escaped = value.replace("'", "''"); // SQL escape single quotes
+                            return format!("'{}'", escaped);
+                        }
+                        syn::Lit::Int(lit_int) => {
+                            return lit_int.to_string();
+                        }
+                        syn::Lit::Float(lit_float) => {
+                            return lit_float.to_string();
+                        }
+                        syn::Lit::Bool(lit_bool) => {
+                            return if lit_bool.value { "TRUE" } else { "FALSE" }.to_string();
+                        }
+                        _ => {
+                            // For other literal types, convert to string representation
+                            return lit.to_token_stream().to_string();
+                        }
+                    }
+                }
+
+                // Normal mode: use bind parameters
                 let debug_str = format!(
                     "Failed to bind `{}` to query parameter",
                     lit.to_token_stream().to_string()
@@ -835,6 +1009,32 @@ impl Value {
                 "{}".to_string()
             }
             Value::OutsideVariable(expr_val) => {
+                // Check if this is an {argN} pattern for custom select
+                if for_custom_select {
+                    if let syn::Expr::Path(expr_path) = expr_val {
+                        if expr_path.path.segments.len() == 1 {
+                            let ident = &expr_path.path.segments[0].ident;
+                            let ident_str = ident.to_string();
+                            if let Some(stripped) = ident_str.strip_prefix("arg") {
+                                if let Ok(_idx) = stripped.parse::<usize>() {
+                                    // This is an {argN} placeholder - push the identifier as a variable reference
+                                    current_format_params.push(quote::quote! {
+                                        #ident
+                                    });
+                                    return "{}".to_string();
+                                }
+                            }
+                        }
+                    }
+                    checks.push(quote::quote_spanned! {expr_val.span()=>
+                        {
+                            compile_error!("Outside variables in custom select must be in the form {argN}, where N is the argument index. Then enter them in the query! like this: query!(SELECT CurrentType(input0, input1, ...) FROM ...)");
+                        }
+                    });
+                    return "{}".to_string();
+                }
+
+                // Normal outside variable handling
                 let debug_str = format!(
                     "Failed to bind `{}` to query parameter",
                     expr_val.to_token_stream().to_string()
@@ -847,6 +1047,40 @@ impl Value {
                 });
                 *current_param_n += 1;
                 "{}".to_string()
+            }
+            Value::FunctionCall { name, args } => {
+                let func_name = name.to_string().to_uppercase();
+                let mut arg_strings = Vec::new();
+
+                for arg in args {
+                    let arg_sql = arg.into_query_string(
+                        binds,
+                        checks,
+                        sql_crate,
+                        driver,
+                        current_param_n,
+                        current_format_params,
+                        before_param_n,
+                        before_format,
+                        func_name.to_uppercase() == "COUNT",
+                        for_custom_select,
+                        output_ty,
+                        main_table_type,
+                    );
+                    arg_strings.push(arg_sql);
+                }
+
+                format!("{}({})", func_name, arg_strings.join(", "))
+            }
+            Value::Star(s) => {
+                if !inside_count {
+                    checks.push(quote_spanned! {s.span()=>
+                        {
+                            compile_error!("Star (*) is only valid inside function calls like COUNT(*).");
+                        }
+                    });
+                }
+                "*".to_string()
             }
         }
     }
@@ -867,7 +1101,7 @@ impl Value {
                                 fn has_table<T:#sql_crate::HasTable<#path>>(_test:&T){}
                                 has_table(&___t___);
                                 //TODO "RealColumns" trait with type leading to the struct with actual database columns
-                                let table_instance = #sql_crate::never::never_any::<#path>();
+                                let table_instance = #sql_crate::macro_support::never_any::<#path>();
                                 let _ = table_instance.#ident;
                             }
                         });
@@ -920,38 +1154,177 @@ impl Value {
                     #sql_crate::Expr::Value
                 }
             }
+            Value::FunctionCall { name, args: _ } => {
+                // Function calls are not supported in the old API (this will be removed)
+                let error_msg = format!(
+                    "Function calls are not supported in this deprecated API context. Use the new query! macro. Function: {}",
+                    name
+                );
+                quote_spanned! {name.span()=>
+                    {
+                        compile_error!(#error_msg);
+                        #sql_crate::Expr::Error
+                    }
+                }
+            }
+            Value::Star(_) => {
+                // Star is not supported in the old API (this will be removed)
+                quote! {
+                    {
+                        compile_error!("Star (*) is not supported in this deprecated API context. Use the new query! macro.");
+                        #sql_crate::Expr::Error
+                    }
+                }
+            }
+        }
+    }
+
+    /// Check if this value contains an outside variable ({arg0}, {arg1}, etc.)
+    /// Collects argument indices into the provided set.
+    fn collect_indices_impl(&self, indices: &mut std::collections::BTreeSet<usize>) {
+        match self {
+            Value::OutsideVariable(expr) => {
+                // Extract index from {argN} pattern
+                if let syn::Expr::Path(expr_path) = expr {
+                    if expr_path.path.segments.len() == 1 {
+                        let ident_str = expr_path.path.segments[0].ident.to_string();
+                        if let Some(stripped) = ident_str.strip_prefix("arg") {
+                            if let Ok(idx) = stripped.parse::<usize>() {
+                                indices.insert(idx);
+                            }
+                        }
+                    }
+                }
+            }
+            Value::FunctionCall { args, .. } => {
+                for e in args {
+                    e.collect_indices_impl(indices);
+                }
+            }
+            _ => {}
         }
     }
 }
 #[derive(Debug, Clone)]
 pub enum ValueIn {
-    Single(Value),
-    Multiple(Vec<Value>),
-}
-
-#[always_context]
-impl Value {
-    fn lookahead(l: &Lookahead1<'_>) -> bool {
-        l.peek(syn::Ident) || l.peek(syn::Lit) || l.peek(syn::token::Brace)
-    }
+    SingleVar(syn::Expr),
+    SingleColumn(Column),
+    Multiple(Box<Vec<Expr>>),
 }
 
 #[always_context]
 impl Parse for Value {
     fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
-        let lookahead = input.lookahead1();
-        if lookahead.peek(syn::Ident) {
-            Ok(Value::Column(input.parse()?))
-        } else if lookahead.peek(syn::Lit) {
-            let lit: syn::Lit = input.parse()?;
-            Ok(Value::Lit(lit))
-        } else if lookahead.peek(syn::token::Brace) {
-            let inside_braces;
-            syn::braced!(inside_braces in input);
-            let expr: syn::Expr = inside_braces.parse()?;
-            Ok(Value::OutsideVariable(expr))
+        // First, check if this is a function call (which may include Rust keywords)
+        if let Some(func_name) = Value::function_call_start(&input)? {
+            // Parse the arguments
+            let inside_paren;
+            syn::parenthesized!(inside_paren in input);
+
+            let mut args = Vec::new();
+
+            let func_name_str = func_name.to_string();
+            let builtin_fn_data = builtin_functions::get_builtin_fn(&func_name_str);
+
+            if !inside_paren.is_empty() {
+                let lookahead_star = inside_paren.lookahead1();
+                if lookahead_star.peek(syn::Token![*]) {
+                    // Check for special case: COUNT(*) with zero regular arguments
+                    //
+                    // This is a star argument - check if function accepts it
+                    let func_name_str = func_name.to_string();
+                    if !builtin_fn_data
+                        .map(|data| data.accepts_star)
+                        .unwrap_or(false)
+                    {
+                        return Err(syn::Error::new(
+                            func_name.span(),
+                            format!(
+                                "Function {} does not accept * as an argument",
+                                func_name_str.to_uppercase()
+                            ),
+                        ));
+                    }
+
+                    let star_token = inside_paren.parse::<syn::Token![*]>()?;
+
+                    // Add star as an Expr::Value(Value::Star)
+                    args.push(Expr::Value(Value::Star(star_token)));
+
+                    // No comma after star for COUNT(*)
+                } else {
+                    // Regular arguments
+                    while !inside_paren.is_empty() {
+                        let arg = sub_where_expr(&inside_paren)?;
+                        args.push(arg);
+
+                        if inside_paren.is_empty() {
+                            break;
+                        }
+
+                        let lookahead2 = inside_paren.lookahead1();
+                        if lookahead2.peek(syn::Token![,]) {
+                            inside_paren.parse::<syn::Token![,]>()?;
+                        } else {
+                            break;
+                        }
+                    }
+                }
+            }
+
+            // Validate built-in functions
+            if let Some(builtin_fn_data) = builtin_fn_data {
+                let arg_count = args.len();
+
+                // Check minimum arguments
+                if arg_count < builtin_fn_data.min_args {
+                    return Err(syn::Error::new(
+                        func_name.span(),
+                        format!(
+                            "Function {} requires at least {} argument(s), but {} provided",
+                            func_name_str.to_uppercase(),
+                            builtin_fn_data.min_args,
+                            arg_count
+                        ),
+                    ));
+                }
+
+                // Check maximum arguments (if specified)
+                if let Some(max) = builtin_fn_data.max_args {
+                    if arg_count > max {
+                        return Err(syn::Error::new(
+                            func_name.span(),
+                            format!(
+                                "Function {} accepts at most {} argument(s), but {} provided",
+                                func_name_str.to_uppercase(),
+                                max,
+                                arg_count
+                            ),
+                        ));
+                    }
+                }
+            }
+
+            Ok(Value::FunctionCall {
+                name: func_name,
+                args,
+            })
         } else {
-            Err(lookahead.error())
+            let lookahead = input.lookahead1();
+            if lookahead.peek(syn::Lit) {
+                let lit: syn::Lit = input.parse()?;
+                Ok(Value::Lit(lit))
+            } else if lookahead.peek(syn::token::Brace) {
+                let inside_braces;
+                syn::braced!(inside_braces in input);
+                let expr: syn::Expr = inside_braces.parse()?;
+                Ok(Value::OutsideVariable(expr))
+            } else if lookahead.peek(syn::Ident) {
+                // Not a function call, parse as column
+                Ok(Value::Column(input.parse()?))
+            } else {
+                Err(lookahead.error())
+            }
         }
     }
 }
@@ -965,7 +1338,7 @@ impl Parse for ValueIn {
             syn::parenthesized!(inside_paren in input);
             let mut values = Vec::new();
             while !inside_paren.is_empty() {
-                let value = inside_paren.parse::<Value>()?;
+                let value = sub_where_expr(&inside_paren)?;
                 values.push(value);
                 if inside_paren.is_empty() {
                     break;
@@ -977,10 +1350,16 @@ impl Parse for ValueIn {
                     break;
                 }
             }
-            Ok(ValueIn::Multiple(values))
-        } else if Value::lookahead(&lookahead) {
-            let value = input.parse::<Value>()?;
-            Ok(ValueIn::Single(value))
+            Ok(ValueIn::Multiple(Box::new(values)))
+        } else if lookahead.peek(syn::Ident) {
+            // Could be a column reference or the start of a path
+            Ok(ValueIn::SingleColumn(input.parse()?))
+        } else if lookahead.peek(syn::token::Brace) {
+            // This is a variable in braces: {some_var}
+            let inside_braces;
+            syn::braced!(inside_braces in input);
+            let expr: syn::Expr = inside_braces.parse()?;
+            Ok(ValueIn::SingleVar(expr))
         } else {
             Err(lookahead.error())
         }
@@ -1014,34 +1393,6 @@ fn continue_parse_value_no_expr(
         } else {
             Err(lookahead2.error())
         }
-    } else if lookahead.peek(syn::Token![=]) {
-        input.parse::<syn::Token![=]>()?;
-        let right_value = input.parse::<Value>()?;
-        Ok(Expr::Equal(current_value, right_value))
-    } else if lookahead.peek(syn::Token![!=]) {
-        input.parse::<syn::Token![!=]>()?;
-        let right_value = input.parse::<Value>()?;
-        Ok(Expr::NotEqual(current_value, right_value))
-    } else if lookahead.peek(syn::Token![>=]) {
-        input.parse::<syn::Token![>=]>()?;
-        let right_value = input.parse::<Value>()?;
-        Ok(Expr::GreaterThanOrEqual(current_value, right_value))
-    } else if lookahead.peek(syn::Token![>]) {
-        input.parse::<syn::Token![>]>()?;
-        let right_value = input.parse::<Value>()?;
-        Ok(Expr::GreaterThan(current_value, right_value))
-    } else if lookahead.peek(syn::Token![<=]) {
-        input.parse::<syn::Token![<=]>()?;
-        let right_value = input.parse::<Value>()?;
-        Ok(Expr::LessThanOrEqual(current_value, right_value))
-    } else if lookahead.peek(syn::Token![<]) {
-        input.parse::<syn::Token![<]>()?;
-        let right_value = input.parse::<Value>()?;
-        Ok(Expr::LessThan(current_value, right_value))
-    } else if lookahead.peek(keyword::like) {
-        input.parse::<keyword::like>()?;
-        let right_value = input.parse::<Value>()?;
-        Ok(Expr::Like(current_value, right_value))
     } else if lookahead.peek(keyword::in_) {
         input.parse::<keyword::in_>()?;
         let right_value = input.parse::<ValueIn>()?;
@@ -1086,6 +1437,14 @@ fn continue_parse_value_maybe_expr(
         || lookahead.peek(syn::Token![|])
         || lookahead.peek(syn::Token![<<])
         || lookahead.peek(syn::Token![>>])
+        // NEW
+        || lookahead.peek(syn::Token![=])
+        || lookahead.peek(syn::Token![!=])
+        || lookahead.peek(syn::Token![>=])
+        || lookahead.peek(syn::Token![>])
+        || lookahead.peek(syn::Token![<=])
+        || lookahead.peek(syn::Token![<])
+        || lookahead.peek(keyword::like)
     {
         // We handle operators in the Expr::parse method
         Ok(Expr::Value(current_value))
@@ -1097,22 +1456,22 @@ fn continue_parse_value_maybe_expr(
 fn sub_where_expr(input: syn::parse::ParseStream) -> syn::Result<Expr> {
     let lookahead = input.lookahead1();
 
-    if lookahead.peek(keyword::not) {
-        input.parse::<keyword::not>()?;
-
-        let expr = sub_where_expr(input)?;
-        Ok(Expr::Not(Box::new(expr)))
-    } else if lookahead.peek(syn::token::Paren) {
+    if lookahead.peek(syn::token::Paren) {
         let inside_paren;
         syn::parenthesized!(inside_paren in input);
         let expr = inside_paren.parse::<Expr>()?;
         Ok(Expr::Parenthesized(Box::new(expr)))
-    } else if Value::lookahead(&lookahead) {
+    } else if Value::lookahead(&input) {
         let parsed = input.parse::<Value>()?;
 
         Ok(continue_parse_value_maybe_expr(input, parsed)?)
     } else {
-        Err(lookahead.error())
+        let mut err = lookahead.error();
+        #[cfg(feature = "parse_debug")]
+        err.combine(
+            input.error("lookahead.peek(syn::token::Paren) && Value::lookahead(&input) failed"),
+        );
+        Err(err)
     }
 }
 
@@ -1120,6 +1479,7 @@ fn sub_where_expr(input: syn::parse::ParseStream) -> syn::Result<Expr> {
 impl Parse for Expr {
     fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
         let mut first_expr = None;
+        let mut first_not_chain = None;
         let mut next_exprs = vec![];
 
         while !input.is_empty() {
@@ -1135,25 +1495,47 @@ impl Parse for Expr {
                 None
             };
 
-            let current_expr = sub_where_expr(&input)?;
+            let not_chain: NotChain = input.parse()?;
+
+            let current_expr = sub_where_expr(&input).map_err(|mut e| {
+                #[cfg(feature = "parse_debug")]
+                e.combine(input.error("sub_where_expr"));
+                e
+            })?;
 
             if let Some(and_or) = and_or {
-                next_exprs.push((and_or, current_expr));
+                next_exprs.push((not_chain, and_or, current_expr));
             } else {
                 first_expr = Some(current_expr);
+                first_not_chain = Some(not_chain);
             }
         }
 
-        let first_expr = if let Some(first_expr) = first_expr {
-            first_expr
+        let (first_expr, first_not_chain) = if let (Some(first_expr), Some(first_not_chain)) =
+            (first_expr, first_not_chain)
+        {
+            (first_expr, first_not_chain)
         } else {
             return Err(input.error("Expected a valid where expression, if you don't want to use any conditions, use `true`"));
         };
 
         if next_exprs.is_empty() {
-            Ok(first_expr)
+            // Check if we have a NOT chain even without operator chains
+            if first_not_chain.not_count > 0 {
+                Ok(Expr::OperatorChain(
+                    first_not_chain,
+                    Box::new(first_expr),
+                    vec![],
+                ))
+            } else {
+                Ok(first_expr)
+            }
         } else {
-            Ok(Expr::OperatorChain(Box::new(first_expr), next_exprs))
+            Ok(Expr::OperatorChain(
+                first_not_chain,
+                Box::new(first_expr),
+                next_exprs,
+            ))
         }
     }
 }
