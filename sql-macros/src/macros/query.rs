@@ -12,8 +12,9 @@ use quote::quote;
 use sql_compilation_data::CompilationData;
 use syn::{self, parse::Parse};
 
-/// Input structure for query! macro: connection, query_type
+/// Input structure for query! macro: optional driver, connection, query_type
 struct QueryInput {
+    driver: Option<syn::Path>,
     connection: syn::Expr,
     query: QueryType,
 }
@@ -21,10 +22,24 @@ struct QueryInput {
 #[always_context]
 impl Parse for QueryInput {
     fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
+        // Check for optional driver specification: <Driver>
+        let driver = if input.peek(syn::Token![<]) {
+            input.parse::<syn::Token![<]>()?;
+            let driver = input.parse::<syn::Path>()?;
+            input.parse::<syn::Token![>]>()?;
+            Some(driver)
+        } else {
+            None
+        };
+
         let connection = input.parse::<syn::Expr>()?;
         input.parse::<syn::Token![,]>()?;
         let query = input.parse::<QueryType>()?;
-        Ok(QueryInput { connection, query })
+        Ok(QueryInput {
+            driver,
+            connection,
+            query,
+        })
     }
 }
 
@@ -38,18 +53,23 @@ pub fn query(input_raw: proc_macro::TokenStream) -> anyhow::Result<proc_macro::T
     // Load compilation data to get driver information
     let sql_crate = sql_crate();
 
-    let compilation_data = CompilationData::load(Vec::<String>::new(), false).with_context(|| {
-        "Failed to load compilation data for query! macro. Make sure easy_sql::build is called in build.rs"
-    })?;
-
-    let driver = if let Some(driver_str) = compilation_data.default_drivers.first() {
-        let driver_path: syn::Path = syn::parse_str(driver_str)
-            .with_context(|| format!("Failed to parse driver path: {}", driver_str))?;
+    // Use provided driver or load from compilation data
+    let driver = if let Some(driver_path) = input.driver {
         quote! {#driver_path}
     } else {
-        return Err(anyhow::anyhow!(
-            "No default driver found in compilation data. Please specify a driver in easy_sql.ron or build.rs"
-        ));
+        let compilation_data = CompilationData::load(Vec::<String>::new(), false).with_context(|| {
+            "Failed to load compilation data for query! macro. Make sure easy_sql::build is called in build.rs"
+        })?;
+
+        if let Some(driver_str) = compilation_data.default_drivers.first() {
+            let driver_path: syn::Path = syn::parse_str(driver_str)
+                .with_context(|| format!("Failed to parse driver path: {}", driver_str))?;
+            quote! {#driver_path}
+        } else {
+            return Err(anyhow::anyhow!(
+                "No default driver found in compilation data. Please specify a driver in build.rs, or at the macro call site using <Driver> syntax (before connection)"
+            ));
+        }
     };
 
     let result = match input.query {
