@@ -2,6 +2,8 @@
 // Note: The query! macro design expects SELECT to specify an Output type,
 // not individual columns/functions. Functions are tested in WHERE, ORDER BY, etc.
 
+use crate::sqlite_math_required;
+
 use super::*;
 use easy_macros::always_context;
 use sql_macros::query;
@@ -241,6 +243,8 @@ async fn test_nested_functions_in_where() -> anyhow::Result<()> {
 #[always_context(skip(!))]
 #[tokio::test]
 async fn test_nested_math_functions_in_where() -> anyhow::Result<()> {
+    sqlite_math_required!();
+
     let db = Database::setup_for_testing::<FunctionTestTable>().await?;
     let mut conn = db.transaction().await?;
 
@@ -418,6 +422,8 @@ async fn test_function_with_or_in_where() -> anyhow::Result<()> {
 #[always_context(skip(!))]
 #[tokio::test]
 async fn test_function_power_in_where() -> anyhow::Result<()> {
+    sqlite_math_required!();
+
     let db = Database::setup_for_testing::<FunctionTestTable>().await?;
     let mut conn = db.transaction().await?;
 
@@ -447,6 +453,8 @@ async fn test_function_power_in_where() -> anyhow::Result<()> {
 #[always_context(skip(!))]
 #[tokio::test]
 async fn test_function_sqrt_in_where() -> anyhow::Result<()> {
+    sqlite_math_required!();
+
     let db = Database::setup_for_testing::<FunctionTestTable>().await?;
     let mut conn = db.transaction().await?;
 
@@ -479,6 +487,8 @@ async fn test_function_sqrt_in_where() -> anyhow::Result<()> {
 #[always_context(skip(!))]
 #[tokio::test]
 async fn test_function_ceil_in_where() -> anyhow::Result<()> {
+    sqlite_math_required!();
+
     let db = Database::setup_for_testing::<FunctionTestTable>().await?;
     let mut conn = db.transaction().await?;
 
@@ -506,6 +516,8 @@ async fn test_function_ceil_in_where() -> anyhow::Result<()> {
 #[always_context(skip(!))]
 #[tokio::test]
 async fn test_function_floor_in_where() -> anyhow::Result<()> {
+    sqlite_math_required!();
+
     let db = Database::setup_for_testing::<FunctionTestTable>().await?;
     let mut conn = db.transaction().await?;
 
@@ -597,6 +609,8 @@ async fn test_function_coalesce() -> anyhow::Result<()> {
 #[always_context(skip(!))]
 #[tokio::test]
 async fn test_function_mod_in_where() -> anyhow::Result<()> {
+    sqlite_math_required!();
+
     let db = Database::setup_for_testing::<FunctionTestTable>().await?;
     let mut conn = db.transaction().await?;
 
