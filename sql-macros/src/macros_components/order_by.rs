@@ -94,7 +94,7 @@ impl OrderBy {
             false,
             false,
             output_ty,
-            main_table_type,
+            Some(main_table_type),
         );
         let order_query_str = match self.order {
             Order::Asc => "ASC",

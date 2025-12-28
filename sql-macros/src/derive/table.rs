@@ -388,8 +388,10 @@ pub fn table(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::TokenS
                 vec![#(#primary_keys),*]
             }
 
-            fn table_joins(_builder: &mut #sql_crate::QueryBuilder<'_, #driver>) -> Vec<#sql_crate::TableJoin> {
-                vec![]
+
+            #[inline(always)]
+            fn table_joins(current_query: &mut String) {
+                
             }
         }
 

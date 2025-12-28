@@ -137,9 +137,7 @@ where
         vec!["table_id"]
     }
 
-    fn table_joins(_builder: &mut QueryBuilder<'_, D>) -> Vec<TableJoin> {
-        vec![]
-    }
+    fn table_joins(_current_query: &mut String) {}
 }
 
 #[always_context]

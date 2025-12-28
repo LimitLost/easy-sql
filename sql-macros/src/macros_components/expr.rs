@@ -181,6 +181,7 @@ pub enum Expr {
 
 #[always_context]
 impl Expr {
+    ///`main_table_type` - None means we're inside of table join
     pub fn into_query_string(
         &self,
         binds: &mut Vec<proc_macro2::TokenStream>,
@@ -194,7 +195,7 @@ impl Expr {
         inside_count_fn: bool,
         for_custom_select: bool,
         output_ty: Option<&proc_macro2::TokenStream>,
-        main_table_type: &proc_macro2::TokenStream,
+        main_table_type: Option<&proc_macro2::TokenStream>,
     ) -> String {
         match self {
             Expr::Value(val) => val.into_query_string(
@@ -782,7 +783,7 @@ impl Value {
             Ok(None)
         }
     }
-
+    ///`main_table_type` - None means we're inside of table join
     fn into_query_string(
         &self,
         binds: &mut Vec<proc_macro2::TokenStream>,
@@ -796,7 +797,7 @@ impl Value {
         inside_count: bool,
         for_custom_select: bool,
         output_ty: Option<&proc_macro2::TokenStream>,
-        main_table_type: &proc_macro2::TokenStream,
+        main_table_type: Option<&proc_macro2::TokenStream>,
     ) -> String {
         match self {
             Value::Column(col) => match col {
@@ -932,6 +933,22 @@ impl Value {
                     }
                 }
                 Column::Column(ident) => {
+                    let main_table_type = if let Some(mt) = main_table_type {
+                        mt
+                    } else {
+                        // Inside table join - no main table type available
+                        checks.push(quote::quote_spanned! {ident.span()=>
+                            {
+                                compile_error!("Column references without a table prefix are not allowed inside of JOIN clauses. Please specify the table name explicitly, e.g., TableName.column_name");
+                            }
+                        });
+                        return if for_custom_select {
+                            format!("{{delimeter}}{ident}{{delimeter}}")
+                        } else {
+                            format!("{{_easy_sql_d}}{}{{_easy_sql_d}}", ident.to_string())
+                        };
+                    };
+
                     #[cfg(feature = "use_output_columns")]
                     {
                         // Feature enabled: validate against Output type if provided
@@ -1029,6 +1046,16 @@ impl Value {
                     checks.push(quote::quote_spanned! {expr_val.span()=>
                         {
                             compile_error!("Outside variables in custom select must be in the form {argN}, where N is the argument index. Then enter them in the query! like this: query!(SELECT CurrentType(input0, input1, ...) FROM ...)");
+                        }
+                    });
+                    return "{}".to_string();
+                }
+
+                if main_table_type.is_none() {
+                    // Inside table join - outside variables are not allowed
+                    checks.push(quote::quote_spanned! {expr_val.span()=>
+                        {
+                            compile_error!("Outside variables are not allowed inside of JOIN clauses. (yet)");
                         }
                     });
                     return "{}".to_string();

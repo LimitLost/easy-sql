@@ -1,7 +1,6 @@
 use easy_macros::always_context;
 
-use crate::QueryBuilder;
-use crate::{Driver, DriverConnection, TableJoin};
+use crate::{Driver, DriverConnection};
 
 #[always_context]
 pub trait Table<D: Driver>: Sized
@@ -11,5 +10,8 @@ where
     fn table_name() -> &'static str;
     fn primary_keys() -> Vec<&'static str>;
 
-    fn table_joins(builder: &mut QueryBuilder<'_, D>) -> Vec<TableJoin>;
+    /// WARNING: Signature of this function WILL change in future releases, use #[derive(Table)] and table_join! macros for automatic implementation
+    ///
+    /// Name and the first argument won't change, but return type and more arguments will be added in future
+    fn table_joins(current_query: &mut String);
 }

@@ -33,10 +33,9 @@ pub fn generate_select(
     }
     .to_string();
 
-    let mut format_str = " FROM {}".to_string();
+    let mut format_str = "".to_string();
 
-    let mut format_params =
-        vec![quote! { <#table_type as #sql_crate::Table<#driver>>::table_name() }];
+    let mut format_params = vec![];
 
     let mut before_param_n = quote! {};
     let mut before_format = Vec::new();
@@ -247,6 +246,10 @@ pub fn generate_select(
 
                 // Add output columns
                 <#output_type as #sql_crate::Output<#table_type, #driver>>::select_sqlx(&mut query);
+
+                query.push_str(&format!(" FROM {}",<#table_type as #sql_crate::Table<#driver>>::table_name()));
+                // Handle potential table joins
+                <#table_type as #sql_crate::Table<#driver>>::table_joins(&mut query);
 
                 query.push_str(&format!(#format_str,
                     #(#format_params),*
@@ -491,9 +494,8 @@ pub fn generate_update(
     let mut all_binds = Vec::new();
     let mut param_counter = 0;
 
-    let mut format_str = "UPDATE {}".to_string();
-    let mut format_params =
-        vec![quote! { <#table_type as #sql_crate::Table<#driver>>::table_name() }];
+    let mut format_str = "".to_string();
+    let mut format_params = vec![];
 
     let mut before_param_n = quote! {};
     let mut before_format = Vec::new();
@@ -716,7 +718,13 @@ pub fn generate_update(
                 let mut _easy_sql_args = #sql_crate::DriverArguments::<#driver>::default();
                 let _easy_sql_d = <#driver as #sql_crate::Driver>::identifier_delimiter();
                 #(#before_format)*
-                let mut query = format!(#format_str, #(#format_params),*);
+                let mut query = format!("UPDATE {}",<#table_type as #sql_crate::Table<#driver>>::table_name());
+
+                // Handle potential table joins
+                <#table_type as #sql_crate::Table<#driver>>::table_joins(&mut query);
+
+                query.push_str(&format!(#format_str, #(#format_params),*));
+
 
                 // Execute SET clause code
                 #set_code
@@ -752,9 +760,8 @@ pub fn generate_delete(
     let mut binds = Vec::new();
     let mut param_counter = 0;
 
-    let mut format_str = "DELETE FROM {}".to_string();
-    let mut format_params =
-        vec![quote! { <#table_type as #sql_crate::Table<#driver>>::table_name() }];
+    let mut format_str = "".to_string();
+    let mut format_params = vec![];
 
     let mut before_param_n = quote! {};
     let mut before_format = Vec::new();
@@ -933,9 +940,13 @@ pub fn generate_delete(
                 let mut _easy_sql_args = #sql_crate::DriverArguments::<#driver>::default();
                 let _easy_sql_d = <#driver as #sql_crate::Driver>::identifier_delimiter();
                 #(#before_format)*
-                let mut query = format!(#format_str,
-                    #(#format_params),*
-                );
+
+                let mut query = format!("DELETE FROM {}",<#table_type as #sql_crate::Table<#driver>>::table_name());
+
+                // Handle potential table joins
+                <#table_type as #sql_crate::Table<#driver>>::table_joins(&mut query);
+
+                query.push_str(&format!(#format_str, #(#format_params),*));
 
                 // Add WHERE parameter values
                 {
@@ -967,9 +978,8 @@ pub fn generate_exists(
     let mut binds = Vec::new();
     let mut param_counter = 0;
 
-    let mut format_str = "SELECT EXISTS(SELECT 1 FROM {}".to_string();
-    let mut format_params =
-        vec![quote! { <#table_type as #sql_crate::Table<#driver>>::table_name() }];
+    let mut format_str = "".to_string();
+    let mut format_params = vec![];
 
     let mut before_param_n = quote! {};
     let mut before_format = Vec::new();
@@ -1069,9 +1079,16 @@ pub fn generate_exists(
                 let mut _easy_sql_args = #sql_crate::DriverArguments::<#driver>::default();
                 let _easy_sql_d = <#driver as #sql_crate::Driver>::identifier_delimiter();
                 #(#before_format)*
-                let mut query = format!(#format_str,
-                    #(#format_params),*
+                let mut query = format!("SELECT EXISTS(SELECT 1 FROM {}",
+                    <#table_type as #sql_crate::Table<#driver>>::table_name()
                 );
+
+                // Handle potential table joins
+                <#table_type as #sql_crate::Table<#driver>>::table_joins(&mut query);
+
+                query.push_str(&format!(#format_str,
+                    #(#format_params),*
+                ));
 
                 // Add WHERE, HAVING, and LIMIT parameter values
                 {

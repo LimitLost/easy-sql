@@ -405,7 +405,7 @@ pub fn sql_output_base(
                     false,
                     true, // for_custom_select
                     Some(&output_type_ts),
-                    &table
+                    Some(&table)
                 );
                 
                 // Generate runtime code to format the template with the provided arguments

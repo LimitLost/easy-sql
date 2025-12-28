@@ -6,7 +6,7 @@ struct DatabaseSetupTest {
 }
 
 use super::TestDriver;
-use crate::{self as sql_crate, Driver, EasySqlTables_create, InternalDriver, QueryBuilder};
+use crate::{self as sql_crate, Driver, EasySqlTables_create, InternalDriver};
 
 #[allow(dead_code)]
 struct ExampleReferencedTable {
@@ -23,9 +23,7 @@ impl sql_crate::Table<TestDriver> for ExampleReferencedTable {
         vec!["id"]
     }
 
-    fn table_joins(_builder: &mut QueryBuilder<'_, TestDriver>) -> Vec<sql_crate::TableJoin> {
-        vec![]
-    }
+    fn table_joins(_current_query: &mut String) {}
 }
 
 #[allow(dead_code)]
@@ -48,9 +46,7 @@ impl sql_crate::Table<TestDriver> for ExampleTable {
         vec!["id"]
     }
 
-    fn table_joins(_builder: &mut QueryBuilder<'_, TestDriver>) -> Vec<sql_crate::TableJoin> {
-        vec![]
-    }
+    fn table_joins(_current_query: &mut String) {}
 }
 
 #[always_context]

@@ -32,7 +32,7 @@ fn sql_expr_clause(
         false,
         false, // for_custom_select
         output_ty,
-        main_table_type,
+        Some(main_table_type),
     );
     format_str.push_str(&format!(" {clause_name} {sql_template}"));
 }
@@ -219,7 +219,7 @@ pub fn set_clause(
                     false,
                     false, // for_custom_select
                     output_ty,
-                    main_table_type,
+                    Some(main_table_type),
                 );
                 set_sql_parts.push(format!(
                     "{{_easy_sql_d}}{}{{_easy_sql_d}} = {}",

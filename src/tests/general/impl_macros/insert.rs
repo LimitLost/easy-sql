@@ -3,7 +3,7 @@ use easy_macros::always_context;
 
 use super::{NeverConnection, TestDriver};
 
-use crate::{DriverArguments, Insert, QueryBuilder, Table, TableJoin, query};
+use crate::{DriverArguments, Insert, QueryBuilder, Table, query};
 #[allow(dead_code)]
 struct ExampleTableStruct {
     id: i64,
@@ -158,9 +158,7 @@ impl Table<TestDriver> for ExampleTableStruct {
         vec!["id"]
     }
 
-    fn table_joins(_builder: &mut QueryBuilder<'_, TestDriver>) -> Vec<TableJoin> {
-        vec![]
-    }
+    fn table_joins(_current_query: &mut String) {}
 }
 
 #[always_context(skip(!))]

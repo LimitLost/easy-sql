@@ -223,79 +223,88 @@ pub fn table_join(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::T
 
     for driver in supported_drivers {
         let driver_tokens = driver.to_token_stream();
-        let table_joins_base = input
+
+        let mut current_param_n = 0;
+        let mut current_format_params = Vec::new();
+        let mut before_param_n = quote! {};
+        let mut before_format = Vec::new();
+
+        let table_joins = input
             .joins
             .iter()
             .map(|join| {
-                let (table, join_type, on) = match join {
+                let format_str = match join {
                     Join::Inner { table, on } => {
-                        let on = on.clone().into_tokens_with_checks(
-                            &mut checks,
+                        current_format_params
+                            .push(quote! {<#table as #sql_crate::Table<#driver>>::table_name()});
+                        let on = on.clone().into_query_string(
                             &mut binds,
+                            &mut checks,
                             &sql_crate,
-                            true,
                             &driver_tokens,
+                            &mut current_param_n,
+                            &mut current_format_params,
+                            &mut before_param_n,
+                            &mut before_format,
+                            false,
+                            false,
+                            None,
+                            None,
                         );
 
-                        (
-                            table,
-                            quote! {#sql_crate::JoinType::Inner},
-                            quote! {Some(#on)},
-                        )
+                        format!(" INNER JOIN {{}} ON {}", on)
                     }
                     Join::Left { table, on } => {
-                        let on = on.clone().into_tokens_with_checks(
-                            &mut checks,
+                        current_format_params
+                            .push(quote! {<#table as #sql_crate::Table<#driver>>::table_name()});
+                        let on = on.clone().into_query_string(
                             &mut binds,
+                            &mut checks,
                             &sql_crate,
-                            true,
                             &driver_tokens,
+                            &mut current_param_n,
+                            &mut current_format_params,
+                            &mut before_param_n,
+                            &mut before_format,
+                            false,
+                            false,
+                            None,
+                            None,
                         );
 
-                        (
-                            table,
-                            quote! {#sql_crate::JoinType::Left},
-                            quote! {Some(#on)},
-                        )
+                        format!(" LEFT JOIN {{}} ON {}", on)
                     }
                     Join::Right { table, on } => {
-                        let on = on.clone().into_tokens_with_checks(
-                            &mut checks,
+                        current_format_params
+                            .push(quote! {<#table as #sql_crate::Table<#driver>>::table_name()});
+                        let on = on.clone().into_query_string(
                             &mut binds,
+                            &mut checks,
                             &sql_crate,
-                            true,
                             &driver_tokens,
+                            &mut current_param_n,
+                            &mut current_format_params,
+                            &mut before_param_n,
+                            &mut before_format,
+                            false,
+                            false,
+                            None,
+                            None,
                         );
 
-                        (
-                            table,
-                            quote! {#sql_crate::JoinType::Right},
-                            quote! {Some(#on)},
-                        )
+                        format!(" RIGHT JOIN {{}} ON {}", on)
                     }
                     Join::Cross { table } => {
-                        (table, quote! {#sql_crate::JoinType::Cross}, quote! {None})
+                        current_format_params
+                            .push(quote! {<#table as #sql_crate::Table<#driver>>::table_name()});
+                        format!(" CROSS JOIN {{}}")
                     }
                 };
-                (table, join_type, on)
+                format_str
             })
             .collect::<Vec<_>>();
 
-        let table_joins = table_joins_base
-            .into_iter()
-            .map(|(table, join_type, on)| {
-                let alias = quote! {None};
-
-                quote! {
-                    #sql_crate::TableJoin::<#driver_tokens>{
-                        table: <#table as #sql_crate::Table<#driver>>::table_name(),
-                        join_type: #join_type,
-                        alias: #alias,
-                        on: #on,
-                    }
-                }
-            })
-            .collect::<Vec<_>>();
+        let table_joins_str = table_joins.join("");
 
         result.add(quote! {
 
@@ -308,16 +317,21 @@ pub fn table_join(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::T
                     vec![]
                 }
 
-                fn table_joins(__easy_sql_builder: &mut #sql_crate::QueryBuilder<'_, #driver>) -> Vec<#sql_crate::TableJoin> {
+                #[inline(always)]
+                fn table_joins(current_query: &mut String ) {
                     let _ = |___t___:#item_name|{
                         #(#checks)*
                     };
 
                     #(#binds)*
 
-                    vec![
-                        #(#table_joins),*
-                    ]
+                    #(#before_format)*
+
+                    let result = format!(#table_joins_str, #(#current_format_params),*);
+
+
+
+                    result
                 }
             }
 
