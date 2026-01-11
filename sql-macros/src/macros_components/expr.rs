@@ -640,9 +640,20 @@ impl Value {
                     }
 
                     if let Some(output_type) = output_ty
-                        && output_matches_type(output_type, &table_type.to_token_stream())
+                         && output_matches_type(output_type, &table_type.to_token_stream())
                     {
-                        // User specified OutputType.column - validate against Output type fields
+                        // User specified OutputType.column - validate against Output type fields (custom select can't reference other columns from select statement)
+
+                        if for_custom_select {
+                            // In custom select mode, referencing select columns (created in OutputType) is unsupported
+                            checks.push(quote::quote_spanned! {table_type.span()=>
+                                {
+                                    compile_error!("Referencing select columns in custom select statements is not supported. Please use table column references instead.");
+                                }
+                            }); 
+                            return format!("{{delimeter}}{}{{delimeter}}", col_name);
+                        }
+
                         // and generate unqualified column reference (just the column name)
                         let drivers_iter = driver.iter_for_checks();
                         checks.push(quote::quote_spanned! {col_name.span()=>
@@ -653,11 +664,7 @@ impl Value {
                             });
 
                         // Generate unqualified column name (Output fields map to table columns)
-                        return if for_custom_select {
-                            format!("{{delimeter}}{col_name}{{delimeter}}")
-                        } else {
-                            format!("{{_easy_sql_d}}{}{{_easy_sql_d}}", col_name)
-                        };
+                        return format!("{{_easy_sql_d}}{}{{_easy_sql_d}}", col_name)
                     }
 
                     // Standard behavior: validate against Table type
@@ -702,21 +709,18 @@ impl Value {
                     };
 
                     #[cfg(feature = "use_output_columns")]
-                    {
-                        // Feature enabled: validate against Output type if provided
+                    if !for_custom_select{
+                        // Feature enabled: validate against Output type if provided, custom select can't reference other columns from select statement
                         if let Some(output_type) = output_ty {
+                            let drivers_iter = driver.iter_for_checks();
                             checks.push(quote::quote_spanned! {ident.span()=>
-                                {
-                                    let output_instance = #sql_crate::macro_support::never_any::<<#output_type as #sql_crate::Output<#main_table_type, #driver>>::UsedForChecks>();
+                                #({
+                                    let output_instance = #sql_crate::macro_support::never_any::<<#output_type as #sql_crate::Output<#main_table_type, #drivers_iter>>::UsedForChecks>();
                                     let _ = output_instance.#ident;
-                                }
+                                })*
                             });
 
-                            return if for_custom_select {
-                                format!("{{delimeter}}{ident}{{delimeter}}")
-                            } else {
-                                format!("{{_easy_sql_d}}{}{{_easy_sql_d}}", ident.to_string())
-                            };
+                            return format!("{{_easy_sql_d}}{}{{_easy_sql_d}}", ident.to_string())
                         }
                     }
 
@@ -724,9 +728,11 @@ impl Value {
                     // This runs when:
                     // - Feature is disabled (always validates against Table)
                     // - Feature is enabled but no output_ty provided (fallback to Table validation)
+                    // - Custom select mode (can't reference other columns from select statement)
                     checks.push(quote::quote_spanned! {ident.span()=>
                         {
-                            let _= ___t___.#ident;
+                            let table_instance = #sql_crate::macro_support::never_any::<#main_table_type>();
+                            let _ = table_instance.#ident;
                         }
                     });
 

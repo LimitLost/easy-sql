@@ -34,7 +34,7 @@ struct OutputColumnsTestInsert {
 struct OutputColumnsTestOutput {
     first_name: String,
     last_name: String,
-    #[sql(select = OutputColumnsTestOutput.first_name || " " || OutputColumnsTestOutput.last_name)]
+    #[sql(select = first_name || " " || OutputColumnsTestTable.last_name)]
     full_name: String,
     #[sql(select = OutputColumnsTestTable.age * 12)]
     age_in_months: i32,

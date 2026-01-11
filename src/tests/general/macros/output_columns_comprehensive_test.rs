@@ -19,7 +19,7 @@ mod output_columns_tests {
     struct BasicOutputRef {
         int_field: i32,
         str_field: String,
-        #[sql(select = BasicOutputRef.str_field || " (" || ExprTestTable.int_field || ")")]
+        #[sql(select = ExprTestTable.str_field || " (" || int_field || ")")]
         combined: String,
     }
 
@@ -30,7 +30,7 @@ mod output_columns_tests {
     struct ComplexExpression {
         int_field: i32,
         str_field: String,
-        #[sql(select = "Value: " || ComplexExpression.str_field || " = " || ExprTestTable.int_field)]
+        #[sql(select = "Value: " || ExprTestTable.str_field || " = " || ExprTestTable.int_field)]
         full_info: String,
     }
 
@@ -53,7 +53,7 @@ mod output_columns_tests {
     struct MixedColumnReferences {
         str_field: String,
         int_field: i32,
-        #[sql(select = MixedColumnReferences.str_field || " -> " || ExprTestTable.int_field)]
+        #[sql(select = str_field || " -> " || ExprTestTable.int_field)]
         description: String,
     }
 

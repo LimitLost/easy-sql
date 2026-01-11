@@ -17,7 +17,6 @@ struct CustomSelectTable {
     age: i64,
 }
 
-// For INSERT operations
 #[derive(crate::Insert)]
 #[sql(table = CustomSelectTable)]
 #[sql(default = id)]
@@ -26,9 +25,7 @@ struct CustomSelectInsert {
     last_name: String,
     age: i64,
 }
-
-// Test basic custom select without args
-// All fields from the table still exist
+#[cfg(not(feature = "use_output_columns"))]
 #[derive(Output)]
 #[sql(table = CustomSelectTable)]
 #[allow(unused)]
@@ -37,7 +34,22 @@ struct CustomSelect1 {
     first_name: String,
     last_name: String,
     #[sql(select = age * 2)]
-    age: i64, // Reuse age field but with custom select expression
+    agee: i64,
+    #[sql(select = CustomSelectTable.age * 4)]
+    ageee: i64,
+}
+#[cfg(feature = "use_output_columns")]
+#[derive(Output)]
+#[sql(table = CustomSelectTable)]
+#[allow(unused)]
+struct CustomSelect1 {
+    id: i32,
+    first_name: String,
+    last_name: String,
+    #[sql(select = age * 2)]
+    agee: i64,
+    #[sql(select = CustomSelectTable.age * 4)]
+    ageee: i64,
 }
 
 // Test custom select with one arg
@@ -68,10 +80,18 @@ async fn test_custom_select_basic() -> anyhow::Result<()> {
     })
     .await?;
 
-    // TODO: Query with custom select - need to implement query macro support first
-    // let result: CustomSelect1 = query!(conn,
-    //     SELECT CustomSelect1 FROM CustomSelectTable WHERE id = 1
-    // ).await?;
+    // Query with custom select - should get age * 2
+    let result: CustomSelect1 = query!(&mut conn,
+        SELECT CustomSelect1 FROM CustomSelectTable WHERE id = 1
+    )
+    .await?;
+
+    // Verify the custom select expression (age * 2)
+    assert_eq!(result.id, 1);
+    assert_eq!(result.first_name, "John");
+    assert_eq!(result.last_name, "Doe");
+    assert_eq!(result.agee, 60, "Expected age * 2 = 30 * 2 = 60");
+    assert_eq!(result.ageee, 120, "Expected age * 2 * 2 = 30 * 2 * 2 = 120");
 
     conn.rollback().await?;
     Ok(())
