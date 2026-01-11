@@ -5,6 +5,7 @@ pub use create_table::*;
 mod database;
 pub use database::*;
 
+mod connection;
 mod to_convert_impl;
 mod to_default_impl;
 

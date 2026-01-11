@@ -6,6 +6,7 @@ use easy_macros::always_context;
 mod database;
 pub use database::*;
 
+mod connection;
 mod to_convert_impl;
 mod to_default_impl;
 

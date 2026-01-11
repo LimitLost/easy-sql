@@ -25,78 +25,6 @@ pub trait EasyExecutor<D: Driver> {
         Self: 'a;
 }
 
-#[always_context(skip(!))]
-impl<T, D: Driver> EasyExecutor<D> for &T
-where
-    for<'b> &'b T: sqlx::Executor<'b, Database = D::InternalDriver> + Send + Sync,
-{
-    type InternalExecutor<'b>
-        = &'b T
-    where
-        Self: 'b;
-    type IntoInternalExecutor<'b>
-        = &'b T
-    where
-        Self: 'b;
-
-    async fn query_setup<O: SetupSql<D> + Send + Sync>(
-        &mut self,
-        sql: O,
-    ) -> anyhow::Result<O::Output>
-    where
-        DriverConnection<D>: Send + Sync,
-    {
-        sql.query(self).await
-    }
-
-    fn executor<'a>(&'a mut self) -> Self::InternalExecutor<'a> {
-        self
-    }
-
-    fn into_executor<'a>(self) -> Self::IntoInternalExecutor<'a>
-    where
-        Self: 'a,
-    {
-        self
-    }
-}
-
-#[always_context(skip(!))]
-impl<T, D: Driver> EasyExecutor<D> for &mut T
-where
-    for<'b> &'b mut T: sqlx::Executor<'b, Database = D::InternalDriver> + Send + Sync,
-{
-    type InternalExecutor<'b>
-        = &'b mut T
-    where
-        Self: 'b;
-    type IntoInternalExecutor<'b>
-        = &'b mut T
-    where
-        Self: 'b;
-
-    async fn query_setup<O: SetupSql<D> + Send + Sync>(
-        &mut self,
-        sql: O,
-    ) -> anyhow::Result<O::Output>
-    where
-        DriverConnection<D>: Send + Sync,
-    {
-        sql.query(self).await
-    }
-
-    fn executor<'a>(&'a mut self) -> Self::InternalExecutor<'a> {
-        self
-    }
-
-    fn into_executor<'a>(self) -> Self::IntoInternalExecutor<'a>
-    where
-        Self: 'a,
-    {
-        self
-    }
-}
-
 #[always_context]
 pub trait SetupSql<D: Driver> {
     type Output;
@@ -106,6 +34,7 @@ pub trait SetupSql<D: Driver> {
 
 #[cfg(test)]
 #[allow(dead_code)]
+#[cfg(not(all(feature = "postgres", feature = "sqlite")))]
 mod impl_test {
     use crate::Driver;
 
