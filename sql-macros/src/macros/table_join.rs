@@ -1,13 +1,15 @@
 use anyhow::Context;
 use easy_macros::always_context;
 use easy_macros::{TokensBuilder, parse_macro_input};
-use quote::{ToTokens, quote};
+use quote::ToTokens;
+use quote::quote;
 use sql_compilation_data::CompilationData;
 use syn::Path;
 use syn::punctuated::Punctuated;
 use syn::{self, parse::Parse};
 
 use crate::macros_components::expr::Expr;
+use crate::query_macro_components::ProvidedDrivers;
 use crate::sql_crate;
 
 use crate::macros_components::keyword;
@@ -213,7 +215,10 @@ pub fn table_join(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::T
 
     let compilation_data = CompilationData::load(Vec::<String>::new(), false)?;
 
-    let supported_drivers = supported_drivers(input.drivers.clone(), &compilation_data)?;
+    let supported_drivers = supported_drivers(input.drivers.clone(), &compilation_data)?
+        .into_iter()
+        .map(|e| e.into_token_stream())
+        .collect::<Vec<_>>();
 
     result.add(quote! {
         struct #item_name;
@@ -221,127 +226,124 @@ pub fn table_join(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::T
         #(#has_table_joined_impls)*
     });
 
-    for driver in supported_drivers {
-        let driver_tokens = driver.to_token_stream();
+    let mut current_param_n = 0;
+    let mut current_format_params = Vec::new();
+    let mut before_param_n = quote! {};
+    let mut before_format = Vec::new();
 
-        let mut current_param_n = 0;
-        let mut current_format_params = Vec::new();
-        let mut before_param_n = quote! {};
-        let mut before_format = Vec::new();
+    let driver = ProvidedDrivers::SingleWithChecks {
+        driver: quote! { D },
+        checks: supported_drivers,
+    };
 
-        let table_joins = input
-            .joins
-            .iter()
-            .map(|join| {
-                let format_str = match join {
-                    Join::Inner { table, on } => {
-                        current_format_params
-                            .push(quote! {<#table as #sql_crate::Table<#driver>>::table_name()});
-                        let on = on.clone().into_query_string(
-                            &mut binds,
-                            &mut checks,
-                            &sql_crate,
-                            &driver_tokens,
-                            &mut current_param_n,
-                            &mut current_format_params,
-                            &mut before_param_n,
-                            &mut before_format,
-                            false,
-                            false,
-                            None,
-                            None,
-                        );
+    let table_joins = input
+        .joins
+        .iter()
+        .map(|join| {
+            let format_str = match join {
+                Join::Inner { table, on } => {
+                    current_format_params.push(driver.table_name(&sql_crate, table));
+                    let on = on.clone().into_query_string(
+                        &mut binds,
+                        &mut checks,
+                        &sql_crate,
+                        &driver,
+                        &mut current_param_n,
+                        &mut current_format_params,
+                        &mut before_param_n,
+                        &mut before_format,
+                        false,
+                        false,
+                        None,
+                        None,
+                    );
 
-                        format!(" INNER JOIN {{}} ON {}", on)
-                    }
-                    Join::Left { table, on } => {
-                        current_format_params
-                            .push(quote! {<#table as #sql_crate::Table<#driver>>::table_name()});
-                        let on = on.clone().into_query_string(
-                            &mut binds,
-                            &mut checks,
-                            &sql_crate,
-                            &driver_tokens,
-                            &mut current_param_n,
-                            &mut current_format_params,
-                            &mut before_param_n,
-                            &mut before_format,
-                            false,
-                            false,
-                            None,
-                            None,
-                        );
-
-                        format!(" LEFT JOIN {{}} ON {}", on)
-                    }
-                    Join::Right { table, on } => {
-                        current_format_params
-                            .push(quote! {<#table as #sql_crate::Table<#driver>>::table_name()});
-                        let on = on.clone().into_query_string(
-                            &mut binds,
-                            &mut checks,
-                            &sql_crate,
-                            &driver_tokens,
-                            &mut current_param_n,
-                            &mut current_format_params,
-                            &mut before_param_n,
-                            &mut before_format,
-                            false,
-                            false,
-                            None,
-                            None,
-                        );
-
-                        format!(" RIGHT JOIN {{}} ON {}", on)
-                    }
-                    Join::Cross { table } => {
-                        current_format_params
-                            .push(quote! {<#table as #sql_crate::Table<#driver>>::table_name()});
-                        format!(" CROSS JOIN {{}}")
-                    }
-                };
-                format_str
-            })
-            .collect::<Vec<_>>();
-
-        let table_joins_str = table_joins.join("");
-
-        result.add(quote! {
-
-            impl #sql_crate::Table<#driver> for #item_name {
-                fn table_name() -> &'static str {
-                    <#main_table_struct as #sql_crate::Table<#driver>>::table_name()
+                    format!(" INNER JOIN {{}} ON {}", on)
                 }
+                Join::Left { table, on } => {
+                    current_format_params.push(driver.table_name(&sql_crate, table));
+                    let on = on.clone().into_query_string(
+                        &mut binds,
+                        &mut checks,
+                        &sql_crate,
+                        &driver,
+                        &mut current_param_n,
+                        &mut current_format_params,
+                        &mut before_param_n,
+                        &mut before_format,
+                        false,
+                        false,
+                        None,
+                        None,
+                    );
 
-                fn primary_keys() -> Vec<&'static str>{
-                    vec![]
+                    format!(" LEFT JOIN {{}} ON {}", on)
                 }
+                Join::Right { table, on } => {
+                    current_format_params.push(driver.table_name(&sql_crate, table));
+                    let on = on.clone().into_query_string(
+                        &mut binds,
+                        &mut checks,
+                        &sql_crate,
+                        &driver,
+                        &mut current_param_n,
+                        &mut current_format_params,
+                        &mut before_param_n,
+                        &mut before_format,
+                        false,
+                        false,
+                        None,
+                        None,
+                    );
 
-                #[inline(always)]
-                fn table_joins(current_query: &mut String ) {
-                    let _ = |___t___:#item_name|{
-                        #(#checks)*
-                    };
-
-                    #(#binds)*
-
-                    #(#before_format)*
-
-                    let result = format!(#table_joins_str, #(#current_format_params),*);
-
-
-
-                    result
+                    format!(" RIGHT JOIN {{}} ON {}", on)
                 }
+                Join::Cross { table } => {
+                    current_format_params.push(driver.table_name(&sql_crate, table));
+                    format!(" CROSS JOIN {{}}")
+                }
+            };
+            format_str
+        })
+        .collect::<Vec<_>>();
+
+    let table_joins_str = table_joins.join("");
+
+    result.add(quote! {
+
+        impl<D:#sql_crate::Driver> #sql_crate::Table<D> for #item_name {
+            fn table_name() -> &'static str {
+                <#main_table_struct as #sql_crate::Table<D>>::table_name()
             }
 
-            impl #sql_crate::HasTable<#main_table_struct> for #item_name{}
+            fn primary_keys() -> Vec<&'static str>{
+                vec![]
+            }
 
-            #(impl #sql_crate::HasTable<#has_table_impls> for #item_name{})*
+            #[inline(always)]
+            fn table_joins(current_query: &mut String ) {
+                let _ = |___t___:#item_name|{
+                    #(#checks)*
+                };
+
+                #(#binds)*
+
+                #(#before_format)*
+
+                let result = format!(#table_joins_str, #(#current_format_params),*);
 
 
-        });
-    }
+
+                result
+            }
+        }
+
+        impl #sql_crate::HasTable<#main_table_struct> for #item_name{}
+
+        #(impl #sql_crate::HasTable<#has_table_impls> for #item_name{})*
+
+
+    });
 
     // panic!("{}", result.to_string());
 
