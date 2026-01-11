@@ -1164,6 +1164,7 @@ fn sub_where_expr(input: syn::parse::ParseStream) -> syn::Result<Expr> {
 
         Ok(continue_parse_value_maybe_expr(input, parsed)?)
     } else {
+        #[allow(unused_mut)]
         let mut err = lookahead.error();
         #[cfg(feature = "parse_debug")]
         err.combine(
@@ -1195,6 +1196,7 @@ impl Parse for Expr {
 
             let not_chain: NotChain = input.parse()?;
 
+            #[allow(unused_mut)]
             let current_expr = sub_where_expr(&input).map_err(|mut e| {
                 #[cfg(feature = "parse_debug")]
                 e.combine(input.error("sub_where_expr"));
