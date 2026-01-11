@@ -12,38 +12,6 @@ pub enum Column {
 
 #[always_context]
 impl Column {
-    pub fn into_tokens_with_checks(
-        self,
-        checks: &mut Vec<TokenStream>,
-        sql_crate: &TokenStream,
-    ) -> TokenStream {
-        match self {
-            Column::SpecificTableColumn(path, ident) => {
-                checks.push(quote_spanned! {path.span()=>
-                    fn has_table<T:#sql_crate::HasTable<#path>>(test:&T){}
-                    has_table(&___t___);
-                    //TODO "RealColumns" trait with type leading to the struct with actual database columns
-                    let mut table_instance = #sql_crate::macro_support::never_any::<#path>();
-                    let _ = table_instance.#ident;
-                });
-
-                let ident_str = ident.to_string();
-
-                quote_spanned! {path.span()=>
-                    format!("{}.{}",<#path as #sql_crate::Table>::table_name(), #ident_str)
-                }
-            }
-            Column::Column(ident) => {
-                checks.push(quote! {
-                        let _ = ___t___.#ident;
-                });
-
-                let ident_str = ident.to_string();
-                quote! {#ident_str.to_string()}
-            }
-        }
-    }
-
     pub fn into_query_string(
         self,
         checks: &mut Vec<TokenStream>,

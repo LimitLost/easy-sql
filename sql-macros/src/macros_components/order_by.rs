@@ -6,7 +6,6 @@ use super::{
 };
 use ::{
     proc_macro2::TokenStream,
-    quote::quote,
     syn::{self, parse::Parse},
 };
 use easy_macros::always_context;
@@ -41,36 +40,6 @@ pub struct OrderBy {
 
 #[always_context]
 impl OrderBy {
-    pub fn into_tokens_with_checks(
-        self,
-        checks: &mut Vec<TokenStream>,
-        sql_crate: &TokenStream,
-    ) -> TokenStream {
-        // For backward compatibility, we need to extract the column from the expression
-        // In the old API, OrderBy only supported columns
-        let column_parsed = match self.expr {
-            Expr::Value(Value::Column(col)) => col.into_tokens_with_checks(checks, sql_crate),
-            _ => {
-                checks.push(quote! {
-                    compile_error!("ORDER BY with complex expressions is only supported in the new query! macro API");
-                });
-                quote! { compile_error!("Unsupported") }
-            }
-        };
-
-        let order_parsed = match self.order {
-            Order::Asc => quote! {false},
-            Order::Desc => quote! {true},
-        };
-
-        quote! {
-            #sql_crate::OrderBy{
-                descending: #order_parsed,
-                column: #column_parsed,
-            }
-        }
-    }
-
     pub fn into_query_string(
         self,
         checks: &mut Vec<TokenStream>,

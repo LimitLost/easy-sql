@@ -33,25 +33,6 @@ impl Parse for Limit {
 
 #[always_context]
 impl Limit {
-    pub fn into_tokens_with_checks(
-        self,
-        _checks: &mut Vec<TokenStream>,
-        sql_crate: &TokenStream,
-    ) -> TokenStream {
-        match self {
-            Limit::Literal(l) => {
-                quote! {#sql_crate::LimitClause{
-                    limit: #l as usize,
-                }}
-            }
-            Limit::Expr(expr) => {
-                quote_spanned! {expr.span()=>#sql_crate::LimitClause{
-                    limit: {#expr},
-                } }
-            }
-        }
-    }
-
     pub fn into_query_string(
         self,
         checks: &mut Vec<TokenStream>,
