@@ -205,16 +205,6 @@ async fn test_query_lazy_insert() -> anyhow::Result<()> {
     Ok(())
 }
 
-/// Test that query_lazy! for INSERT without RETURNING requires regular query! instead
-/// Note: For SQLite, use regular query! macro for simple INSERTs
-#[always_context(skip(!))]
-#[tokio::test]
-async fn test_query_lazy_insert_note_for_sqlite() -> anyhow::Result<()> {
-    // For simple inserts without RETURNING, use query! macro instead of query_lazy!
-    // query_lazy! is designed for reusable queries with output
-    Ok(())
-}
-
 /// Test query_lazy! UPDATE with RETURNING
 #[always_context(skip(!))]
 #[tokio::test]
