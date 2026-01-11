@@ -1,7 +1,7 @@
 use easy_macros::always_context;
 use sqlx::Executor;
 
-use crate::{Driver, DriverArguments, QueryBuilder, QueryData, Sql};
+use crate::{Driver, DriverArguments};
 
 #[always_context]
 pub trait ToConvert<D: Driver> {
@@ -19,8 +19,6 @@ pub trait ToConvertSingle<D: Driver>: ToConvert<D> + sqlx::Row {}
 pub trait Output<Table, D: Driver>: Sized {
     type DataToConvert: ToConvert<D>;
     type UsedForChecks;
-    fn sql_to_query<'a>(sql: Sql, builder: QueryBuilder<'a, D>)
-    -> anyhow::Result<QueryData<'a, D>>;
 
     fn select_sqlx(current_query: &mut String);
     fn convert(data: Self::DataToConvert) -> anyhow::Result<Self>;

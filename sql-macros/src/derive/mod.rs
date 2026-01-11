@@ -21,17 +21,18 @@ pub use update::*;
 
 #[always_context]
 fn ty_to_variant(
+    current_self: TokenStream,
     field_name: TokenStream,
     bytes: bool,
     crate_prefix: &TokenStream,
 ) -> anyhow::Result<TokenStream> {
     if bytes {
         Ok(quote! {
-            #crate_prefix::to_binary(&self.#field_name)?
+            #crate_prefix::to_binary(&#current_self.#field_name)?
         })
     } else {
         Ok(quote! {
-            self.#field_name
+            #current_self.#field_name
         })
     }
 }

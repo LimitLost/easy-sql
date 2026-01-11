@@ -3,7 +3,7 @@ use quote::quote;
 
 use crate::macros_components::{Expr, Limit, OrderBy, column::Column};
 
-use super::SetClause;
+use super::{ProvidedDrivers, SetClause};
 
 fn sql_expr_clause(
     expr: Expr,
@@ -12,7 +12,7 @@ fn sql_expr_clause(
     binds: &mut Vec<TokenStream>,
     checks: &mut Vec<TokenStream>,
     sql_crate: &TokenStream,
-    driver: &TokenStream,
+    driver: &ProvidedDrivers,
     param_counter: &mut usize,
     clause_name: &'static str,
     before_param_n: &mut TokenStream,
@@ -44,7 +44,7 @@ pub fn where_clause(
     binds: &mut Vec<TokenStream>,
     checks: &mut Vec<TokenStream>,
     sql_crate: &TokenStream,
-    driver: &TokenStream,
+    driver: &ProvidedDrivers,
     param_counter: &mut usize,
     before_param_n: &mut TokenStream,
     before_format: &mut Vec<TokenStream>,
@@ -75,7 +75,7 @@ pub fn having_clause(
     binds: &mut Vec<TokenStream>,
     checks: &mut Vec<TokenStream>,
     sql_crate: &TokenStream,
-    driver: &TokenStream,
+    driver: &ProvidedDrivers,
     param_counter: &mut usize,
     before_param_n: &mut TokenStream,
     before_format: &mut Vec<TokenStream>,
@@ -122,7 +122,7 @@ pub fn order_by_clause(
     sql_crate: &TokenStream,
     checks: &mut Vec<TokenStream>,
     binds: &mut Vec<TokenStream>,
-    driver: &TokenStream,
+    driver: &ProvidedDrivers,
     param_counter: &mut usize,
     before_param_n: &mut TokenStream,
     before_format: &mut Vec<TokenStream>,
@@ -158,7 +158,7 @@ pub fn limit_clause(
     checks: &mut Vec<TokenStream>,
     binds: &mut Vec<TokenStream>,
     sql_crate: &TokenStream,
-    driver: &TokenStream,
+    driver: &ProvidedDrivers,
     param_counter: &mut usize,
     before_param_n: &TokenStream,
 ) {
@@ -180,7 +180,7 @@ pub fn set_clause(
     format_str: &mut String,
     format_params: &mut Vec<TokenStream>,
     sql_crate: &TokenStream,
-    driver: &TokenStream,
+    driver: &ProvidedDrivers,
     param_counter: &mut usize,
     all_binds: &mut Vec<TokenStream>,
     checks: &mut Vec<TokenStream>,
@@ -192,10 +192,11 @@ pub fn set_clause(
     match clause {
         SetClause::FromType(type_expr) => {
             format_str.push_str(" SET ");
+            let query_update_data = driver.query_update_data(sql_crate, main_table_type, type_expr);
             let result = quote! {
                 // Use Update trait's updates_sqlx method to add SET arguments
                 let mut current_arg_n = #param_counter;
-                _easy_sql_args = {#type_expr}.updates_sqlx(_easy_sql_args, &mut query, &mut current_arg_n).context("Update::updates_sqlx failed")?;
+                _easy_sql_args = #query_update_data.context("Update::updates_sqlx failed")?;
             };
             *before_param_n = quote! { current_arg_n + #before_param_n};
             *param_counter = 0;

@@ -3,7 +3,7 @@ use easy_macros::always_context;
 
 use super::{NeverConnection, TestDriver};
 
-use crate::{DriverArguments, Insert, QueryBuilder, Table, query};
+use crate::{Driver, DriverArguments, Insert, InternalDriver, Table, query};
 #[allow(dead_code)]
 struct ExampleTableStruct {
     id: i64,
@@ -24,7 +24,17 @@ struct ExampleStruct {
 
 #[always_context]
 #[no_context]
-impl<'a> Insert<'a, ExampleTableStruct, TestDriver> for ExampleStruct {
+impl<'a, D: Driver> Insert<'a, ExampleTableStruct, D> for ExampleStruct
+where
+    for<'x> String: sqlx::Encode<'x, InternalDriver<D>>,
+    String: sqlx::Type<InternalDriver<D>>,
+    for<'x> i32: sqlx::Encode<'x, InternalDriver<D>>,
+    i32: sqlx::Type<InternalDriver<D>>,
+    for<'x> i64: sqlx::Encode<'x, InternalDriver<D>>,
+    i64: sqlx::Type<InternalDriver<D>>,
+    for<'x> i16: sqlx::Encode<'x, InternalDriver<D>>,
+    i16: sqlx::Type<InternalDriver<D>>,
+{
     fn insert_columns() -> Vec<String> {
         let _ = || {
             //Check for validity
@@ -48,26 +58,26 @@ impl<'a> Insert<'a, ExampleTableStruct, TestDriver> for ExampleStruct {
         ]
     }
 
-    fn insert_values(self, builder: &mut QueryBuilder<'_, TestDriver>) -> anyhow::Result<usize> {
-        // Fully safe because we pass by value, not by reference
-        unsafe {
-            builder
-                .bind(self.field0)
-                .context("Binding `field0` failed")?;
-            builder.bind(self.field1)?;
-            builder.bind(self.field2)?;
-            builder.bind(self.field3)?;
-            builder.bind(self.field4)?;
-        }
-        Ok(1)
-    }
-
     fn insert_values_sqlx(
         self,
-        args_list: DriverArguments<'a, TestDriver>,
-    ) -> anyhow::Result<(DriverArguments<'a, TestDriver>, usize)> {
+        args_list: DriverArguments<'a, D>,
+    ) -> anyhow::Result<(DriverArguments<'a, D>, usize)> {
         let mut args = args_list;
         use sqlx::Arguments;
+
+        let _ = |mut args: DriverArguments<'a, TestDriver>| {
+            let _self = crate::macro_support::never_any::<Self>();
+            args.add(_self.field0)
+                .map_err(anyhow::Error::from_boxed)
+                .context("Failed to add `field0` to the sqlx arguments list")?;
+            args.add(_self.field1).map_err(anyhow::Error::from_boxed)?;
+            args.add(_self.field2).map_err(anyhow::Error::from_boxed)?;
+            args.add(_self.field3).map_err(anyhow::Error::from_boxed)?;
+            args.add(_self.field4).map_err(anyhow::Error::from_boxed)?;
+
+            anyhow::Result::<()>::Ok(())
+        };
+
         args.add(self.field0)
             .map_err(anyhow::Error::from_boxed)
             .context("Failed to add `field0` to the sqlx arguments list")?;
@@ -104,19 +114,6 @@ impl<'a> Insert<'a, ExampleTableStruct, TestDriver> for &'a ExampleStruct {
             "field3".to_string(),
             "field4".to_string(),
         ]
-    }
-
-    fn insert_values(self, builder: &mut QueryBuilder<'_, TestDriver>) -> anyhow::Result<usize> {
-        unsafe {
-            builder
-                .bind(&self.field0)
-                .with_context(|| format!("Binding `field0` (= {:?}) failed", &self.field0))?;
-            builder.bind(&self.field1)?;
-            builder.bind(&self.field2)?;
-            builder.bind(&self.field3)?;
-            builder.bind(&self.field4)?;
-        }
-        Ok(1)
     }
 
     fn insert_values_sqlx(

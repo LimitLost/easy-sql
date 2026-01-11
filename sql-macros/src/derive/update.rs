@@ -16,7 +16,7 @@ pub fn sql_update_base(
     item_name: &syn::Ident,
     fields: &Punctuated<syn::Field, syn::Token![,]>,
     table: &TokenStream,
-    driver: &TokenStream,
+    drivers: &[syn::Path],
 ) -> anyhow::Result<TokenStream> {
     let field_names = fields
         .iter()
@@ -31,15 +31,28 @@ pub fn sql_update_base(
     let macro_support = quote! { #sql_crate::macro_support };
 
     let mut update_values = Vec::new();
-    let mut insert_values_debug = Vec::new();
-    let mut insert_values_debug_ref = Vec::new();
+    let mut update_values_for_checks = Vec::new();
+    let mut update_values_debug = Vec::new();
+    let mut update_values_debug_ref = Vec::new();
 
     for field in fields.iter() {
         let field_name = field.ident.as_ref().unwrap();
 
         let bytes = has_attributes!(field, #[sql(bytes)]);
 
-        let ty_variant = ty_to_variant(field_name.to_token_stream(), bytes, &sql_crate)?;
+        let ty_variant = ty_to_variant(
+            quote! {self},
+            field_name.to_token_stream(),
+            bytes,
+            &sql_crate,
+        )?;
+
+        let ty_variant_for_checks = ty_to_variant(
+            quote! {_self},
+            field_name.to_token_stream(),
+            bytes,
+            &sql_crate,
+        )?;
 
         let debug_format_str =
             format!("Binding field `{}` to query failed", field_name.to_string());
@@ -47,14 +60,15 @@ pub fn sql_update_base(
             "Binding field `{}` (= {{:?}}) to query failed",
             field_name.to_string()
         );
-        insert_values_debug.push(quote! {
+        update_values_debug.push(quote! {
             .context(#debug_format_str)
         });
-        insert_values_debug_ref.push(quote! {
+        update_values_debug_ref.push(quote! {
             .with_context(|| format!(#debug_format_str_ref, #ty_variant))
         });
 
         update_values.push(ty_variant);
+        update_values_for_checks.push(ty_variant_for_checks);
     }
 
     let sqlx_query_format_str = field_names_str
@@ -67,17 +81,44 @@ pub fn sql_update_base(
         .enumerate()
         .map(|(i, _)| {
             quote! {
-                <#driver as #sql_crate::Driver>::parameter_placeholder(*parameter_n + #i)
+                <D as #sql_crate::Driver>::parameter_placeholder(*parameter_n + #i)
             }
         })
         .collect::<Vec<_>>();
 
+    let driver_tests=drivers.iter().map(|driver|{
+        quote! {
+            let _=|mut args_list:#sql_crate::DriverArguments<'a, #driver>|{
+                let _self=#macro_support::never_any::<Self>();
+                #(
+                    args_list.add(#update_values_for_checks).map_err(#macro_support::Error::from_boxed)?;
+                )*
+                #macro_support::Result::<()>::Ok(())
+            };
+        }
+    });
+
+    let where_clauses_types=fields.iter().map(|field|{
+        let field_ty=&field.ty;
+        quote! {
+            for<'__easy_sql_x> #field_ty: #macro_support::Encode<'__easy_sql_x, #sql_crate::InternalDriver<D>>,
+            #field_ty: #macro_support::Type<#sql_crate::InternalDriver<D>>,
+        }
+    }).collect::<Vec<_>>();
+
     let args_len = field_names.len();
 
     Ok(quote! {
-        impl<'a> #sql_crate::Update<'a,#table, #driver> for #item_name {
-            fn updates(self, builder: &mut #sql_crate::QueryBuilder<'_, #driver>) -> #macro_support::Result<Vec<(String, #sql_crate::Expr)>> {
-                use #macro_support::Context as _;
+        impl<'a,D:#sql_crate::Driver> #sql_crate::Update<'a,#table, D> for #item_name
+        where #(#where_clauses_types)* {
+
+            fn updates_sqlx(
+                self,
+                mut args_list: #sql_crate::DriverArguments<'a, D>,
+                current_query: &mut String,
+                parameter_n: &mut usize,
+            ) -> #macro_support::Result<#sql_crate::DriverArguments<'a, D>>{
+                use #macro_support::{Arguments as _, Context as _};
 
                 let _ = || {
                     //Check for validity
@@ -86,34 +127,14 @@ pub fn sql_update_base(
 
                     #(table_instance.#field_names = update_instance.#field_names;)*
                 };
-                // Fully safe because we pass by value, not by reference
-                unsafe {
-                    #(
-                        builder.bind(#update_values)#insert_values_debug?;
-                    )*
-                }
 
-                Ok(vec![
-                    #((
-                        #field_names_str.to_string(),
-                        #sql_crate::Expr::Value,
-                    ),)*
-                ])
-            }
-
-            fn updates_sqlx(
-                self,
-                mut args_list: #sql_crate::DriverArguments<'a, #driver>,
-                current_query: &mut String,
-                parameter_n: &mut usize,
-            ) -> #macro_support::Result<#sql_crate::DriverArguments<'a, #driver>>{
-                use #macro_support::{Arguments, Context as _};
+                #(#driver_tests)*
 
                 #(
-                    args_list.add(#update_values).map_err(#macro_support::Error::from_boxed)#insert_values_debug?;
+                    args_list.add(#update_values).map_err(#macro_support::Error::from_boxed)#update_values_debug?;
                 )*
 
-                let delimeter = <#driver as #sql_crate::Driver>::identifier_delimiter();
+                let delimeter = <D as #sql_crate::Driver>::identifier_delimiter();
 
                 current_query.push_str(&format!(
                     #sqlx_query_format_str,
@@ -127,38 +148,23 @@ pub fn sql_update_base(
             }
         }
 
-        impl<'a> #sql_crate::Update<'a,#table, #driver> for &'a #item_name {
-            fn updates( self, builder: &mut #sql_crate::QueryBuilder<'_, #driver>) -> #macro_support::Result<Vec<(String, #sql_crate::Expr)>> {
-                use #macro_support::Context as _;
-                // Validity check needs to be done only once
-                // SAFETY: Fully safe because we pass by reference, and the reference lives until
-                // the end of the QueryBuilder usage (parent function call)
-                unsafe {
-                    #(
-                        builder.bind(&#update_values)#insert_values_debug_ref?;
-                    )*
-                }
-                Ok(vec![
-                    #((
-                        #field_names_str.to_string(),
-                        #sql_crate::Expr::Value,
-                    ),)*
-                ])
-            }
+        impl<'a,D:#sql_crate::Driver> #sql_crate::Update<'a,#table, D> for &'a #item_name
+        where #(#where_clauses_types)* {
 
             fn updates_sqlx(
                 self,
-                mut args_list: #sql_crate::DriverArguments<'a, #driver>,
+                mut args_list: #sql_crate::DriverArguments<'a, D>,
                 current_query: &mut String,
                 parameter_n: &mut usize,
-            ) -> #macro_support::Result<#sql_crate::DriverArguments<'a, #driver>>{
+            ) -> #macro_support::Result<#sql_crate::DriverArguments<'a, D>>{
                 use #macro_support::{Arguments, Context as _};
+                // Validity check needs to be done only once
 
                 #(
-                    args_list.add(&#update_values).map_err(#macro_support::Error::from_boxed)#insert_values_debug_ref?;
+                    args_list.add(&#update_values).map_err(#macro_support::Error::from_boxed)#update_values_debug_ref?;
                 )*
 
-                let delimeter = <#driver as #sql_crate::Driver>::identifier_delimiter();
+                let delimeter = <D as #sql_crate::Driver>::identifier_delimiter();
 
                 current_query.push_str(&format!(
                     #sqlx_query_format_str,
@@ -203,15 +209,5 @@ pub fn update(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::Token
     let compilation_data = CompilationData::load(Vec::<String>::new(), false)?;
     let supported_drivers = super::supported_drivers(&item, &compilation_data)?;
 
-    let mut result = quote!();
-    for driver in supported_drivers.iter() {
-        result.extend(sql_update_base(
-            &item_name,
-            fields,
-            &table,
-            &driver.to_token_stream(),
-        ));
-    }
-
-    Ok(result.into())
+    sql_update_base(&item_name, fields, &table, &supported_drivers).map(|tokens| tokens.into())
 }

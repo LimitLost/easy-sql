@@ -13,7 +13,7 @@ use easy_macros::{
 };
 use sql_compilation_data::CompilationData;
 
-use crate::{ sql_crate,  macros_components::joined_field::JoinedField, macros_components::expr::Expr, CUSTOM_SELECT_ALIAS_PREFIX
+use crate::{ CUSTOM_SELECT_ALIAS_PREFIX, macros_components::{expr::Expr, joined_field::JoinedField}, query_macro_components::ProvidedDrivers, sql_crate
 };
 
 #[always_context]
@@ -22,7 +22,7 @@ pub fn sql_output_base(
     fields: &Punctuated<syn::Field, syn::Token![,]>,
     joined_fields: Vec<JoinedField>,
     table: &TokenStream,
-    driver: &TokenStream,
+    drivers: &[syn::Path],
 ) -> anyhow::Result<TokenStream> {
     let sql_crate = sql_crate();
     let macro_support = quote! { #sql_crate::macro_support };
@@ -69,112 +69,15 @@ pub fn sql_output_base(
     // Check if any custom select expressions exist (with or without arguments)
     let has_custom_select = !fields_with_select.is_empty();
     let has_custom_select_args = !indices.is_empty();
-
-    // Now create iterators from regular_fields (not all fields)
-    let field_names = regular_fields.iter().map(|field| field.ident.as_ref().unwrap());
-    let field_names_str = field_names.clone().map(|field| field.to_string());
     
-    // Also create iterators for custom select fields
-    let custom_select_field_names = fields_with_select.iter().map(|fws| fws.field.ident.as_ref().unwrap());
-    let custom_select_field_names_str = custom_select_field_names.clone().map(|field| field.to_string());
-    // Create aliased names for custom select fields (used in SQL AS clause and when reading results)
-    let custom_select_field_aliases = custom_select_field_names_str.clone().map(|field| {
-        format!("{}{}", CUSTOM_SELECT_ALIAS_PREFIX, field)
-    }).collect::<Vec<_>>();
-    let custom_select_field_names_validity = fields_with_select.iter().map(|fws| fws.field.ident.as_ref().unwrap());
-
     let joined_field_aliases=(0..joined_fields.len()).into_iter().map(|i|{
         format!("___easy_sql_joined_field_{}",i)
-    }).collect::<Vec<_>>();
-
-    let joined_checks = joined_fields.iter().map(|joined_field| {
-        let field_name = joined_field.field.ident.as_ref().unwrap();
-        let field_type = &joined_field.field.ty;
-        let ref_table = &joined_field.table;
-        let table_field = &joined_field.table_field;
-
-        //Check if the field type is an option
-        let is_option = match field_type {
-            syn::Type::Path(path_ty) => {
-                if let Some(last_segment) = path_ty.path.segments.last() {
-                    //Check if the type is an option
-                    if last_segment.ident == "Option" {
-                        //Get the inner type
-                        if let syn::PathArguments::AngleBracketed(args) = &last_segment.arguments {
-                            args.args.first().is_some()
-                        } else {
-                            false
-                        }
-                    } else {
-                        false
-                    }
-                } else {
-                    false
-                }
-            }
-            ty => {
-                let compile_error =
-                    format!("Non path type is not supported `{}`", ty.to_token_stream());
-                return quote! {
-                    let #field_name={
-                        compile_error!(#compile_error);
-                        panic!()
-                    };
-                };
-            }
-        };
-
-        //Create _Flatten trait if needed
-        let (flatten, flatten_use) = if is_option {
-            (
-                quote! {
-                    trait _Flatten{
-                        fn _flatten(self)->#field_type;
-                    }
-
-                    impl _Flatten for #field_type{
-                        fn _flatten(self)->#field_type{
-                            self
-                        }
-                    }
-                    impl _Flatten for Option<#field_type>{
-                        fn _flatten(self)->#field_type{
-                            self.unwrap()
-                        }
-                    }
-                },
-                quote! {
-                    ._flatten()
-                },
-            )
-        } else {
-            (quote! {}, quote! {})
-        };
-
-        quote! {
-            let #field_name = {
-                //Get field from reference table
-                let mut table_instance = #macro_support::never_any::<#ref_table>();
-
-                #flatten
-                    
-                <#table as #sql_crate::HasTableJoined<#ref_table>>::into_maybe_option(table_instance.#table_field)#flatten_use
-            };
-        }
     }).collect::<Vec<_>>();
 
     let joined_checks_field_names=joined_fields.iter().map(|joined_field|{
         let field_name = joined_field.field.ident.as_ref().unwrap();
         field_name
     }).collect::<Vec<_>>();
-
-    let joined_checks_table_names=joined_fields.iter().map(|joined_field|{
-        joined_field.table.clone()
-    }).collect::<Vec<_>>();
-
-    let joined_checks_column_name_format=joined_fields.iter().map(|joined_field|{
-        format!("{}",joined_field.table_field) 
-    });
 
     let context_strs2 = joined_fields.iter().map(|joined_field| {
         format!(
@@ -184,9 +87,9 @@ pub fn sql_output_base(
             item_name,
             joined_field.table.to_token_stream()
         )
-    });
+    }).collect::<Vec<_>>();
 
-    let mut fields_quotes=Vec::new();
+    let mut fields_quotes:Vec<Box<dyn Fn(&syn::Path) -> TokenStream>>=Vec::new();
 
     //Handle regular fields (without custom select)
     for field in regular_fields.iter()
@@ -200,6 +103,9 @@ pub fn sql_output_base(
             item_name
         );
 
+            let sql_crate=&sql_crate;
+            let macro_support=&macro_support;
+
         if has_attributes!(field, #[sql(bytes)]){
             let context_str2=format!(
                 "Getting field `{}` with type {} for struct `{}` (Converting from binary)",
@@ -208,19 +114,19 @@ pub fn sql_output_base(
                 item_name
             );
 
-            fields_quotes.push(quote! {
+            fields_quotes.push(Box::new(move |driver|quote! {
                 #field_name: #sql_crate::from_binary_vec( <#sql_crate::DriverRow<#driver> as #sql_crate::SqlxRow>::try_get(&data, #field_name_str).with_context(
                     #macro_support::context!(#context_str),
                 )?).with_context(
                     #macro_support::context!(#context_str2),
                 )?,
-            });
+            }));
         }else{
-            fields_quotes.push(quote! {
+            fields_quotes.push(Box::new(move |driver|quote! {
                 #field_name: <#sql_crate::DriverRow<#driver> as #sql_crate::SqlxRow>::try_get(&data, #field_name_str).with_context(
                     #macro_support::context!(#context_str),
                 )?,
-            });
+            }));
         }
 
     }
@@ -238,6 +144,8 @@ pub fn sql_output_base(
             field.ty.to_token_stream(),
             item_name
         );
+            let sql_crate=&sql_crate;
+            let macro_support=&macro_support;
 
         // Custom select fields are read using their aliased column names
         // The custom SQL expression is used in the SELECT clause with an AS alias,
@@ -250,19 +158,20 @@ pub fn sql_output_base(
                 item_name
             );
 
-            fields_quotes.push(quote! {
+
+            fields_quotes.push(Box::new(move |driver|quote! {
                 #field_name: #sql_crate::from_binary_vec( <#sql_crate::DriverRow<#driver> as #sql_crate::SqlxRow>::try_get(&data, #aliased_name).with_context(
                     #macro_support::context!(#context_str),
                 )?).with_context(
                     #macro_support::context!(#context_str2),
                 )?,
-            });
+            }));
         }else{
-            fields_quotes.push(quote! {
+            fields_quotes.push(Box::new(move |driver|quote! {
                 #field_name: <#sql_crate::DriverRow<#driver> as #sql_crate::SqlxRow>::try_get(&data, #aliased_name).with_context(
                     #macro_support::context!(#context_str),
                 )?,
-            });
+            }));
         }
     }
 
@@ -303,7 +212,7 @@ pub fn sql_output_base(
         quote! {
             current_query.push_str(&format!(
                 #format_str,
-                <#ref_table as #sql_crate::Table<#driver>>::table_name(),
+                <#ref_table as #sql_crate::Table<D>>::table_name(),
             ));
         }
     });
@@ -313,7 +222,7 @@ pub fn sql_output_base(
     let select_sqlx_body = if has_custom_select && !has_custom_select_args {
         // When custom select exists WITHOUT args, delegate to __easy_sql_select
         quote! {
-            current_query.push_str(&Self::__easy_sql_select(delimeter));
+            current_query.push_str(&Self::__easy_sql_select::<D>(delimeter));
         }
     } else {
         // Otherwise, build the select list from regular and joined fields
@@ -355,13 +264,18 @@ pub fn sql_output_base(
         }
         
         // Generate parameter list
-        let arg_params = if indices.is_empty() {
-            vec![]
+        let (arg_params,arg_params_in_call) = if indices.is_empty() {
+            (vec![], vec![])
         } else {
-            (0..=max_idx).map(|i| {
+            ((0..=max_idx).map(|i| {
                 let arg_name = quote::format_ident!("arg{}", i);
                 quote! { #arg_name: &str }
+            }).collect::<Vec<_>>(),
+            (0..=max_idx).map(|i| {
+                let arg_name = quote::format_ident!("arg{}", i);
+                quote! { #arg_name }
             }).collect::<Vec<_>>()
+        )
         };
         
         // Build the SELECT string generation using into_query_string
@@ -389,6 +303,8 @@ pub fn sql_output_base(
                 // Generate the SQL template at compile time
                 let mut checks = Vec::new();
                 let mut format_params = Vec::new();
+
+                let drivers_for_checks=drivers.iter().map(|e|e.to_token_stream()).collect::<Vec<_>>();
                 
                 // Call into_query_string at proc-macro expansion time with for_custom_select = true
                 // Pass the Output type so columns can be validated against it
@@ -397,7 +313,7 @@ pub fn sql_output_base(
                     &mut Vec::new(),
                     &mut checks,
                     &sql_crate,
-                    driver,
+                    &ProvidedDrivers::SingleWithChecks{driver:quote! { D },checks:drivers_for_checks},
                     &mut 0,
                     &mut format_params,
                     &mut quote! {},
@@ -433,8 +349,22 @@ pub fn sql_output_base(
         
         quote! {
             impl #item_name {
-                pub fn __easy_sql_select(delimeter: &str, #(#arg_params),*) -> String {
+                pub fn __easy_sql_select<D: #sql_crate::Driver>(delimeter: &str, #(#arg_params),*) -> String
+                where
+                    Self: #sql_crate::Output<#table, D>, 
+                {
                     #select_generation_code
+                }
+
+                pub fn __easy_sql_select_driver_from_conn<D: #sql_crate::Driver>(
+                    _conn: &impl #sql_crate::EasyExecutor<D>,
+                    delimeter: &str,
+                    #(#arg_params),*
+                ) -> String
+                where
+                    Self: #sql_crate::Output<#table, D>, 
+                {
+                    Self::__easy_sql_select::<D>(delimeter, #(#arg_params_in_call),*)
                 }
             }
         }
@@ -442,75 +372,63 @@ pub fn sql_output_base(
         quote! {}
     };
 
+    let driver_checks = drivers.iter().map(|driver| {
+        let fields_quotes=fields_quotes.iter().map(|f|f(driver));
+        quote! {
+            let _ = |data: #sql_crate::DriverRow<#driver>| {
+                #macro_support::Result::<Self>::Ok(Self {
+                    #(
+                        #fields_quotes
+                    )*
+                    #(
+                        #joined_checks_field_names: <#sql_crate::DriverRow<#driver> as #sql_crate::SqlxRow>::try_get(&data, #joined_field_aliases).with_context(
+                            #macro_support::context!(#context_strs2),
+                        )?,
+                    )*
+                })
+            };
+        }
+    }).collect::<Vec<_>>();
+
+    let where_clauses_types=fields.iter().map(|field|{
+        let field_ty=&field.ty;
+        quote! {
+            for<'__easy_sql_x> #field_ty: #macro_support::Decode<'__easy_sql_x, #sql_crate::InternalDriver<D>>,
+            #field_ty: #macro_support::Type<#sql_crate::InternalDriver<D>>,
+        }
+    });
+
     
+
+    let fields_quotes=fields_quotes.into_iter().map(|f|f(& syn::parse_quote!{D}));
         
 
     Ok(quote! {
-        impl #sql_crate::Output<#table, #driver> for #item_name {
-            type DataToConvert = #sql_crate::DriverRow<#driver>;
+        impl<D: #sql_crate::Driver> #sql_crate::Output<#table, D> for #item_name
+        where #sql_crate::DriverRow<D>: #sql_crate::ToConvert<D>,
+        for<'__easy_sql_x> &'__easy_sql_x str: #macro_support::ColumnIndex<#sql_crate::DriverRow<D>>,
+        #(#where_clauses_types)*
+     {
+            type DataToConvert = #sql_crate::DriverRow<D>;
             type UsedForChecks = Self;
-
-            fn sql_to_query<'a>(sql: #sql_crate::Sql, builder: #sql_crate::QueryBuilder<'a, #driver>) -> #macro_support::Result<#sql_crate::QueryData<'a, #driver>> {
-                use #macro_support::Context;
-                
-                let _ = || {
-                    //Check for validity
-                    let table_instance = #macro_support::never_any::<#table>();
-
-                    //Joined fields check for validity
-                    #(#joined_checks)*
-
-                    Self {
-                        #(#field_names: table_instance.#field_names,)*
-                        //Custom select fields (with dummy values for type checking)
-                        #(#custom_select_field_names_validity: #macro_support::never_any(),)*
-                        //Joined fields
-                        #(#joined_checks_field_names,)*
-                    }
-                };
-
-                let requested_columns = vec![
-                    #(
-                        #sql_crate::RequestedColumn {
-                            table_name: None,
-                            name: #field_names_str.to_owned(),
-                            alias: None,
-                        },
-                    )*
-                    #(
-                        #sql_crate::RequestedColumn {
-                            table_name: None,
-                            name: #custom_select_field_names_str.to_owned(),
-                            alias: Some(#custom_select_field_aliases.to_owned()),
-                        },
-                    )*
-                    #(
-                        #sql_crate::RequestedColumn {
-                            table_name: Some(<#joined_checks_table_names as #sql_crate::Table<#driver>>::table_name()),
-                            name: #joined_checks_column_name_format.to_owned(),
-                            alias: Some(#joined_field_aliases.to_owned()),
-                        },
-                    )*
-                ];
-
-                sql.query_output(builder, requested_columns)
-            }
             
             fn select_sqlx(current_query: &mut String) {
                 use #macro_support::Context;
-                let delimeter = <#driver as #sql_crate::Driver>::identifier_delimiter();
+                let delimeter = <D as #sql_crate::Driver>::identifier_delimiter();
                 #select_sqlx_body
             }
 
-            fn convert(data: #sql_crate::DriverRow<#driver>) -> #macro_support::Result<Self> {
+            fn convert(data: #sql_crate::DriverRow<D>) -> #macro_support::Result<Self> {
                 use #macro_support::{Context,context};
+
+                #(#driver_checks)*
 
                 Ok(Self {
                     #(
                         #fields_quotes
                     )*
                     #(
-                        #joined_checks_field_names: <#sql_crate::DriverRow<#driver> as #sql_crate::SqlxRow>::try_get(&data, #joined_field_aliases).with_context(
+                        #joined_checks_field_names: <#sql_crate::DriverRow<D> as #sql_crate::SqlxRow>::try_get(&data, #joined_field_aliases).with_context(
                             #macro_support::context!(#context_strs2),
                         )?,
                     )*
@@ -606,15 +524,14 @@ pub fn output(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::Token
     let supported_drivers = super::supported_drivers(&item, &compilation_data)?;
 
     let mut result = TokensBuilder::default();
-    for driver in supported_drivers {
-        result.add(sql_output_base(
+
+    result.add(sql_output_base(
             &item_name,
             &fields,
             joined_fields.clone(),
             &table,
-            &driver.to_token_stream(),
+            &supported_drivers,
         )?);
-    }
 
     // panic!("{}", result);
 

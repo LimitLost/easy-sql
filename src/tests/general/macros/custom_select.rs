@@ -1,4 +1,5 @@
 use super::Database;
+use super::TestDriver;
 use crate::{Output, Table};
 use anyhow::Context;
 use easy_macros::always_context;
@@ -80,7 +81,7 @@ async fn test_custom_select_basic() -> anyhow::Result<()> {
 fn test_custom_select_method_generation() {
     // Test that __easy_sql_select is generated correctly
     let delimiter = "\"";
-    let select_str = CustomSelect2::__easy_sql_select(delimiter, " Suffix");
+    let select_str = CustomSelect2::__easy_sql_select::<TestDriver>(delimiter, " Suffix");
     println!("Generated SELECT: {}", select_str);
 
     // Verify exact SELECT string (with alias prefix to avoid conflicts)
@@ -98,7 +99,7 @@ fn test_custom_select_format_string_uses_named_args() {
     // This is a compile-time check - if the macro generates {0} instead of {arg0},
     // this will fail to compile because format! won't be able to match the argument names
 
-    let result = CustomSelect2::__easy_sql_select("\"", "TestValue");
+    let result = CustomSelect2::__easy_sql_select::<TestDriver>("\"", "TestValue");
 
     // The fact that this compiles and runs proves that the macro
     // generates format! with {arg0} syntax like: format!("... || {arg0} ...", arg0=arg0)
@@ -127,7 +128,7 @@ fn test_custom_select_multiple_args() {
     ];
 
     for (delimiter, arg, expected) in test_cases {
-        let select_str = CustomSelect2::__easy_sql_select(delimiter, arg);
+        let select_str = CustomSelect2::__easy_sql_select::<TestDriver>(delimiter, arg);
         assert_eq!(
             select_str, expected,
             "With delimiter='{}' and arg='{}'\nExpected: {}\nActual:   {}",

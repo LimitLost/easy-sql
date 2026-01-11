@@ -1,6 +1,7 @@
 use crate::{
     query_macro_components::{
-        QueryType, generate_delete, generate_insert, generate_select, generate_update,
+        ProvidedDrivers, QueryType, generate_delete, generate_insert, generate_select,
+        generate_update,
     },
     sql_crate,
 };
@@ -44,16 +45,22 @@ pub fn query_lazy(input_raw: proc_macro::TokenStream) -> anyhow::Result<proc_mac
 
     // Use provided driver or load from compilation data
     let driver = if let Some(driver_path) = input.driver {
-        quote! {#driver_path}
+        ProvidedDrivers::Single(quote! {#driver_path})
     } else {
         let compilation_data = CompilationData::load(Vec::<String>::new(), false).with_context(|| {
             "Failed to load compilation data for query_lazy! macro. Make sure easy_sql::build is called in build.rs"
         })?;
 
+        if compilation_data.default_drivers.len() > 1 {
+            return Err(anyhow::anyhow!(
+                "Multiple default drivers found in compilation data. Please specify the driver at the macro call site using <Driver> syntax (before connection) or limit to a single default driver in build.rs"
+            ));
+        }
+
         if let Some(driver_str) = compilation_data.default_drivers.first() {
             let driver_path: syn::Path = syn::parse_str(driver_str)
                 .with_context(|| format!("Failed to parse driver path: {}", driver_str))?;
-            quote! {#driver_path}
+            ProvidedDrivers::Single(quote! {#driver_path})
         } else {
             return Err(anyhow::anyhow!(
                 "No default driver found in compilation data. Please specify a driver in build.rs or at the macro call site using <Driver> syntax (before connection)"
@@ -66,7 +73,7 @@ pub fn query_lazy(input_raw: proc_macro::TokenStream) -> anyhow::Result<proc_mac
             select.clone(),
             #[context(no)]
             None,
-            &driver,
+            driver.clone(),
             &sql_crate,
             &input_str,
         )?,
@@ -74,7 +81,7 @@ pub fn query_lazy(input_raw: proc_macro::TokenStream) -> anyhow::Result<proc_mac
             insert.clone(),
             #[context(no)]
             None,
-            &driver,
+            driver.clone(),
             &sql_crate,
             &input_str,
         )?,
@@ -82,7 +89,7 @@ pub fn query_lazy(input_raw: proc_macro::TokenStream) -> anyhow::Result<proc_mac
             update.clone(),
             #[context(no)]
             None,
-            &driver,
+            driver.clone(),
             &sql_crate,
             &input_str,
         )?,
@@ -90,7 +97,7 @@ pub fn query_lazy(input_raw: proc_macro::TokenStream) -> anyhow::Result<proc_mac
             delete.clone(),
             #[context(no)]
             None,
-            &driver,
+            driver.clone(),
             &sql_crate,
             &input_str,
         )?,

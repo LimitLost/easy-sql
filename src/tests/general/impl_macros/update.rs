@@ -1,7 +1,6 @@
-use anyhow::Context;
 use easy_macros::always_context;
 
-use crate::{Driver, Expr, QueryBuilder, Update};
+use crate::{Driver, InternalDriver, Update};
 
 use super::TestDriver;
 #[allow(dead_code)]
@@ -21,42 +20,39 @@ struct ExampleStruct {
 
 #[always_context]
 #[no_context]
-impl<'a> Update<'a, ExampleTableStruct, TestDriver> for ExampleStruct {
-    fn updates(
-        self,
-        builder: &mut QueryBuilder<'_, TestDriver>,
-    ) -> anyhow::Result<Vec<(String, Expr)>> {
-        let _ = || {
-            //Check for validity
-            let update_instance = crate::macro_support::never_any::<Self>();
-            let mut table_instance = crate::macro_support::never_any::<ExampleTableStruct>();
-
-            table_instance.field1 = update_instance.field1;
-            table_instance.field2 = update_instance.field2;
-            table_instance.field3 = update_instance.field3;
-        };
-        // Fully safe because we pass by value, not by reference
-        unsafe {
-            builder
-                .bind(self.field1)
-                .context("Binding `field1` failed")?;
-            builder.bind(self.field2)?;
-            builder.bind(self.field3)?;
-        }
-        Ok(vec![
-            ("field1".to_string(), crate::Expr::Value),
-            ("field2".to_string(), crate::Expr::Value),
-            ("field3".to_string(), crate::Expr::Value),
-        ])
-    }
-
+impl<'a, D: Driver> Update<'a, ExampleTableStruct, D> for ExampleStruct
+where
+    for<'x> String: sqlx::Encode<'x, InternalDriver<D>>,
+    String: sqlx::Type<InternalDriver<D>>,
+    for<'x> i32: sqlx::Encode<'x, InternalDriver<D>>,
+    i32: sqlx::Type<InternalDriver<D>>,
+    for<'x> i64: sqlx::Encode<'x, InternalDriver<D>>,
+    i64: sqlx::Type<InternalDriver<D>>,
+{
     fn updates_sqlx(
         self,
-        mut args_list: crate::DriverArguments<'a, TestDriver>,
+        mut args_list: crate::DriverArguments<'a, D>,
         current_query: &mut String,
         parameter_n: &mut usize,
-    ) -> anyhow::Result<crate::DriverArguments<'a, TestDriver>> {
+    ) -> anyhow::Result<crate::DriverArguments<'a, D>> {
         use sqlx::Arguments;
+
+        let _ = |mut args_list: crate::DriverArguments<'a, TestDriver>| {
+            let _self = crate::macro_support::never_any::<Self>();
+
+            args_list
+                .add(_self.field1)
+                .map_err(anyhow::Error::from_boxed)?;
+            args_list
+                .add(_self.field2)
+                .map_err(anyhow::Error::from_boxed)?;
+            args_list
+                .add(_self.field3)
+                .map_err(anyhow::Error::from_boxed)?;
+
+            anyhow::Result::<()>::Ok(())
+        };
+
         args_list
             .add(self.field1)
             .map_err(anyhow::Error::from_boxed)?;
@@ -91,39 +87,6 @@ struct ExampleStruct2 {
 #[always_context]
 #[no_context]
 impl<'a> Update<'a, ExampleTableStruct, TestDriver> for ExampleStruct2 {
-    fn updates(
-        self,
-        builder: &mut QueryBuilder<'_, TestDriver>,
-    ) -> anyhow::Result<Vec<(String, Expr)>> {
-        //If Option is set to None then ignore
-        let _ = || {
-            //Check for validity
-            let update_instance = crate::macro_support::never_any::<Self>();
-            let mut table_instance = crate::macro_support::never_any::<ExampleTableStruct>();
-
-            table_instance.field1 = update_instance.field1;
-            table_instance.field2 = update_instance.field2.unwrap();
-            table_instance.field3 = update_instance.field3.unwrap();
-        };
-        let mut updates = Vec::new();
-        updates.push(("field1".to_string(), crate::Expr::Value));
-        // Fully safe because we pass by value, not by reference
-        unsafe {
-            builder
-                .bind(&self.field1)
-                .context("Binding `field1` failed")?;
-            if let Some(field2) = &self.field2 {
-                updates.push(("field2".to_string(), crate::Expr::Value));
-                builder.bind(field2)?;
-            }
-            if let Some(field3) = &self.field3 {
-                updates.push(("field3".to_string(), crate::Expr::Value));
-                builder.bind(field3)?;
-            }
-        }
-        Ok(updates)
-    }
-
     fn updates_sqlx(
         self,
         mut args_list: crate::DriverArguments<'a, TestDriver>,

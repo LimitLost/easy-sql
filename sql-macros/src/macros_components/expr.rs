@@ -1,5 +1,6 @@
 use crate::builtin_functions;
 use crate::macros_components::keyword::DoubleArrow;
+use crate::query_macro_components::ProvidedDrivers;
 
 use super::{column::Column, next_clause::next_clause_token};
 
@@ -187,7 +188,7 @@ impl Expr {
         binds: &mut Vec<proc_macro2::TokenStream>,
         checks: &mut Vec<proc_macro2::TokenStream>,
         sql_crate: &proc_macro2::TokenStream,
-        driver: &proc_macro2::TokenStream,
+        driver: &ProvidedDrivers,
         current_param_n: &mut usize,
         current_format_params: &mut Vec<proc_macro2::TokenStream>,
         before_param_n: &mut proc_macro2::TokenStream,
@@ -406,17 +407,24 @@ impl Expr {
                             let #before_param_n_name:usize;
                         });
 
+                        let parameter_placeholder_call =
+                            driver.parameter_placeholder_fn(sql_crate, v.span());
+
                         // Create format parameter that generates placeholders at runtime
-                        current_format_params.push(quote! {
+                        current_format_params.push(quote::quote_spanned! {v.span()=>
+                            
                             {
-                                #before_param_n_name = (#v).len();
-                                let mut __easy_sql_in_placeholders = Vec::with_capacity(#before_param_n_name);
-                                for __easy_sql_in_i in 0..#before_param_n_name {
-                                    __easy_sql_in_placeholders.push(
-                                        <#driver as #sql_crate::Driver>::parameter_placeholder(#before_param_n #param_start + __easy_sql_in_i)
-                                    );
+                                #[allow(clippy::needless_borrow)]
+                                {
+                                    #before_param_n_name = (#v).len();
+                                    let mut __easy_sql_in_placeholders = Vec::with_capacity(#before_param_n_name);
+                                    for __easy_sql_in_i in 0..#before_param_n_name {
+                                        __easy_sql_in_placeholders.push(
+                                            #parameter_placeholder_call(#before_param_n #param_start + __easy_sql_in_i)
+                                        );
+                                    }
+                                    __easy_sql_in_placeholders.join(", ")
                                 }
-                                __easy_sql_in_placeholders.join(", ")
                             }
                         });
 
@@ -789,7 +797,7 @@ impl Value {
         binds: &mut Vec<proc_macro2::TokenStream>,
         checks: &mut Vec<proc_macro2::TokenStream>,
         sql_crate: &proc_macro2::TokenStream,
-        driver: &proc_macro2::TokenStream,
+        driver: &ProvidedDrivers,
         current_param_n: &mut usize,
         current_format_params: &mut Vec<proc_macro2::TokenStream>,
         before_param_n: &mut proc_macro2::TokenStream,
@@ -885,11 +893,12 @@ impl Value {
                     {
                         // User specified OutputType.column - validate against Output type fields
                         // and generate unqualified column reference (just the column name)
+                        let drivers_iter = driver.iter_for_checks();
                         checks.push(quote::quote_spanned! {col_name.span()=>
-                                {
-                                    let output_instance : <#output_ty as #sql_crate::Output<#main_table_type, #driver>>::UsedForChecks = #sql_crate::macro_support::never_any::<#table_type>();
+                                #({
+                                    let output_instance : <#output_ty as #sql_crate::Output<#main_table_type, #drivers_iter>>::UsedForChecks = #sql_crate::macro_support::never_any::<#table_type>();
                                     let _ = output_instance.#col_name;
-                                }
+                                })*
                             });
 
                         // Generate unqualified column name (Output fields map to table columns)
@@ -911,26 +920,18 @@ impl Value {
                         }
                     });
 
-                    if for_custom_select {
-                        // For custom select, use delimeter directly in format string
-                        // Format: {delim}{table_name}{delim}.{delim}col_name{delim}
-                        let col_str = col_name.to_string();
-                        current_format_params.push(quote! {
-                            <#table_type as #sql_crate::Table<#driver>>::table_name()
-                        });
-                        format!(
-                            "{{delimeter}}{{}}{{delimeter}}.{{delimeter}}{}{{delimeter}}",
-                            col_str
-                        )
+                    let delimeter = if for_custom_select {
+                        "delimeter"
                     } else {
-                        current_format_params.push(quote! {
-                            <#table_type as #sql_crate::Table<#driver>>::table_name()
-                        });
-                        format!(
-                            "{{_easy_sql_d}}{{}}{{_easy_sql_d}}.{{_easy_sql_d}}{}{{_easy_sql_d}}",
-                            col_name
-                        )
-                    }
+                        "_easy_sql_d"
+                    };
+
+                    current_format_params.push(driver.table_name(sql_crate, &table_type));
+
+                    format!(
+                        "{{{delimeter}}}{{}}{{{delimeter}}}.{{{delimeter}}}{}{{{delimeter}}}",
+                        col_name
+                    )
                 }
                 Column::Column(ident) => {
                     let main_table_type = if let Some(mt) = main_table_type {
@@ -1019,9 +1020,12 @@ impl Value {
                 binds.push(quote::quote_spanned! {lit.span()=>
                         _easy_sql_args.add(&#lit).map_err(anyhow::Error::from_boxed).context(#debug_str)?;
                     });
-                current_format_params.push(quote! {
-                    <#driver as #sql_crate::Driver>::parameter_placeholder(#before_param_n #current_param_n)
-                });
+                current_format_params.push(driver.parameter_placeholder(
+                    sql_crate,
+                    lit.span(),
+                    before_param_n,
+                    &*current_param_n,
+                ));
                 *current_param_n += 1;
                 "{}".to_string()
             }
@@ -1069,9 +1073,13 @@ impl Value {
                 binds.push(quote::quote_spanned! {expr_val.span()=>
                         _easy_sql_args.add(&#expr_val).map_err(anyhow::Error::from_boxed).context(#debug_str)?;
                     });
-                current_format_params.push(quote! {
-                    <#driver as #sql_crate::Driver>::parameter_placeholder(#before_param_n #current_param_n)
-                });
+                current_format_params.push(driver.parameter_placeholder(
+                    sql_crate,
+                    expr_val.span(),
+                    before_param_n,
+                    &*current_param_n,
+                ));
+
                 *current_param_n += 1;
                 "{}".to_string()
             }

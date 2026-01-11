@@ -1,6 +1,7 @@
 use easy_macros::always_context;
+use sqlx::ColumnIndex;
 
-use crate::{DriverRow, QueryBuilder, QueryData, Sql};
+use crate::{Driver, DriverRow, InternalDriver, ToConvert};
 
 use super::TestDriver;
 
@@ -21,67 +22,56 @@ struct ExampleStruct {
 }
 //Remove in derive
 #[always_context]
-impl crate::Output<ExampleTableStruct, TestDriver> for ExampleStruct {
+impl<D: Driver> crate::Output<ExampleTableStruct, D> for ExampleStruct
+where
+    DriverRow<D>: ToConvert<D>,
+    str: ColumnIndex<DriverRow<D>>,
+    for<'x> String: sqlx::Decode<'x, InternalDriver<D>>,
+    String: sqlx::Type<InternalDriver<D>>,
+    for<'x> i32: sqlx::Decode<'x, InternalDriver<D>>,
+    i32: sqlx::Type<InternalDriver<D>>,
+    for<'x> i64: sqlx::Decode<'x, InternalDriver<D>>,
+    i64: sqlx::Type<InternalDriver<D>>,
+{
     type UsedForChecks = Self;
-    type DataToConvert = DriverRow<TestDriver>;
-    fn sql_to_query<'a>(
-        sql: Sql,
-        builder: QueryBuilder<'a, TestDriver>,
-    ) -> anyhow::Result<QueryData<'a, TestDriver>> {
-        let _ = || {
-            //Check for validity
-            let table_instance = crate::macro_support::never_any::<ExampleTableStruct>();
-
-            Self {
-                field1: table_instance.field1,
-                field2: table_instance.field2,
-                field3: table_instance.field3,
-            }
-        };
-
-        let requested_columns = vec![
-            crate::RequestedColumn {
-                table_name: None,
-                name: "field1".to_owned(),
-                alias: None,
-            },
-            crate::RequestedColumn {
-                table_name: None,
-                name: "field2".to_owned(),
-                alias: None,
-            },
-            crate::RequestedColumn {
-                table_name: None,
-                name: "field3".to_owned(),
-                alias: None,
-            },
-        ];
-
-        sql.query_output(builder, requested_columns)
-    }
+    type DataToConvert = DriverRow<D>;
 
     fn select_sqlx(current_query: &mut String) {
         current_query.push_str("field1, field2, field3");
     }
     //Remove in derive
     #[no_context]
-    fn convert(data: DriverRow<TestDriver>) -> anyhow::Result<Self> {
+    fn convert(data: DriverRow<D>) -> anyhow::Result<Self> {
         use anyhow::Context;
         use easy_macros::context;
 
+        let _ = |data: DriverRow<TestDriver>| {
+            anyhow::Result::<Self>::Ok(Self {
+                field1: <DriverRow<TestDriver> as crate::SqlxRow>::try_get(&data, "field1")
+                    .with_context(context!(
+                        "Getting field `field1` with type String for struct ExampleStruct"
+                    ))?,
+                field2: <DriverRow<TestDriver> as crate::SqlxRow>::try_get(&data, "field2")
+                    .with_context(context!(
+                        "Getting field `field2` with type i32 for struct ExampleStruct"
+                    ))?,
+                field3: <DriverRow<TestDriver> as crate::SqlxRow>::try_get(&data, "field3")
+                    .with_context(context!(
+                        "Getting field `field3` with type i64 for struct ExampleStruct"
+                    ))?,
+            })
+        };
+
         Ok(Self {
-            field1: <DriverRow<TestDriver> as crate::SqlxRow>::try_get(&data, "field1")
-                .with_context(context!(
-                    "Getting field `field1` with type String for struct ExampleStruct"
-                ))?,
-            field2: <DriverRow<TestDriver> as crate::SqlxRow>::try_get(&data, "field2")
-                .with_context(context!(
-                    "Getting field `field2` with type i32 for struct ExampleStruct"
-                ))?,
-            field3: <DriverRow<TestDriver> as crate::SqlxRow>::try_get(&data, "field3")
-                .with_context(context!(
-                    "Getting field `field3` with type i64 for struct ExampleStruct"
-                ))?,
+            field1: <DriverRow<D> as crate::SqlxRow>::try_get(&data, "field1").with_context(
+                context!("Getting field `field1` with type String for struct ExampleStruct"),
+            )?,
+            field2: <DriverRow<D> as crate::SqlxRow>::try_get(&data, "field2").with_context(
+                context!("Getting field `field2` with type i32 for struct ExampleStruct"),
+            )?,
+            field3: <DriverRow<D> as crate::SqlxRow>::try_get(&data, "field3").with_context(
+                context!("Getting field `field3` with type i64 for struct ExampleStruct"),
+            )?,
         })
     }
 }

@@ -1,12 +1,9 @@
 use easy_macros::always_context;
 
-use crate::{Driver, DriverConnection};
+use crate::Driver;
 
 #[always_context]
-pub trait Table<D: Driver>: Sized
-where
-    DriverConnection<D>: Send + Sync,
-{
+pub trait Table<D: Driver>: Sized {
     fn table_name() -> &'static str;
     fn primary_keys() -> Vec<&'static str>;
 

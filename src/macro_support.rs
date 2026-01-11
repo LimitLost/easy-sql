@@ -1,9 +1,21 @@
+//! Reexports and functions used by procedural macros
+
 pub use anyhow::{Context, Error, Result};
+use easy_macros::always_context;
 pub use easy_macros::context;
 pub use futures::FutureExt;
 pub use futures_core::Stream;
 pub use lazy_static::lazy_static;
-pub use sqlx::{Arguments, Executor, QueryBuilder, Type, TypeInfo, query::Query};
+use sqlx::IntoArguments;
+pub use sqlx::{
+    Arguments, ColumnIndex, Decode, Encode, Executor, QueryBuilder, Type, TypeInfo, query::Query,
+    query_with,
+};
+
+use crate::{
+    Driver, DriverArguments, DriverQueryResult, DriverRow, EasyExecutor, Insert, InternalDriver,
+    Output, Table, ToConvert, Update,
+};
 
 /// Used for compiler checks, quickly creates a value of any type
 ///
@@ -11,6 +23,158 @@ pub use sqlx::{Arguments, Executor, QueryBuilder, Type, TypeInfo, query::Query};
 ///
 pub fn never_any<T>() -> T {
     panic!(
-        "This function should never be called, it's used to quickly create value for type in compiler checks"
+        "This function should never be called in runtime, it's used to quickly create value for type in compiler checks"
     );
+}
+#[inline(always)]
+///This function extracts Driver from connection (that's the only reason why it exists instead of direct call)
+pub fn args_for_driver<'a, D: Driver>(
+    _exec: &impl crate::EasyExecutor<D>,
+) -> DriverArguments<'a, D> {
+    DriverArguments::<D>::default()
+}
+///This function extracts Driver from connection (that's the only reason why it exists instead of direct call)
+#[inline(always)]
+pub fn driver_identifier_delimiter<D: Driver>(_exec: &impl crate::EasyExecutor<D>) -> &'static str {
+    D::identifier_delimiter()
+}
+///This function extracts Driver from connection (that's the only reason why it exists instead of direct call)
+pub fn driver_parameter_placeholder<D: Driver>(
+    _exec: &impl crate::EasyExecutor<D>,
+) -> Box<dyn Fn(usize) -> String> {
+    Box::new(|index: usize| D::parameter_placeholder(index))
+}
+
+///This function extracts Driver from connection (that's the only reason why it exists instead of direct call)
+#[inline(always)]
+pub fn query_add_selected<T, O: Output<T, D>, D: Driver>(
+    query: &mut String,
+    _exec: &impl crate::EasyExecutor<D>,
+) where
+    DriverRow<D>: ToConvert<D>,
+{
+    O::select_sqlx(query);
+}
+
+#[always_context(skip(!))]
+#[inline(always)]
+///This function extracts Driver from connection (that's the only reason why it exists instead of direct call)
+pub fn query_insert_data<'a, Table, D: Driver, T: Insert<'a, Table, D>>(
+    to_insert: T,
+    args: DriverArguments<'a, D>,
+    _exec: &impl crate::EasyExecutor<D>,
+) -> anyhow::Result<(Vec<String>, DriverArguments<'a, D>, usize)> {
+    to_insert
+        .insert_values_sqlx(args)
+        .map(|(new_args, count)| (T::insert_columns(), new_args, count))
+        .context("Insert::insert_values_sqlx failed")
+}
+
+#[always_context(skip(!))]
+#[inline(always)]
+///This function extracts Insert type (that's the only reason why it exists instead of direct call)
+///
+/// Driver is already known
+pub fn query_insert_data_selected_driver<'a, Table, D: Driver, T: Insert<'a, Table, D>>(
+    to_insert: T,
+    args: DriverArguments<'a, D>,
+) -> anyhow::Result<(Vec<String>, DriverArguments<'a, D>, usize)> {
+    to_insert
+        .insert_values_sqlx(args)
+        .map(|(new_args, count)| (T::insert_columns(), new_args, count))
+        .context("Insert::insert_values_sqlx failed")
+}
+
+#[always_context(skip(!))]
+#[inline(always)]
+///This function extracts Driver from connection (that's the only reason why it exists instead of direct call)
+pub fn query_update_data<'a, Table, D: Driver, T: Update<'a, Table, D>>(
+    update_data: T,
+    args: DriverArguments<'a, D>,
+    current_query: &mut String,
+    parameter_n: &mut usize,
+    _exec: &impl crate::EasyExecutor<D>,
+) -> anyhow::Result<DriverArguments<'a, D>> {
+    update_data
+        .updates_sqlx(args, current_query, parameter_n)
+        .context("Update::updates_sqlx failed")
+}
+#[always_context(skip(!))]
+#[inline(always)]
+/// This function extracts Update type (that's the only reason why it exists instead of direct call)
+///
+/// Driver is already known
+pub fn query_update_data_selected_driver<'a, Table, D: Driver, T: Update<'a, Table, D>>(
+    update_data: T,
+    args: DriverArguments<'a, D>,
+    current_query: &mut String,
+    parameter_n: &mut usize,
+) -> anyhow::Result<DriverArguments<'a, D>> {
+    update_data
+        .updates_sqlx(args, current_query, parameter_n)
+        .context("Update::updates_sqlx failed")
+}
+
+///This function extracts Driver from connection (that's the only reason why it exists instead of direct call)
+#[inline(always)]
+pub fn driver_related_table_name<T: Table<D>, D: Driver>(
+    _exec: &impl crate::EasyExecutor<D>,
+) -> &'static str {
+    T::table_name()
+}
+
+///This function extracts Driver from connection (that's the only reason why it exists instead of direct call)
+#[inline(always)]
+pub fn driver_table_joins<T: Table<D>, D: Driver>(
+    query: &mut String,
+    _exec: &impl crate::EasyExecutor<D>,
+) {
+    T::table_joins(query);
+}
+/// Used by UPDATE, DELETE modes of query! and query_lazy! macros
+pub async fn query_execute<'a, T, O: Output<T, D>, D: Driver>(
+    exec: &mut impl EasyExecutor<D>,
+    query: Query<'a, InternalDriver<D>, DriverArguments<'a, D>>,
+) -> Result<O>
+where
+    DriverArguments<'a, D>: IntoArguments<'a, InternalDriver<D>>,
+{
+    let raw_data = O::DataToConvert::get(exec.executor(), query)
+        .await
+        .context("Output::DataToConvert::get failed")?;
+
+    O::convert(raw_data).context("Output::convert failed")
+}
+/// Used by UPDATE, DELETE modes of query! and query_lazy! macros
+pub async fn query_execute_no_output<'a, D: Driver>(
+    exec: &mut impl EasyExecutor<D>,
+    query: Query<'a, InternalDriver<D>, DriverArguments<'a, D>>,
+) -> Result<DriverQueryResult<D>>
+where
+    DriverArguments<'a, D>: IntoArguments<'a, InternalDriver<D>>,
+{
+    query
+        .execute(exec.executor())
+        .await
+        .context("QueryBuilder::build.execute failed")
+}
+
+pub async fn query_exists_execute<'a, D: Driver>(
+    exec: &mut impl EasyExecutor<D>,
+    query: Query<'a, InternalDriver<D>, DriverArguments<'a, D>>,
+) -> Result<bool>
+where
+    DriverArguments<'a, D>: IntoArguments<'a, InternalDriver<D>>,
+    for<'x> bool: Decode<'x, InternalDriver<D>>,
+    bool: Type<InternalDriver<D>>,
+    usize: ColumnIndex<DriverRow<D>>,
+{
+    let row = query
+        .fetch_one(exec.executor())
+        .await
+        .context("sqlx::Query::fetch_one failed")?;
+    let exists: bool =
+        <DriverRow<D> as sqlx::Row>::try_get(&row, 0).context("SqlxRow::try_get failed")?;
+
+    Ok(exists)
 }

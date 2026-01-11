@@ -1,5 +1,7 @@
+use crate::query_macro_components::ProvidedDrivers;
+
 use super::{
-    expr::{Expr, Value},
+    expr::Expr,
     keyword::{self},
 };
 use ::{
@@ -74,7 +76,7 @@ impl OrderBy {
         checks: &mut Vec<TokenStream>,
         binds: &mut Vec<TokenStream>,
         sql_crate: &TokenStream,
-        driver: &TokenStream,
+        driver: &ProvidedDrivers,
         current_param_n: &mut usize,
         current_format_params: &mut Vec<TokenStream>,
         before_param_n: &mut TokenStream,

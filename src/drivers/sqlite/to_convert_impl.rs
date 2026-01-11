@@ -5,10 +5,7 @@ use sqlx::{Executor, Row as SqlxRow};
 /// Current Driver
 type CDriver = super::Sqlite;
 
-use crate::{
-    DriverArguments, InternalDriver, Output, QueryBuilder, QueryData, Sql, ToConvert,
-    ToConvertSingle,
-};
+use crate::{DriverArguments, InternalDriver, Output, ToConvert, ToConvertSingle};
 
 type Row = sqlx::sqlite::SqliteRow;
 
@@ -83,12 +80,6 @@ where
 {
     type DataToConvert = Vec<Row>;
     type UsedForChecks = T::UsedForChecks;
-    fn sql_to_query<'a>(
-        sql: Sql,
-        builder: QueryBuilder<'a, CDriver>,
-    ) -> anyhow::Result<QueryData<'a, CDriver>> {
-        T::sql_to_query(sql, builder)
-    }
 
     fn select_sqlx(current_query: &mut String) {
         T::select_sqlx(current_query);
@@ -112,13 +103,6 @@ where
     type DataToConvert = Option<Row>;
     type UsedForChecks = T::UsedForChecks;
 
-    fn sql_to_query<'a>(
-        sql: Sql,
-        builder: QueryBuilder<'a, CDriver>,
-    ) -> anyhow::Result<QueryData<'a, CDriver>> {
-        T::sql_to_query(sql, builder)
-    }
-
     fn select_sqlx(current_query: &mut String) {
         T::select_sqlx(current_query);
     }
@@ -137,12 +121,6 @@ where
 impl<Table> Output<Table, CDriver> for () {
     type DataToConvert = ();
     type UsedForChecks = ();
-    fn sql_to_query<'a>(
-        sql: Sql,
-        builder: QueryBuilder<'a, CDriver>,
-    ) -> anyhow::Result<QueryData<'a, CDriver>> {
-        sql.query(builder)
-    }
 
     fn select_sqlx(current_query: &mut String) {
         current_query.push('1');
@@ -150,27 +128,5 @@ impl<Table> Output<Table, CDriver> for () {
 
     fn convert(_data: ()) -> anyhow::Result<Self> {
         Ok(())
-    }
-}
-
-#[always_context]
-impl<Table> Output<Table, CDriver> for bool {
-    type DataToConvert = Row;
-    type UsedForChecks = bool;
-    fn sql_to_query<'a>(
-        sql: Sql,
-        builder: QueryBuilder<'a, CDriver>,
-    ) -> anyhow::Result<QueryData<'a, CDriver>> {
-        sql.query(builder)
-    }
-
-    fn select_sqlx(_current_query: &mut String) {
-        panic!(
-            "Usage of `bool` type as output of query! macro should be dissallowed by the macro itself. Are you using `type` to circumvent security checks? ;) If not please report this bug to easy-sql repository."
-        );
-    }
-
-    fn convert(data: Row) -> anyhow::Result<Self> {
-        Ok(data.get(0))
     }
 }

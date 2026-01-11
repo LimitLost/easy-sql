@@ -1,3 +1,4 @@
+use crate::query_macro_components::ProvidedDrivers;
 use ::{
     proc_macro2::TokenStream,
     quote::{quote, quote_spanned},
@@ -57,7 +58,7 @@ impl Limit {
         format_args: &mut Vec<TokenStream>,
         binds: &mut Vec<TokenStream>,
         sql_crate: &TokenStream,
-        driver: &TokenStream,
+        driver: &ProvidedDrivers,
         param_counter: &mut usize,
         before_param_n: &TokenStream,
     ) -> String {
@@ -83,10 +84,12 @@ impl Limit {
                 });
 
                 // Add parameter placeholder
-                let current_param_n = *param_counter;
-                format_args.push(quote! {
-                    <#driver as #sql_crate::Driver>::parameter_placeholder(#before_param_n #current_param_n)
-                });
+                format_args.push(driver.parameter_placeholder(
+                    sql_crate,
+                    expr.span(),
+                    before_param_n,
+                    &*param_counter,
+                ));
                 *param_counter += 1;
 
                 "{}".to_string()

@@ -142,10 +142,37 @@ pub fn table(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::TokenS
     };
 
     let mut result_builder = TokensBuilder::default();
-    for driver in supported_drivers {
-        let driver_tokens = driver.to_token_stream();
 
-        let mut primary_keys = Vec::new();
+    let output_impl = sql_output_base(
+        item_name,
+        &fields,
+        Vec::<JoinedField>::new(),
+        &item_name_tokens,
+        &supported_drivers,
+    )?;
+    result_builder.add(output_impl);
+
+    let insert_impl = sql_insert_base(
+        item_name,
+        &fields,
+        &item_name_tokens,
+        &supported_drivers,
+        vec![] as Vec<syn::Ident>,
+    )?;
+    result_builder.add(insert_impl);
+    let update_impl = sql_update_base(item_name, &fields, &item_name_tokens, &supported_drivers)?;
+    result_builder.add(update_impl);
+
+    let mut primary_keys = Vec::new();
+
+    for field in fields.iter() {
+        //Primary Key Check
+        if has_attributes!(field, #[sql(primary_key)]) {
+            primary_keys.push(field.ident.as_ref()?.to_string());
+        }
+    }
+
+    for driver in supported_drivers {
         let mut foreign_keys = HashMap::new();
 
         //TODO Primary key types check (compile time in the build script)
@@ -199,10 +226,6 @@ pub fn table(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::TokenS
             };
             is_not_null.push(is_field_not_null);
 
-            //Primary Key Check
-            if has_attributes!(field, #[sql(primary_key)]) {
-                primary_keys.push(field.ident.as_ref()?.to_string());
-            }
             //Unique Check
             is_unique.push(has_attributes!(field, #[sql(unique)]));
 
@@ -299,22 +322,6 @@ pub fn table(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::TokenS
             );
         }
 
-        let insert_impl = sql_insert_base(
-            item_name,
-            &fields,
-            &item_name_tokens,
-            &driver_tokens,
-            vec![] as Vec<syn::Ident>,
-        )?;
-        let update_impl = sql_update_base(item_name, &fields, &item_name_tokens, &driver_tokens)?;
-        let output_impl = sql_output_base(
-            item_name,
-            &fields,
-            Vec::<JoinedField>::new(),
-            &item_name_tokens,
-            &driver_tokens,
-        )?;
-
         // Foreign keys converted
         let foreign_keys = {
             let mut foreign_keys_converted = Vec::new();
@@ -334,51 +341,57 @@ pub fn table(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::TokenS
         };
 
         result_builder.add(quote! {
-        impl #sql_crate::DatabaseSetup<#driver> for #item_name {
+            impl #sql_crate::DatabaseSetup<#driver> for #item_name {
 
-            async fn setup(
-                conn: &mut (impl #sql_crate::EasyExecutor<#driver> + Send + Sync),
-            ) -> #macro_support::Result<()> {
-                use #macro_support::Context;
+                async fn setup(
+                    conn: &mut (impl #sql_crate::EasyExecutor<#driver> + Send + Sync),
+                ) -> #macro_support::Result<()> {
+                    use #macro_support::Context;
 
-                let current_version_number = #sql_crate::EasySqlTables_get_version!(#driver, *conn,#unique_id);
+                    let current_version_number = #sql_crate::EasySqlTables_get_version!(#driver, *conn,#unique_id);
 
-                if let Some(current_version_number) = current_version_number{
-                    use #sql_crate::EasyExecutor;
+                    if let Some(current_version_number) = current_version_number{
+                        use #sql_crate::EasyExecutor;
 
-                    #migrations
-                }else{
-                    // Create table and create version in EasySqlTables
-                    <#driver as #sql_crate::Driver>::create_table(
-                        conn,
-                        #table_name,
-                        vec![
-                            #(
-                            #sql_crate::TableField{
-                                name: #field_names_str,
-                                data_type: #field_types,
-                                is_unique: #is_unique,
-                                is_not_null: #is_not_null,
-                                default: #default_values,
-                                is_auto_increment: #is_auto_increment_list,
+                        #migrations
+                    }else{
+                        // Create table and create version in EasySqlTables
+                        <#driver as #sql_crate::Driver>::create_table(
+                            conn,
+                            #table_name,
+                            vec![
+                                #(
+                                #sql_crate::TableField{
+                                    name: #field_names_str,
+                                    data_type: #field_types,
+                                    is_unique: #is_unique,
+                                    is_not_null: #is_not_null,
+                                    default: #default_values,
+                                    is_auto_increment: #is_auto_increment_list,
+                                },
+                                )*
+                            ],
+                            vec![#(#primary_keys),*],
+                            {
+                                vec![#(#foreign_keys),*]
+                                .into_iter()
+                                .collect()
                             },
-                            )*
-                        ],
-                        vec![#(#primary_keys),*],
-                        {
-                            vec![#(#foreign_keys),*]
-                            .into_iter()
-                            .collect()
-                        },
-                    ).await?;
-                    #sql_crate::EasySqlTables_create!(#driver, *conn, #unique_id.to_string(), #table_version_i64);
+                        ).await?;
+                        #sql_crate::EasySqlTables_create!(#driver, *conn, #unique_id.to_string(), #table_version_i64);
+                    }
+
+                    Ok(())
                 }
-
-                Ok(())
             }
-        }
 
-        impl #sql_crate::Table<#driver> for #item_name {
+        }    );
+    }
+
+    result_builder.add(quote! {
+        impl #sql_crate::HasTable<#item_name> for #item_name{}
+
+        impl<EasySqlD:#sql_crate::Driver> #sql_crate::Table<EasySqlD> for #item_name {
 
             fn table_name() -> &'static str {
                 #table_name
@@ -391,19 +404,9 @@ pub fn table(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::TokenS
 
             #[inline(always)]
             fn table_joins(current_query: &mut String) {
-                
+
             }
         }
-
-        }    );
-
-        result_builder.add(insert_impl);
-        result_builder.add(update_impl);
-        result_builder.add(output_impl);
-    }
-
-    result_builder.add(quote! {
-        impl #sql_crate::HasTable<#item_name> for #item_name{}
     });
 
     //panic!("{}", result);

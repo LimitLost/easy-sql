@@ -1,11 +1,11 @@
 use std::fmt::Debug;
 
-use crate::{Driver, DriverConnection, HasTable, InternalDriver, Output, QueryBuilder};
+use crate::{Driver, DriverConnection, HasTable, InternalDriver, Output};
 use easy_macros::always_context;
-use sql_macros::{Insert, Update, sql_convenience};
+use sql_macros::{Insert, Update};
 use sqlx::TypeInfo;
 
-use crate::{DatabaseSetup, EasyExecutor, Table, TableField, TableJoin};
+use crate::{DatabaseSetup, EasyExecutor, Table, TableField};
 
 #[derive(Insert, Debug)]
 #[sql(table = EasySqlTables)]
@@ -59,63 +59,6 @@ macro_rules! EasySqlTables_get_version {
             .await?;
         version.map(|v| v.version)
     }};
-}
-
-#[sql_convenience]
-#[always_context]
-impl EasySqlTables {
-    /* pub async fn create<D: Driver>(
-        conn: &mut (impl EasyExecutor<D> + Send + Sync),
-        table_id: String,
-        version: i64,
-    ) -> anyhow::Result<()>
-    where
-        (): ToConvert<D> + Output<Self, D, ()>,
-        DriverConnection<D>: Send + Sync,
-        for<'b> &'b mut DriverConnection<D>:
-            sqlx::Executor<'b, Database = D::InternalDriver> + Send + Sync,
-    {
-        let inserted = EasySqlTables { table_id, version };
-        <EasySqlTables as Table<D>>::insert(conn, &inserted).await?;
-
-        Ok(())
-    } */
-
-    /*pub async fn update_version<D: Driver>(
-        conn: &mut (impl EasyExecutor<D> + Send + Sync),
-        table_id: &str,
-        new_version: i64,
-    ) -> anyhow::Result<()>
-    where
-        (): ToConvert<D> + Output<Self, D, ()>,
-        DriverRow<D>: ToConvert<D>,
-        DriverConnection<D>: Send + Sync,
-        for<'b> &'b mut DriverConnection<D>:
-            sqlx::Executor<'b, Database = D::InternalDriver> + Send + Sync,
-        for<'b> DriverArguments<'b, D>: sqlx::IntoArguments<'b, D::InternalDriver>,
-    {
-        EasySqlTables::update(
-            conn,
-            &mut EasySqlTableVersion {
-                version: new_version,
-            },
-            sql_where!(table_id = { table_id }),
-        )
-        .await?;
-
-        Ok(())
-    }
-
-    pub async fn get_version<D>(
-        conn: &mut (impl EasyExecutor<D> + Send + Sync),
-        table_id: &str,
-    ) -> anyhow::Result<Option<i64>> {
-        #[no_context]
-        let version: Option<EasySqlTableVersion> =
-            <EasySqlTables as Table<D>>::select(conn, sql_where!(table_id = { table_id }))
-                .await?;
-        Ok(version.map(|v| v.version))
-    }*/
 }
 
 #[derive(Update, Output, Debug)]

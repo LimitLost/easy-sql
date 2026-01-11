@@ -4,9 +4,7 @@ use ::{
     quote::{ToTokens, quote},
     syn::{self, parse::Parse, punctuated::Punctuated},
 };
-use easy_macros::{
-    TokensBuilder, always_context, context, get_attributes, has_attributes, parse_macro_input,
-};
+use easy_macros::{always_context, context, get_attributes, has_attributes, parse_macro_input};
 use sql_compilation_data::CompilationData;
 
 use crate::sql_crate;
@@ -30,7 +28,7 @@ pub fn sql_insert_base(
     item_name: &syn::Ident,
     fields: &Punctuated<syn::Field, syn::Token![,]>,
     table: &TokenStream,
-    driver: &TokenStream,
+    drivers: &[syn::Path],
     defaults: Vec<syn::Ident>,
 ) -> anyhow::Result<TokenStream> {
     let field_names = fields.iter().map(|field| field.ident.as_ref().unwrap());
@@ -43,13 +41,25 @@ pub fn sql_insert_base(
     let macro_support = quote! { #sql_crate::macro_support };
 
     let mut insert_values = Vec::new();
+    let mut insert_values_support = Vec::new();
     let mut insert_values_debug = Vec::new();
     let mut insert_values_debug_ref = Vec::new();
 
     for field in fields.iter() {
         let bytes = has_attributes!(field, #[sql(bytes)]);
         let field_name = field.ident.as_ref().unwrap();
-        let mapped = ty_to_variant(field_name.to_token_stream(), bytes, &sql_crate)?;
+        let mapped = ty_to_variant(
+            quote! {self},
+            field_name.to_token_stream(),
+            bytes,
+            &sql_crate,
+        )?;
+        let mapped_support = ty_to_variant(
+            quote! {_self},
+            field_name.to_token_stream(),
+            bytes,
+            &sql_crate,
+        )?;
         let debug_format_str =
             format!("Binding field `{}` to query failed", field_name.to_string());
         let debug_format_str_ref = format!(
@@ -63,10 +73,32 @@ pub fn sql_insert_base(
             .with_context(|| format!(#debug_format_str_ref, #mapped))
         });
         insert_values.push(mapped);
+        insert_values_support.push(mapped_support);
     }
 
+    let insert_driver_tests=drivers.iter().map(|driver|{
+        quote! {
+            let _=|mut args_list:#sql_crate::DriverArguments<'a, #driver>|{
+                let _self=#macro_support::never_any::<Self>();
+                #(
+                    args_list.add(#insert_values_support).map_err(#macro_support::Error::from_boxed)#insert_values_debug_ref?;
+                )*
+                #macro_support::Result::<()>::Ok(())
+            };
+        }
+    });
+
+    let where_clauses_types=fields.iter().map(|field|{
+        let field_ty=&field.ty;
+        quote! {
+            for<'__easy_sql_x> #field_ty: #macro_support::Encode<'__easy_sql_x, #sql_crate::InternalDriver<D>>,
+            #field_ty: #macro_support::Type<#sql_crate::InternalDriver<D>>,
+        }
+    }).collect::<Vec<_>>();
+
     Ok(quote! {
-        impl<'a> #sql_crate::Insert<'a,#table,#driver> for #item_name {
+        impl<'a,D:#sql_crate::Driver> #sql_crate::Insert<'a,#table,D> for #item_name
+        where #(#where_clauses_types)* {
             fn insert_columns() -> Vec<String> {
                 let _ = || {
                     //Check for validity
@@ -88,28 +120,16 @@ pub fn sql_insert_base(
                 ]
             }
 
-            fn insert_values(
-                self,
-                builder: &mut #sql_crate::QueryBuilder<'_, #driver>,
-            ) -> #macro_support::Result<usize>{
-                use #macro_support::Context as _;
-
-                // Fully safe because we pass by value, not by reference
-                unsafe{
-                    #(
-                        builder.bind(#insert_values)#insert_values_debug?;
-                    )*
-                }
-                Ok(1)
-            }
-
             fn insert_values_sqlx(
                 self,
-                mut args_list: #sql_crate::DriverArguments<'a, #driver>,
-            ) -> #macro_support::Result<(#sql_crate::DriverArguments<'a, #driver>, usize)> {
+                mut args_list: #sql_crate::DriverArguments<'a, D>,
+            ) -> #macro_support::Result<(#sql_crate::DriverArguments<'a, D>, usize)> {
                 use #macro_support::Context as _;
 
                 use #macro_support::Arguments;
+
+                #(#insert_driver_tests)*
+
                     #(
                         args_list.add(#insert_values).map_err(#macro_support::Error::from_boxed)#insert_values_debug?;
                     )*
@@ -119,9 +139,9 @@ pub fn sql_insert_base(
             }
         }
 
-        impl<'a> #sql_crate::Insert<'a,#table,#driver> for &'a #item_name{
+        impl<'a,D:#sql_crate::Driver> #sql_crate::Insert<'a,#table,D> for &'a #item_name where #(#where_clauses_types)*{
             fn insert_columns() -> Vec<String> {
-                // Validity check needs to be done only once
+                // Validity check needs to be done only once since they are compile time
                 vec![
                     #(
                         #field_names_str.to_string(),
@@ -129,26 +149,10 @@ pub fn sql_insert_base(
                 ]
             }
 
-            fn insert_values(
-                self,
-                builder: &mut #sql_crate::QueryBuilder<'_, #driver>,
-            ) -> #macro_support::Result<usize>{
-                use #macro_support::Context as _;
-
-                // Fully safe because we pass by reference, and the reference lives until
-                // the end of the QueryBuilder usage (parent function call)
-                unsafe{
-                    #(
-                        builder.bind(&#insert_values)#insert_values_debug_ref?;
-                    )*
-                }
-                Ok(1)
-            }
-
             fn insert_values_sqlx(
                 self,
-                mut args_list: #sql_crate::DriverArguments<'a, #driver>,
-            ) -> #macro_support::Result<(#sql_crate::DriverArguments<'a, #driver>, usize)> {
+                mut args_list: #sql_crate::DriverArguments<'a, D>,
+            ) -> #macro_support::Result<(#sql_crate::DriverArguments<'a, D>, usize)> {
                 use #macro_support::Context as _;
 
                 use #macro_support::Arguments;
@@ -202,17 +206,12 @@ pub fn insert(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::Token
 
     let supported_drivers = super::supported_drivers(&item, &compilation_data)?;
 
-    let mut result = TokensBuilder::default();
-
-    for driver in supported_drivers {
-        result.add(sql_insert_base(
-            &item_name,
-            &fields,
-            &table,
-            &driver.to_token_stream(),
-            defaults.clone(),
-        )?);
-    }
-
-    Ok(result.finalize().into())
+    sql_insert_base(
+        &item_name,
+        &fields,
+        &table,
+        &supported_drivers,
+        defaults.clone(),
+    )
+    .map(|s| s.into())
 }
