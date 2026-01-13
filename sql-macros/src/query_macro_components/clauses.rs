@@ -105,10 +105,23 @@ pub fn group_by_clause(
     format_params: &mut Vec<TokenStream>,
     sql_crate: &TokenStream,
     checks: &mut Vec<TokenStream>,
+    driver: &ProvidedDrivers,
+    output_ty: Option<&TokenStream>,
+    main_table_type: &TokenStream,
 ) {
     let clause_args = group_by_list
         .into_iter()
-        .map(|gb| gb.into_query_string(checks, sql_crate, format_params))
+        .map(|gb| {
+            gb.into_query_string(
+                checks,
+                sql_crate,
+                driver,
+                format_params,
+                false,
+                output_ty,
+                Some(main_table_type),
+            )
+        })
         .collect::<Vec<_>>()
         .join(", ");
 

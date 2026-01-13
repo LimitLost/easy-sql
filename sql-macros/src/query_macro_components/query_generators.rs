@@ -69,6 +69,9 @@ pub fn generate_select(
             &mut format_params,
             sql_crate,
             &mut checks,
+            &driver,
+            Some(&output_type_ts),
+            &table_type_tokens,
         )
     }
 
@@ -972,6 +975,9 @@ pub fn generate_exists(
             &mut format_params,
             sql_crate,
             &mut checks,
+            &driver,
+            None, // No output type in EXISTS
+            &table_type_tokens,
         )
     }
 
