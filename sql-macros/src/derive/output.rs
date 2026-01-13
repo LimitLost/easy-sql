@@ -3,14 +3,14 @@ use std::collections::BTreeSet;
 use ::{
     anyhow::{self, Context},
     proc_macro2::TokenStream,
-    quote::{quote, ToTokens},
+    quote::{ToTokens, quote},
     syn::{self, parse::Parse, punctuated::Punctuated},
 };
 
 use easy_macros::{
-    context, parse_macro_input, TokensBuilder,
-    always_context, get_attributes, has_attributes,
+    TokensBuilder, always_context, context, get_attributes, has_attributes, parse_macro_input,
 };
+use quote::quote_spanned;
 use sql_compilation_data::CompilationData;
 
 use crate::{ CUSTOM_SELECT_ALIAS_PREFIX, macros_components::{expr::Expr, joined_field::JoinedField}, query_macro_components::ProvidedDrivers, sql_crate
@@ -290,7 +290,29 @@ pub fn sql_output_base(
                     parts.push(format!("{delimeter}{}{delimeter}",  #field_str));
                 });
             }
-            
+
+            // Add joined fields with their alias
+            for (i, _joined_field) in joined_fields.iter().enumerate() {
+                let alias: &String = &joined_field_aliases[i];
+                let ref_table_ts = &_joined_field.table;
+                let field_name = &_joined_field.table_field;
+
+                let parts_format_str = format!(
+                    "{{delimeter}}{{}}{{delimeter}}.{{delimeter}}{}{{delimeter}} AS {{delimeter}}{}{{delimeter}}",
+                    field_name, alias
+                );
+
+                field_generation.push(quote_spanned! {field_name.span()=>
+                    let _ = || {
+                            let ___t___ = #macro_support::never_any::<#ref_table_ts>();
+                            let _ = ___t___.#field_name;
+                        };
+                    parts.push(format!(#parts_format_str,
+                        <#ref_table_ts as #sql_crate::Table<D>>::table_name(),
+                    ));
+                });
+            }
+
             // Add custom select fields with AS alias
             for field_with_sel in &fields_with_select {
                 let field_name = field_with_sel.field.ident.as_ref().unwrap();
@@ -323,7 +345,9 @@ pub fn sql_output_base(
                     Some(&output_type_ts),
                     Some(&table)
                 );
-                
+
+                let parts_format_str = format!("{{}} AS {{delimeter}}{}{{delimeter}}", alias);
+
                 // Generate runtime code to format the template with the provided arguments
                 // Include compile-time checks for column validity
                 field_generation.push(quote! {
@@ -333,9 +357,9 @@ pub fn sql_output_base(
                             let ___t___ = #macro_support::never_any::<#table>();
                             #(#checks)*
                         };
-                        
+
                         let formatted_expr = format!(#sql_template, #(#format_params),*);
-                        parts.push(format!("{} AS {delimeter}{}{delimeter}", formatted_expr, #alias));
+                        parts.push(format!(#parts_format_str, formatted_expr));
                     }
                 });
             }
@@ -390,7 +414,7 @@ pub fn sql_output_base(
         }
     }).collect::<Vec<_>>();
 
-    let where_clauses_types=fields.iter().map(|field|{
+    let where_clauses_types=joined_fields.iter().map(|e|&e.field).chain( fields.iter()).map(|field|{
         let field_ty=&field.ty;
         quote! {
             for<'__easy_sql_x> #field_ty: #macro_support::Decode<'__easy_sql_x, #sql_crate::InternalDriver<D>>,

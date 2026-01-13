@@ -2,7 +2,6 @@
 // This macro creates reusable query builders without immediate execution
 
 use super::*;
-use crate::macro_support::never_any;
 use anyhow::Context;
 use easy_macros::always_context;
 use futures::StreamExt;

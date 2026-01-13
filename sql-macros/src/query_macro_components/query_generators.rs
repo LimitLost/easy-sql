@@ -138,7 +138,7 @@ pub fn generate_select(
                     _el: T,
                 ) {
                 }
-                to_convert_single_impl(never_any::<#output_type>());
+                to_convert_single_impl(#macro_support::never_any::<#output_type>());
             }
         })
     }
@@ -191,7 +191,7 @@ pub fn generate_select(
                     &'_easy_sql_e mut self,
                     mut conn: &'_easy_sql_e mut E,
                 ) -> impl #macro_support::Stream<
-                    Item = #macro_support::Result<ExprTestData>,
+                    Item = #macro_support::Result<#output_type>,
                 > + '_easy_sql_e
                 where
                     &'_easy_sql_e mut E: #sql_crate::EasyExecutor<#lazy_mode_driver> + '_easy_sql_e,
@@ -330,7 +330,7 @@ pub fn generate_insert(
                             _el: T,
                         ) {
                         }
-                        to_convert_single_impl(never_any::<#returning_type>());
+                        to_convert_single_impl(#macro_support::never_any::<#returning_type>());
                     };
                     struct LazyQueryResult<'_easy_sql_a> {
                         builder: #macro_support::QueryBuilder<'_easy_sql_a, #sql_crate::InternalDriver<#driver>>,
@@ -602,7 +602,7 @@ pub fn generate_update(
                         _el: T,
                     ) {
                     }
-                    to_convert_single_impl(never_any::<#returning_type>());
+                    to_convert_single_impl(#macro_support::never_any::<#returning_type>());
                 }
             });
             (
@@ -815,7 +815,7 @@ pub fn generate_delete(
                         _el: T,
                     ) {
                     }
-                    to_convert_single_impl(never_any::<#returning_type>());
+                    to_convert_single_impl(#macro_support::never_any::<#returning_type>());
                 }
             });
             (

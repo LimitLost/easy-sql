@@ -67,7 +67,6 @@ impl Parse for Join {
 
             let table = input.parse::<syn::Path>()?;
 
-            input.parse::<keyword::on>()?;
             Ok(Join::Cross { table })
         } else {
             Err(input.error("Expected join type"))
@@ -310,8 +309,7 @@ pub fn table_join(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::T
     let table_joins_str = table_joins.join("");
 
     result.add(quote! {
-
-        impl<D:#sql_crate::Driver> #sql_crate::Table<D> for #item_name {
+        impl<D: #sql_crate::Driver> #sql_crate::Table<D> for #item_name {
             fn table_name() -> &'static str {
                 <#main_table_struct as #sql_crate::Table<D>>::table_name()
             }
@@ -330,11 +328,12 @@ pub fn table_join(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::T
 
                 #(#before_format)*
 
+                // Define the identifier delimiter for the current driver
+                let _easy_sql_d = <D as #sql_crate::Driver>::identifier_delimiter();
+
                 let result = format!(#table_joins_str, #(#current_format_params),*);
 
-
-
-                result
+                current_query.push_str(&result);
             }
         }
 
