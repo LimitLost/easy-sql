@@ -104,12 +104,22 @@ run_test() {
     local build_status=$?
     echo "$build_output" | grep -E "(Compiling|Finished|error)" | tail -10
     
+    # Also check if build output contains "error" to catch compile errors
+    if echo "$build_output" | grep -q "^error"; then
+        build_status=1
+    fi
+    
     if [ $build_status -eq 0 ]; then
         # Run tests
         echo -e "${BLUE}[TEST]${NC} cargo test --no-default-features --features \"$features\""
         local test_output=$(cargo test --no-default-features --features "$features" 2>&1)
         local test_status=$?
         echo "$test_output" | tail -20
+        
+        # Also check if test output contains "error" to catch test errors
+        if echo "$test_output" | grep -q "^error"; then
+            test_status=1
+        fi
         
         if [ $test_status -eq 0 ]; then
             print_result 0 "$config_name" "$env_info"
@@ -183,11 +193,21 @@ build_output=$(cargo build --no-default-features 2>&1)
 build_status=$?
 echo "$build_output" | grep -E "(Compiling|Finished|error)" | tail -10
 
+# Also check if build output contains "error" to catch compile errors
+if echo "$build_output" | grep -q "^error"; then
+    build_status=1
+fi
+
 if [ $build_status -eq 0 ]; then
     echo -e "${BLUE}[TEST]${NC} cargo test --no-default-features"
     test_output=$(cargo test --no-default-features 2>&1)
     test_status=$?
     echo "$test_output" | tail -20
+    
+    # Also check if test output contains "error" to catch test errors
+    if echo "$test_output" | grep -q "^error"; then
+        test_status=1
+    fi
     
     if [ $test_status -eq 0 ]; then
         print_result 0 "No features" "[without LIBSQLITE3_FLAGS]"
@@ -209,11 +229,21 @@ build_output=$(cargo build --no-default-features 2>&1)
 build_status=$?
 echo "$build_output" | grep -E "(Compiling|Finished|error)" | tail -10
 
+# Also check if build output contains "error" to catch compile errors
+if echo "$build_output" | grep -q "^error"; then
+    build_status=1
+fi
+
 if [ $build_status -eq 0 ]; then
     echo -e "${BLUE}[TEST]${NC} cargo test --no-default-features"
     test_output=$(cargo test --no-default-features 2>&1)
     test_status=$?
     echo "$test_output" | tail -20
+    
+    # Also check if test output contains "error" to catch test errors
+    if echo "$test_output" | grep -q "^error"; then
+        test_status=1
+    fi
     
     if [ $test_status -eq 0 ]; then
         print_result 0 "No features" "[with LIBSQLITE3_FLAGS]"
