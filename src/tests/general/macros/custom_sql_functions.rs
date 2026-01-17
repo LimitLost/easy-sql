@@ -56,8 +56,7 @@ custom_sql_function! {
 // ==============================================
 
 #[derive(Table, Debug, Clone)]
-#[sql(version = 1)]
-#[sql(unique_id = "372f9c5b-54d7-44d0-98b4-e32e40eadcb3")]
+#[sql(no_version)]
 pub struct CustomFuncTestTable {
     #[sql(primary_key)]
     #[sql(auto_increment)]

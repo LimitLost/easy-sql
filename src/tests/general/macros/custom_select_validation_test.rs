@@ -4,8 +4,7 @@
 use crate::Table;
 
 #[derive(Table)]
-#[sql(version = 1)]
-#[sql(unique_id = "06e6dabd-a01e-41f5-82c3-f8880a647eb4")]
+#[sql(no_version)]
 struct ValidationTestTable {
     #[sql(primary_key)]
     #[sql(auto_increment)]

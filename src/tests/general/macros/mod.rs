@@ -12,8 +12,7 @@ use sql_macros::query;
 
 /// Main test table for SQL expression testing
 #[derive(Table, Debug, Clone)]
-#[sql(version = 1)]
-#[sql(unique_id = "0632f005-d617-4901-88be-169bef3ca248")]
+#[sql(no_version)]
 pub struct ExprTestTable {
     #[sql(primary_key)]
     #[sql(auto_increment)]
@@ -36,8 +35,7 @@ pub struct ExprTestData {
 
 /// Table for testing relationships and joins
 #[derive(Table, Debug, Clone)]
-#[sql(version = 1)]
-#[sql(unique_id = "e37ea44c-0838-4275-ae02-b8b43eb9392c")]
+#[sql(no_version)]
 pub struct RelatedTestTable {
     #[sql(primary_key)]
     #[sql(auto_increment)]
@@ -57,8 +55,7 @@ pub struct RelatedTestData {
 
 /// Table for testing numeric operations
 #[derive(Table, Debug, Clone)]
-#[sql(version = 1)]
-#[sql(unique_id = "56972a6d-b57d-4007-820b-3732a92a3586")]
+#[sql(no_version)]
 pub struct NumericTestTable {
     #[sql(primary_key)]
     #[sql(auto_increment)]

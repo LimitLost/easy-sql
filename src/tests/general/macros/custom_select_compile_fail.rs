@@ -6,8 +6,7 @@
 use crate::Table;
 
 #[derive(Table)]
-#[sql(version = 1)]
-#[sql(unique_id = "e2f5f221-008c-4ffa-9454-fe0de3ad36ba")]
+#[sql(no_version)]
 struct CompileFailTable {
     #[sql(primary_key)]
     #[sql(auto_increment)]
@@ -32,7 +31,7 @@ struct InvalidColumn {
 // Uncomment to verify this fails compilation
 /*
 #[derive(Table)]
-#[sql(version = 1)]
+#[sql(no_version)]
 struct OtherTable {
     #[sql(primary_key)]
     id: i32,

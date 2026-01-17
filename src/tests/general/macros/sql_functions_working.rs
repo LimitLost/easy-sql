@@ -13,8 +13,7 @@ use sql_macros::query;
 // ==============================================
 
 #[derive(Table, Debug, Clone)]
-#[sql(version = 1)]
-#[sql(unique_id = "65c65ec0-6f8c-4096-a6c6-f07100aaa19e")]
+#[sql(no_version)]
 pub struct FunctionTestTable {
     #[sql(primary_key)]
     #[sql(auto_increment)]
@@ -552,8 +551,8 @@ async fn test_function_floor_in_where() -> anyhow::Result<()> {
 async fn test_function_coalesce() -> anyhow::Result<()> {
     // Create table with nullable column
     #[derive(Table, Debug, Clone)]
-    #[sql(version = 1)]
-    #[sql(unique_id = "f0f8083c-70a4-46e2-a201-ddb0a810fa3b")]
+    #[sql(no_version)]
+    #[sql(unique_id = "22eaea17-209b-40b8-9a96-bcbbc7ba54fa")]
     struct NullableTable {
         #[sql(primary_key)]
         #[sql(auto_increment)]

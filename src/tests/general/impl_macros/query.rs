@@ -9,8 +9,7 @@ use crate::macro_support;
 
 use super::TestDriver;
 #[derive(Debug, Table)]
-#[sql(version = 1)]
-#[sql(unique_id = "192edcad-1b14-42d5-a4d0-246923d46561")]
+#[sql(no_version)]
 struct ExampleTable {
     #[sql(primary_key)]
     id: i64,

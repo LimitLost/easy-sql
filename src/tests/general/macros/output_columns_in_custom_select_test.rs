@@ -7,8 +7,7 @@ use easy_macros::always_context;
 use sql_macros::query;
 
 #[derive(Table)]
-#[sql(version = 1)]
-#[sql(unique_id = "ec51bd8a-2f9b-472d-bac7-0953c8217f3b")]
+#[sql(no_version)]
 struct OutputColumnsTestTable {
     #[sql(primary_key)]
     #[sql(auto_increment)]

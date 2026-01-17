@@ -6,8 +6,7 @@ use easy_macros::always_context;
 use sql_macros::query;
 
 #[derive(Table)]
-#[sql(version = 1)]
-#[sql(unique_id = "2c8bee3e-18e3-4ed6-8bb4-54ea0ed31ea8")]
+#[sql(no_version)]
 struct CustomSelectTable {
     #[sql(primary_key)]
     #[sql(auto_increment)]

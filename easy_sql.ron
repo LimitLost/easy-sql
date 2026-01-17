@@ -1,649 +1,110 @@
 CompilationData(
-    tables: {
-        "0632f005-d617-4901-88be-169bef3ca248": TableData(
-            saved_versions: {
-                1: TableDataVersion(
-                    table_name: "expr_test_table",
-                    fields: [
-                        TableField(
-                            name: "id",
-                            ty_to_bytes: false,
-                            field_type: "i32",
-                            default: None,
-                            is_unique: false,
-                        ),
-                        TableField(
-                            name: "int_field",
-                            ty_to_bytes: false,
-                            field_type: "i32",
-                            default: None,
-                            is_unique: false,
-                        ),
-                        TableField(
-                            name: "str_field",
-                            ty_to_bytes: false,
-                            field_type: "String",
-                            default: None,
-                            is_unique: false,
-                        ),
-                        TableField(
-                            name: "bool_field",
-                            ty_to_bytes: false,
-                            field_type: "bool",
-                            default: None,
-                            is_unique: false,
-                        ),
-                        TableField(
-                            name: "nullable_field",
-                            ty_to_bytes: false,
-                            field_type: "Option<String>",
-                            default: None,
-                            is_unique: false,
-                        ),
-                    ],
-                    primary_keys: [
-                        "id",
-                    ],
-                    auto_increment: true,
-                    foreign_keys: {},
-                ),
-            },
-            latest_version: 1,
-        ),
-        "06e6dabd-a01e-41f5-82c3-f8880a647eb4": TableData(
-            saved_versions: {
-                1: TableDataVersion(
-                    table_name: "validation_test_table",
-                    fields: [
-                        TableField(
-                            name: "id",
-                            ty_to_bytes: false,
-                            field_type: "i32",
-                            default: None,
-                            is_unique: false,
-                        ),
-                        TableField(
-                            name: "name",
-                            ty_to_bytes: false,
-                            field_type: "String",
-                            default: None,
-                            is_unique: false,
-                        ),
-                        TableField(
-                            name: "age",
-                            ty_to_bytes: false,
-                            field_type: "i64",
-                            default: None,
-                            is_unique: false,
-                        ),
-                    ],
-                    primary_keys: [
-                        "id",
-                    ],
-                    auto_increment: true,
-                    foreign_keys: {},
-                ),
-            },
-            latest_version: 1,
-        ),
-        "091ed233-63ca-46dc-aaa8-438a51ccbcc2": TableData(
-            saved_versions: {
-                1: TableDataVersion(
-                    table_name: "nullable_test_table",
-                    fields: [
-                        TableField(
-                            name: "id",
-                            ty_to_bytes: false,
-                            field_type: "i32",
-                            default: None,
-                            is_unique: false,
-                        ),
-                        TableField(
-                            name: "nullable_value",
-                            ty_to_bytes: false,
-                            field_type: "Option<i32>",
-                            default: None,
-                            is_unique: false,
-                        ),
-                        TableField(
-                            name: "default_value",
-                            ty_to_bytes: false,
-                            field_type: "i32",
-                            default: None,
-                            is_unique: false,
-                        ),
-                    ],
-                    primary_keys: [
-                        "id",
-                    ],
-                    auto_increment: true,
-                    foreign_keys: {},
-                ),
-            },
-            latest_version: 1,
-        ),
-        "192edcad-1b14-42d5-a4d0-246923d46561": TableData(
-            saved_versions: {
-                1: TableDataVersion(
-                    table_name: "example_table",
-                    fields: [
-                        TableField(
-                            name: "id",
-                            ty_to_bytes: false,
-                            field_type: "i64",
-                            default: None,
-                            is_unique: false,
-                        ),
-                        TableField(
-                            name: "field0",
-                            ty_to_bytes: false,
-                            field_type: "String",
-                            default: None,
-                            is_unique: false,
-                        ),
-                        TableField(
-                            name: "field1",
-                            ty_to_bytes: false,
-                            field_type: "String",
-                            default: None,
-                            is_unique: false,
-                        ),
-                        TableField(
-                            name: "field2",
-                            ty_to_bytes: false,
-                            field_type: "i32",
-                            default: None,
-                            is_unique: false,
-                        ),
-                        TableField(
-                            name: "field3",
-                            ty_to_bytes: false,
-                            field_type: "i64",
-                            default: None,
-                            is_unique: false,
-                        ),
-                        TableField(
-                            name: "field4",
-                            ty_to_bytes: false,
-                            field_type: "i16",
-                            default: None,
-                            is_unique: false,
-                        ),
-                    ],
-                    primary_keys: [
-                        "id",
-                    ],
-                    auto_increment: false,
-                    foreign_keys: {},
-                ),
-            },
-            latest_version: 1,
-        ),
-        "2c8bee3e-18e3-4ed6-8bb4-54ea0ed31ea8": TableData(
-            saved_versions: {
-                1: TableDataVersion(
-                    table_name: "custom_select_table",
-                    fields: [
-                        TableField(
-                            name: "id",
-                            ty_to_bytes: false,
-                            field_type: "i32",
-                            default: None,
-                            is_unique: false,
-                        ),
-                        TableField(
-                            name: "first_name",
-                            ty_to_bytes: false,
-                            field_type: "String",
-                            default: None,
-                            is_unique: false,
-                        ),
-                        TableField(
-                            name: "last_name",
-                            ty_to_bytes: false,
-                            field_type: "String",
-                            default: None,
-                            is_unique: false,
-                        ),
-                        TableField(
-                            name: "age",
-                            ty_to_bytes: false,
-                            field_type: "i64",
-                            default: None,
-                            is_unique: false,
-                        ),
-                    ],
-                    primary_keys: [
-                        "id",
-                    ],
-                    auto_increment: true,
-                    foreign_keys: {},
-                ),
-            },
-            latest_version: 1,
-        ),
-        "36a1547d-1bb3-478b-afcd-be31d65ccdd0": TableData(
-            saved_versions: {
-                1: TableDataVersion(
-                    table_name: "example_table",
-                    fields: [
-                        TableField(
-                            name: "id",
-                            ty_to_bytes: false,
-                            field_type: "i64",
-                            default: None,
-                            is_unique: false,
-                        ),
-                        TableField(
-                            name: "field0",
-                            ty_to_bytes: false,
-                            field_type: "String",
-                            default: None,
-                            is_unique: false,
-                        ),
-                        TableField(
-                            name: "field1",
-                            ty_to_bytes: false,
-                            field_type: "String",
-                            default: None,
-                            is_unique: false,
-                        ),
-                        TableField(
-                            name: "field2",
-                            ty_to_bytes: false,
-                            field_type: "i32",
-                            default: None,
-                            is_unique: false,
-                        ),
-                        TableField(
-                            name: "field3",
-                            ty_to_bytes: false,
-                            field_type: "i64",
-                            default: None,
-                            is_unique: false,
-                        ),
-                        TableField(
-                            name: "field4",
-                            ty_to_bytes: false,
-                            field_type: "i16",
-                            default: None,
-                            is_unique: false,
-                        ),
-                    ],
-                    primary_keys: [
-                        "id",
-                    ],
-                    auto_increment: false,
-                    foreign_keys: {},
-                ),
-            },
-            latest_version: 1,
-        ),
-        "372f9c5b-54d7-44d0-98b4-e32e40eadcb3": TableData(
-            saved_versions: {
-                1: TableDataVersion(
-                    table_name: "custom_func_test_table",
-                    fields: [
-                        TableField(
-                            name: "id",
-                            ty_to_bytes: false,
-                            field_type: "i32",
-                            default: None,
-                            is_unique: false,
-                        ),
-                        TableField(
-                            name: "name",
-                            ty_to_bytes: false,
-                            field_type: "String",
-                            default: None,
-                            is_unique: false,
-                        ),
-                        TableField(
-                            name: "value",
-                            ty_to_bytes: false,
-                            field_type: "i32",
-                            default: None,
-                            is_unique: false,
-                        ),
-                        TableField(
-                            name: "json_data",
-                            ty_to_bytes: false,
-                            field_type: "String",
-                            default: None,
-                            is_unique: false,
-                        ),
-                    ],
-                    primary_keys: [
-                        "id",
-                    ],
-                    auto_increment: true,
-                    foreign_keys: {},
-                ),
-            },
-            latest_version: 1,
-        ),
-        "56972a6d-b57d-4007-820b-3732a92a3586": TableData(
-            saved_versions: {
-                1: TableDataVersion(
-                    table_name: "numeric_test_table",
-                    fields: [
-                        TableField(
-                            name: "id",
-                            ty_to_bytes: false,
-                            field_type: "i32",
-                            default: None,
-                            is_unique: false,
-                        ),
-                        TableField(
-                            name: "int_val",
-                            ty_to_bytes: false,
-                            field_type: "i32",
-                            default: None,
-                            is_unique: false,
-                        ),
-                        TableField(
-                            name: "float_val",
-                            ty_to_bytes: false,
-                            field_type: "Option<f64>",
-                            default: None,
-                            is_unique: false,
-                        ),
-                    ],
-                    primary_keys: [
-                        "id",
-                    ],
-                    auto_increment: true,
-                    foreign_keys: {},
-                ),
-            },
-            latest_version: 1,
-        ),
-        "595b7d92-bd05-4327-840e-49f07d581588": TableData(
-            saved_versions: {
-                1: TableDataVersion(
-                    table_name: "function_test_table",
-                    fields: [
-                        TableField(
-                            name: "id",
-                            ty_to_bytes: false,
-                            field_type: "i32",
-                            default: None,
-                            is_unique: false,
-                        ),
-                        TableField(
-                            name: "name",
-                            ty_to_bytes: false,
-                            field_type: "String",
-                            default: None,
-                            is_unique: false,
-                        ),
-                        TableField(
-                            name: "value",
-                            ty_to_bytes: false,
-                            field_type: "i32",
-                            default: None,
-                            is_unique: false,
-                        ),
-                        TableField(
-                            name: "price",
-                            ty_to_bytes: false,
-                            field_type: "f64",
-                            default: None,
-                            is_unique: false,
-                        ),
-                        TableField(
-                            name: "category",
-                            ty_to_bytes: false,
-                            field_type: "String",
-                            default: None,
-                            is_unique: false,
-                        ),
-                    ],
-                    primary_keys: [
-                        "id",
-                    ],
-                    auto_increment: true,
-                    foreign_keys: {},
-                ),
-            },
-            latest_version: 1,
-        ),
-        "5d28c663-9bdd-40dd-a1c8-3dd40f567974": TableData(
-            saved_versions: {
-                1: TableDataVersion(
-                    table_name: "case_function_test_table",
-                    fields: [
-                        TableField(
-                            name: "id",
-                            ty_to_bytes: false,
-                            field_type: "i32",
-                            default: None,
-                            is_unique: false,
-                        ),
-                        TableField(
-                            name: "name",
-                            ty_to_bytes: false,
-                            field_type: "String",
-                            default: None,
-                            is_unique: false,
-                        ),
-                    ],
-                    primary_keys: [
-                        "id",
-                    ],
-                    auto_increment: true,
-                    foreign_keys: {},
-                ),
-            },
-            latest_version: 1,
-        ),
-        "65c65ec0-6f8c-4096-a6c6-f07100aaa19e": TableData(
-            saved_versions: {
-                1: TableDataVersion(
-                    table_name: "function_test_table",
-                    fields: [
-                        TableField(
-                            name: "id",
-                            ty_to_bytes: false,
-                            field_type: "i32",
-                            default: None,
-                            is_unique: false,
-                        ),
-                        TableField(
-                            name: "name",
-                            ty_to_bytes: false,
-                            field_type: "String",
-                            default: None,
-                            is_unique: false,
-                        ),
-                        TableField(
-                            name: "value",
-                            ty_to_bytes: false,
-                            field_type: "i32",
-                            default: None,
-                            is_unique: false,
-                        ),
-                        TableField(
-                            name: "price",
-                            ty_to_bytes: false,
-                            field_type: "f64",
-                            default: None,
-                            is_unique: false,
-                        ),
-                        TableField(
-                            name: "category",
-                            ty_to_bytes: false,
-                            field_type: "String",
-                            default: None,
-                            is_unique: false,
-                        ),
-                    ],
-                    primary_keys: [
-                        "id",
-                    ],
-                    auto_increment: true,
-                    foreign_keys: {},
-                ),
-            },
-            latest_version: 1,
-        ),
-        "e2f5f221-008c-4ffa-9454-fe0de3ad36ba": TableData(
-            saved_versions: {
-                1: TableDataVersion(
-                    table_name: "compile_fail_table",
-                    fields: [
-                        TableField(
-                            name: "id",
-                            ty_to_bytes: false,
-                            field_type: "i32",
-                            default: None,
-                            is_unique: false,
-                        ),
-                        TableField(
-                            name: "name",
-                            ty_to_bytes: false,
-                            field_type: "String",
-                            default: None,
-                            is_unique: false,
-                        ),
-                        TableField(
-                            name: "age",
-                            ty_to_bytes: false,
-                            field_type: "i64",
-                            default: None,
-                            is_unique: false,
-                        ),
-                    ],
-                    primary_keys: [
-                        "id",
-                    ],
-                    auto_increment: true,
-                    foreign_keys: {},
-                ),
-            },
-            latest_version: 1,
-        ),
-        "e37ea44c-0838-4275-ae02-b8b43eb9392c": TableData(
-            saved_versions: {
-                1: TableDataVersion(
-                    table_name: "related_test_table",
-                    fields: [
-                        TableField(
-                            name: "id",
-                            ty_to_bytes: false,
-                            field_type: "i32",
-                            default: None,
-                            is_unique: false,
-                        ),
-                        TableField(
-                            name: "parent_id",
-                            ty_to_bytes: false,
-                            field_type: "i32",
-                            default: None,
-                            is_unique: false,
-                        ),
-                        TableField(
-                            name: "data",
-                            ty_to_bytes: false,
-                            field_type: "String",
-                            default: None,
-                            is_unique: false,
-                        ),
-                    ],
-                    primary_keys: [
-                        "id",
-                    ],
-                    auto_increment: true,
-                    foreign_keys: {
-                        "ExprTestTable": [
-                            "parent_id",
-                        ],
-                    },
-                ),
-            },
-            latest_version: 1,
-        ),
-        "ec51bd8a-2f9b-472d-bac7-0953c8217f3b": TableData(
-            saved_versions: {
-                1: TableDataVersion(
-                    table_name: "output_columns_test_table",
-                    fields: [
-                        TableField(
-                            name: "id",
-                            ty_to_bytes: false,
-                            field_type: "i32",
-                            default: None,
-                            is_unique: false,
-                        ),
-                        TableField(
-                            name: "first_name",
-                            ty_to_bytes: false,
-                            field_type: "String",
-                            default: None,
-                            is_unique: false,
-                        ),
-                        TableField(
-                            name: "last_name",
-                            ty_to_bytes: false,
-                            field_type: "String",
-                            default: None,
-                            is_unique: false,
-                        ),
-                        TableField(
-                            name: "age",
-                            ty_to_bytes: false,
-                            field_type: "i32",
-                            default: None,
-                            is_unique: false,
-                        ),
-                    ],
-                    primary_keys: [
-                        "id",
-                    ],
-                    auto_increment: true,
-                    foreign_keys: {},
-                ),
-            },
-            latest_version: 1,
-        ),
-        "f0f8083c-70a4-46e2-a201-ddb0a810fa3b": TableData(
-            saved_versions: {
-                1: TableDataVersion(
-                    table_name: "nullable_table",
-                    fields: [
-                        TableField(
-                            name: "id",
-                            ty_to_bytes: false,
-                            field_type: "i32",
-                            default: None,
-                            is_unique: false,
-                        ),
-                        TableField(
-                            name: "nullable_value",
-                            ty_to_bytes: false,
-                            field_type: "Option<i32>",
-                            default: None,
-                            is_unique: false,
-                        ),
-                        TableField(
-                            name: "default_value",
-                            ty_to_bytes: false,
-                            field_type: "i32",
-                            default: None,
-                            is_unique: false,
-                        ),
-                    ],
-                    primary_keys: [
-                        "id",
-                    ],
-                    auto_increment: true,
-                    foreign_keys: {},
-                ),
-            },
-            latest_version: 1,
-        ),
+    tables: {},
+    used_table_names: {
+        "case_function_test_table": [
+            TableNameData(
+                filename: "src/tests/general/macros/sql_case_insensitive_functions.rs",
+                struct_name: "CaseFunctionTestTable",
+            ),
+        ],
+        "comments_table": [
+            TableNameData(
+                filename: "src/tests/general/macros/table_join.rs",
+                struct_name: "CommentsTable",
+            ),
+        ],
+        "compile_fail_table": [
+            TableNameData(
+                filename: "src/tests/general/macros/custom_select_compile_fail.rs",
+                struct_name: "CompileFailTable",
+            ),
+        ],
+        "custom_func_test_table": [
+            TableNameData(
+                filename: "src/tests/general/macros/custom_sql_functions.rs",
+                struct_name: "CustomFuncTestTable",
+            ),
+        ],
+        "custom_select_table": [
+            TableNameData(
+                filename: "src/tests/general/macros/custom_select.rs",
+                struct_name: "CustomSelectTable",
+            ),
+        ],
+        "example_table": [
+            TableNameData(
+                filename: "src/tests/general/impl_macros/query.rs",
+                struct_name: "ExampleTable",
+            ),
+        ],
+        "example_table_query_lazy": [
+            TableNameData(
+                filename: "src/tests/general/impl_macros/query_lazy.rs",
+                struct_name: "ExampleTable",
+            ),
+        ],
+        "expr_test_table": [
+            TableNameData(
+                filename: "src/tests/general/macros/mod.rs",
+                struct_name: "ExprTestTable",
+            ),
+        ],
+        "function_test_table": [
+            TableNameData(
+                filename: "src/tests/general/macros/sql_functions_working.rs",
+                struct_name: "FunctionTestTable",
+            ),
+        ],
+        "nullable_table": [
+            TableNameData(
+                filename: "src/tests/general/macros/sql_functions_working.rs",
+                struct_name: "NullableTable",
+            ),
+        ],
+        "numeric_test_table": [
+            TableNameData(
+                filename: "src/tests/general/macros/mod.rs",
+                struct_name: "NumericTestTable",
+            ),
+        ],
+        "output_columns_test_table": [
+            TableNameData(
+                filename: "src/tests/general/macros/output_columns_in_custom_select_test.rs",
+                struct_name: "OutputColumnsTestTable",
+            ),
+        ],
+        "posts_table": [
+            TableNameData(
+                filename: "src/tests/general/macros/table_join.rs",
+                struct_name: "PostsTable",
+            ),
+        ],
+        "profiles_table": [
+            TableNameData(
+                filename: "src/tests/general/macros/table_join.rs",
+                struct_name: "ProfilesTable",
+            ),
+        ],
+        "related_test_table": [
+            TableNameData(
+                filename: "src/tests/general/macros/mod.rs",
+                struct_name: "RelatedTestTable",
+            ),
+        ],
+        "users_table": [
+            TableNameData(
+                filename: "src/tests/general/macros/table_join.rs",
+                struct_name: "UsersTable",
+            ),
+        ],
+        "validation_test_table": [
+            TableNameData(
+                filename: "src/tests/general/macros/custom_select_validation_test.rs",
+                struct_name: "ValidationTestTable",
+            ),
+        ],
     },
     default_drivers: [
-        "crate::Sqlite",
+        "crate::Postgres",
     ],
 )

@@ -10,8 +10,8 @@ use crate::{
 
 use super::TestDriver;
 #[derive(Debug, Table)]
-#[sql(version = 1)]
-#[sql(unique_id = "36a1547d-1bb3-478b-afcd-be31d65ccdd0")]
+#[sql(no_version)]
+#[sql(table_name = "example_table_query_lazy")]
 struct ExampleTable {
     #[sql(primary_key)]
     id: i64,

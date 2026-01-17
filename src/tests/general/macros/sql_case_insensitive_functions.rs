@@ -4,8 +4,7 @@ use easy_macros::always_context;
 use sql_macros::query;
 
 #[derive(Table, Debug, Clone)]
-#[sql(version = 1)]
-#[sql(unique_id = "5d28c663-9bdd-40dd-a1c8-3dd40f567974")]
+#[sql(no_version)]
 pub struct CaseFunctionTestTable {
     #[sql(primary_key)]
     #[sql(auto_increment)]

@@ -21,8 +21,7 @@ use sql_macros::{query, query_lazy};
 
 /// Main users table
 #[derive(Table, Debug, Clone)]
-#[sql(version = 1)]
-#[sql(unique_id = "a69e7a9d-6067-4e53-b753-0b644786ec45")]
+#[sql(no_version)]
 pub struct UsersTable {
     #[sql(primary_key)]
     #[sql(auto_increment)]
@@ -41,8 +40,7 @@ pub struct User {
 
 /// Posts table with foreign key to users
 #[derive(Table, Debug, Clone)]
-#[sql(version = 1)]
-#[sql(unique_id = "82a5439a-608f-4a56-94c5-0baa3ead0923")]
+#[sql(no_version)]
 pub struct PostsTable {
     #[sql(primary_key)]
     #[sql(auto_increment)]
@@ -64,8 +62,7 @@ pub struct Post {
 
 /// Comments table with foreign key to posts
 #[derive(Table, Debug, Clone)]
-#[sql(version = 1)]
-#[sql(unique_id = "b4cf5abd-144e-4c03-a39e-1fbcab72124a")]
+#[sql(no_version)]
 pub struct CommentsTable {
     #[sql(primary_key)]
     #[sql(auto_increment)]
@@ -88,8 +85,7 @@ pub struct Comment {
 
 /// User profiles table (optional one-to-one relationship)
 #[derive(Table, Debug, Clone)]
-#[sql(version = 1)]
-#[sql(unique_id = "6e341c71-5935-46c7-8a47-a2572ffd1115")]
+#[sql(no_version)]
 pub struct ProfilesTable {
     #[sql(primary_key)]
     #[sql(auto_increment)]
