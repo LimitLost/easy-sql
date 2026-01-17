@@ -139,7 +139,7 @@ mod sql_expressions;
 
 mod custom_select_validation_test;
 mod sql_case_insensitive_functions;
-mod sql_functions_working;
+mod sql_functions;
 // mod custom_sql_functions;
 
 mod table_join;
