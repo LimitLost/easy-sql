@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # test.sh - Comprehensive test script for easy-sql
-# Tests all combinations of features: postgres, sqlite, use_output_columns
+# Tests all combinations of features: postgres, sqlite, use_output_columns, migrations, check_duplicate_table_names
 # Also tests with and without LIBSQLITE3_FLAGS environment variable
 
 # Don't exit on error - we want to test all combinations
@@ -147,13 +147,15 @@ echo "This script will test all combinations of:"
 echo "  - postgres (feature)"
 echo "  - sqlite (feature)"
 echo "  - use_output_columns (feature)"
+echo "  - migrations (feature)"
+echo "  - check_duplicate_table_names (feature)"
 echo "  - LIBSQLITE3_FLAGS environment variable"
 echo ""
 echo "Each combination will be built and tested with --no-default-features"
 echo ""
 
 # Generate all feature combinations
-# Features: postgres, sqlite, use_output_columns
+# Features: postgres, sqlite, use_output_columns, migrations, check_duplicate_table_names
 # We'll test each combination with and without LIBSQLITE3_FLAGS
 
 declare -a FEATURE_COMBINATIONS=(
@@ -161,15 +163,36 @@ declare -a FEATURE_COMBINATIONS=(
     "postgres|Postgres only"
     "sqlite|SQLite only"
     "use_output_columns|use_output_columns only"
+    "migrations|migrations only"
+    "check_duplicate_table_names|check_duplicate_table_names only"
     
     # Two features
     "postgres,use_output_columns|Postgres + use_output_columns"
+    "postgres,migrations|Postgres + migrations"
     "sqlite,use_output_columns|SQLite + use_output_columns"
+    "sqlite,migrations|SQLite + migrations"
+    "use_output_columns,migrations|use_output_columns + migrations"
+    "use_output_columns,check_duplicate_table_names|use_output_columns + check_duplicate_table_names"
+    "migrations,check_duplicate_table_names|migrations + check_duplicate_table_names"
+    
+    # Three features
+    "postgres,use_output_columns,migrations|Postgres + use_output_columns + migrations"
+    "sqlite,use_output_columns,migrations|SQLite + use_output_columns + migrations"
+    "postgres,use_output_columns,check_duplicate_table_names|Postgres + use_output_columns + check_duplicate_table_names"
+    "sqlite,use_output_columns,check_duplicate_table_names|SQLite + use_output_columns + check_duplicate_table_names"
+    "postgres,migrations,check_duplicate_table_names|Postgres + migrations + check_duplicate_table_names"
+    "sqlite,migrations,check_duplicate_table_names|SQLite + migrations + check_duplicate_table_names"
     
     # Note: postgres + sqlite combination doesn't make sense as they're mutually exclusive database backends
     # But we can test them together to verify the build handles it
     "postgres,sqlite|Postgres + SQLite (both backends)"
-    "postgres,sqlite,use_output_columns|All features"
+    "postgres,sqlite,use_output_columns|Postgres + SQLite + use_output_columns"
+    "postgres,sqlite,migrations|Postgres + SQLite + migrations"
+    "postgres,sqlite,use_output_columns,migrations|All features"
+    "postgres,sqlite,check_duplicate_table_names|Postgres + SQLite + check_duplicate_table_names"
+    "postgres,sqlite,migrations,check_duplicate_table_names|Postgres + SQLite + migrations + check_duplicate_table_names"
+    "postgres,sqlite,use_output_columns,check_duplicate_table_names|Postgres + SQLite + use_output_columns + check_duplicate_table_names"
+    "postgres,sqlite,use_output_columns,migrations,check_duplicate_table_names|All features + check_duplicate_table_names"
 )
 
 # Test each feature combination with and without LIBSQLITE3_FLAGS

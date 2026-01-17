@@ -1,11 +1,13 @@
 #!/bin/bash
 
 # test-all.sh - Run ALL tests for sqlite and postgres
-# Usage: ./test-all.sh [--math] [--use-output-columns]
+# Usage: ./test-all.sh [--math] [--use-output-columns] [--migrations] [--check-duplicate-table-names]
 # Example: ./test-all.sh
 # Example: ./test-all.sh --math
 # Example: ./test-all.sh --use-output-columns
-# Example: ./test-all.sh --math --use-output-columns
+# Example: ./test-all.sh --migrations
+# Example: ./test-all.sh --check-duplicate-table-names
+# Example: ./test-all.sh --math --use-output-columns --migrations
 
 set +e
 
@@ -19,6 +21,8 @@ NC='\033[0m' # No Color
 # Parse arguments
 USE_MATH=false
 USE_OUTPUT_COLUMNS=false
+USE_MIGRATIONS=false
+USE_CHECK_DUPLICATE_TABLE_NAMES=false
 
 while [[ $# -gt 0 ]]; do
     case $1 in
@@ -30,15 +34,25 @@ while [[ $# -gt 0 ]]; do
             USE_OUTPUT_COLUMNS=true
             shift
             ;;
+        --migrations)
+            USE_MIGRATIONS=true
+            shift
+            ;;
+        --check-duplicate-table-names)
+            USE_CHECK_DUPLICATE_TABLE_NAMES=true
+            shift
+            ;;
         *)
             echo -e "${RED}Error: Unknown option $1${NC}"
-            echo "Usage: $0 [--math] [--use-output-columns]"
+            echo "Usage: $0 [--math] [--use-output-columns] [--migrations] [--check-duplicate-table-names]"
             echo ""
             echo "Examples:"
             echo "  $0"
             echo "  $0 --math"
             echo "  $0 --use-output-columns"
-            echo "  $0 --math --use-output-columns"
+            echo "  $0 --migrations"
+            echo "  $0 --check-duplicate-table-names"
+            echo "  $0 --math --use-output-columns --migrations"
             exit 1
             ;;
     esac
@@ -57,6 +71,20 @@ FEATURES=""
 if [ "$USE_OUTPUT_COLUMNS" = true ]; then
     FEATURES="use_output_columns"
 fi
+if [ "$USE_MIGRATIONS" = true ]; then
+    if [ -n "$FEATURES" ]; then
+        FEATURES="$FEATURES,migrations"
+    else
+        FEATURES="migrations"
+    fi
+fi
+if [ "$USE_CHECK_DUPLICATE_TABLE_NAMES" = true ]; then
+    if [ -n "$FEATURES" ]; then
+        FEATURES="$FEATURES,check_duplicate_table_names"
+    else
+        FEATURES="check_duplicate_table_names"
+    fi
+fi
 
 # Setup environment
 if [ "$USE_MATH" = true ]; then
@@ -69,6 +97,7 @@ fi
 echo -e "${BLUE}╔════════════════════════════════════════════════════════════════╗${NC}"
 echo -e "${BLUE}║         Running ALL Tests${NC}"
 echo -e "${BLUE}║         Math: ${USE_MATH} | use_output_columns: ${USE_OUTPUT_COLUMNS}${NC}"
+echo -e "${BLUE}║         migrations: ${USE_MIGRATIONS} | check_duplicate_table_names: ${USE_CHECK_DUPLICATE_TABLE_NAMES}${NC}"
 echo -e "${BLUE}╚════════════════════════════════════════════════════════════════╝${NC}"
 echo ""
 

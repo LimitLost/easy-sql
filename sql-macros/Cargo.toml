@@ -25,3 +25,5 @@ easy-macros = { version="1.0.2", features = ["build"] }
 default = []
 use_output_columns = []
 parse_debug = []
+migrations = ["sql-compilation-data/migrations"]
+check_duplicate_table_names = ["sql-compilation-data/check_duplicate_table_names"]

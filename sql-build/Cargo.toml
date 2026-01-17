@@ -18,3 +18,7 @@ anyhow = { version = "1" }
 sql-compilation-data = { path = "../sql-compilation-data", features = [
     "build",
 ] }
+
+[features]
+migrations = ["sql-compilation-data/migrations"]
+check_duplicate_table_names = ["sql-compilation-data/check_duplicate_table_names"]

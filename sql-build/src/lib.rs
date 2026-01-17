@@ -1,21 +1,26 @@
-use std::{
-    collections::{HashMap, hash_map::Entry},
-    io::Write,
-    path::Path,
+use std::{io::Write, path::Path};
+#[cfg(feature = "migrations")]
+use {
+    quote::quote,
+    sql_compilation_data::{TableData, TableDataVersion},
+    std::collections::{HashMap, hash_map::Entry},
+    syn::LitInt,
 };
 
 use ::{
     anyhow::{self, Context},
     proc_macro2::LineColumn,
-    quote::{ToTokens, quote},
+    quote::ToTokens,
     syn::{
-        self, ItemFn, ItemImpl, ItemTrait, LitInt, LitStr, Macro, Meta, punctuated::Punctuated,
+        self, ItemFn, ItemImpl, ItemTrait, LitStr, Macro, Meta, punctuated::Punctuated,
         spanned::Spanned,
     },
 };
 use convert_case::{Case, Casing};
-use easy_macros::{all_syntax_cases, always_context, context, get_attributes};
-use sql_compilation_data::{CompilationData, TableData, TableDataVersion};
+use easy_macros::{all_syntax_cases, always_context, context, get_attributes, has_attributes};
+use sql_compilation_data::CompilationData;
+#[cfg(feature = "check_duplicate_table_names")]
+use {sql_compilation_data::TableNameData, std::path::PathBuf};
 #[derive(Debug)]
 struct SearchData {
     ///When parsing rust files
@@ -30,6 +35,10 @@ struct SearchData {
     found_existing_tables_ids: Vec<String>,
     //Use also created_unique_ids to check if tables were updated
     tables_updated: bool,
+    #[cfg(feature = "check_duplicate_table_names")]
+    base_dir: PathBuf,
+    #[cfg(feature = "check_duplicate_table_names")]
+    current_file_relative: Option<String>,
     ///Will be added to logs
     /// Also add to logs when there were no errors
     unsorted_errors: Vec<anyhow::Error>,
@@ -37,6 +46,26 @@ struct SearchData {
 }
 
 impl SearchData {
+    #[cfg(feature = "check_duplicate_table_names")]
+    fn new(compilation_data: CompilationData, base_dir: PathBuf) -> Self {
+        SearchData {
+            errors_found: false,
+            found: false,
+            updates: Vec::new(),
+            created_unique_ids: Vec::new(),
+            compilation_data,
+            found_existing_tables_ids: Vec::new(),
+            tables_updated: false,
+            #[cfg(feature = "check_duplicate_table_names")]
+            base_dir,
+            #[cfg(feature = "check_duplicate_table_names")]
+            current_file_relative: None,
+            unsorted_errors: Vec::new(),
+            file_matched_errors: Vec::new(),
+        }
+    }
+
+    #[cfg(not(feature = "check_duplicate_table_names"))]
     fn new(compilation_data: CompilationData) -> Self {
         SearchData {
             errors_found: false,
@@ -118,6 +147,14 @@ fn struct_table_handle(
         //No Sql Table derive
         return Ok(());
     }
+
+    // Check for no_version attribute
+    let _no_version = has_attributes!(item, #[sql(no_version)]);
+
+    // Skip migrations if no_version is set
+    #[cfg(feature = "migrations")]
+    let skip_migrations = _no_version;
+
     //Check is unique_id present
     let mut unique_id = None;
     for attr_data in get_attributes!(item, #[sql(unique_id = __unknown__)]) {
@@ -132,6 +169,7 @@ fn struct_table_handle(
         unique_id = Some(lit_str.value());
     }
     //Unique Id
+    #[cfg(feature = "migrations")]
     let newly_created = if unique_id.is_none() {
         //Create unique_id
         let generated = context_info.compilation_data.generate_unique_id();
@@ -145,22 +183,11 @@ fn struct_table_handle(
         false
     };
 
-    let unique_id = unique_id.unwrap();
-
-    context_info
-        .found_existing_tables_ids
-        .push(unique_id.clone());
-
-    //Check if table version has changed
-    let mut version = None;
-    for attr_data in get_attributes!(item, #[sql(version = __unknown__)]) {
-        let lit_int: LitInt = syn::parse2(attr_data.clone())?;
-        version = Some(lit_int.base10_parse::<i64>()?);
+    if let Some(unique_id) = unique_id.clone() {
+        context_info
+            .found_existing_tables_ids
+            .push(unique_id.clone());
     }
-
-    //Version attribute should exist. if it doesn't error by derive macro should be shown
-    #[no_context]
-    let version = version.context("Version attribute should exist")?;
 
     match &item.fields {
         syn::Fields::Named(_) => {}
@@ -178,38 +205,74 @@ fn struct_table_handle(
         break;
     }
 
-    //Generate table version data
-    let version_data = TableDataVersion::from_struct(item, table_name.clone())?;
+    #[cfg(feature = "check_duplicate_table_names")]
+    {
+        let file_name = context_info
+            .current_file_relative
+            .clone()
+            .unwrap_or_else(|| "<unknown file>".to_string());
 
-    //Migration check if data exists before
-    if !newly_created {
         context_info
             .compilation_data
-            .generate_migrations(&unique_id, &version_data, version, &quote! {}, &quote! {})
-            .with_context(|| format!("Compilation data: {:?}", context_info.compilation_data))?;
+            .used_table_names
+            .entry(table_name.clone())
+            .or_insert_with(Vec::new)
+            .push(TableNameData {
+                filename: file_name,
+                struct_name: item.ident.to_string(),
+            });
     }
 
-    match context_info.compilation_data.tables.entry(unique_id) {
-        Entry::Occupied(occupied_entry) => {
-            let table_data = occupied_entry.into_mut();
-            //Ignore when current version is smaller than the latest version (Error by derive macro)
-            if table_data.latest_version < version {
-                table_data.saved_versions.insert(version, version_data);
+    #[cfg(feature = "migrations")]
+    {
+        let unique_id = unique_id.unwrap();
 
-                table_data.latest_version = version;
-                context_info.tables_updated = true;
-            }
+        //Check if table version has changed
+        let mut version = None;
+        for attr_data in get_attributes!(item, #[sql(version = __unknown__)]) {
+            let lit_int: LitInt = syn::parse2(attr_data.clone())?;
+            version = Some(lit_int.base10_parse::<i64>()?);
         }
-        Entry::Vacant(vacant_entry) => {
-            let mut saved_versions = HashMap::new();
-            saved_versions.insert(version, version_data);
 
-            let table_data = TableData {
-                latest_version: version,
-                saved_versions,
-            };
+        //Version attribute should exist. if it doesn't error by derive macro should be shown
+        #[no_context]
+        let version = version.context("Version attribute should exist")?;
 
-            vacant_entry.insert(table_data);
+        //Generate table version data
+        let version_data = TableDataVersion::from_struct(item, table_name.clone())?;
+
+        //Migration check if data exists before
+        if !newly_created {
+            context_info
+                .compilation_data
+                .generate_migrations(&unique_id, &version_data, version, &quote! {}, &quote! {})
+                .with_context(|| {
+                    format!("Compilation data: {:?}", context_info.compilation_data)
+                })?;
+        }
+
+        match context_info.compilation_data.tables.entry(unique_id) {
+            Entry::Occupied(occupied_entry) => {
+                let table_data = occupied_entry.into_mut();
+                //Ignore when current version is smaller than the latest version (Error by derive macro)
+                if table_data.latest_version < version {
+                    table_data.saved_versions.insert(version, version_data);
+
+                    table_data.latest_version = version;
+                    context_info.tables_updated = true;
+                }
+            }
+            Entry::Vacant(vacant_entry) => {
+                let mut saved_versions = HashMap::new();
+                saved_versions.insert(version, version_data);
+
+                let table_data = TableData {
+                    latest_version: version,
+                    saved_versions,
+                };
+
+                vacant_entry.insert(table_data);
+            }
         }
     }
 
@@ -312,6 +375,16 @@ fn handle_file(file_path: impl AsRef<Path>, search_data: &mut SearchData) -> any
         _ => return Ok(()),
     }
 
+    #[cfg(feature = "check_duplicate_table_names")]
+    {
+        let file_relative = file_path
+            .strip_prefix(&search_data.base_dir)
+            .unwrap_or(file_path)
+            .to_string_lossy()
+            .to_string();
+        search_data.current_file_relative = Some(file_relative);
+    }
+
     // Read the file
     let mut contents = std::fs::read_to_string(file_path)?;
     //Operate on syn::File
@@ -387,6 +460,11 @@ fn handle_file(file_path: impl AsRef<Path>, search_data: &mut SearchData) -> any
         ));
     }
 
+    #[cfg(feature = "check_duplicate_table_names")]
+    {
+        search_data.current_file_relative = None;
+    }
+
     Ok(())
 }
 
@@ -450,8 +528,20 @@ fn build_result(ignore_list: &[regex::Regex], default_drivers: &[&str]) -> anyho
         .map(|s| s.to_string())
         .collect::<Vec<_>>();
 
+    #[cfg(feature = "check_duplicate_table_names")]
+    let mut search_data = SearchData::new(
+        CompilationData::load(default_drivers_mapped.clone(), true)?,
+        current_dir.clone(),
+    );
+
+    #[cfg(not(feature = "check_duplicate_table_names"))]
     let mut search_data =
         SearchData::new(CompilationData::load(default_drivers_mapped.clone(), true)?);
+
+    #[cfg(feature = "check_duplicate_table_names")]
+    {
+        search_data.compilation_data.used_table_names.clear();
+    }
 
     handle_dir(&src_dir, ignore_list, base_path_len_bytes, &mut search_data)?;
 

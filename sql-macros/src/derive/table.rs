@@ -4,13 +4,15 @@ use ::{
     anyhow::{self, Context},
     proc_macro2::TokenStream,
     quote::{ToTokens, quote},
-    syn::{self, LitInt, LitStr},
+    syn::{self, LitStr},
 };
 use convert_case::{Case, Casing};
 use easy_macros::{
-    TokensBuilder, always_context, context, get_attributes, has_attributes, parse_macro_input,
+    TokensBuilder, always_context, get_attributes, has_attributes, parse_macro_input,
 };
-use sql_compilation_data::{CompilationData, TableDataVersion};
+use sql_compilation_data::CompilationData;
+#[cfg(feature = "migrations")]
+use {easy_macros::context, sql_compilation_data::TableDataVersion, syn::LitInt};
 
 use crate::{
     derive::{sql_insert_base, sql_output_base, sql_update_base},
@@ -68,6 +70,8 @@ pub fn table(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::TokenS
 
     let mut table_name = item_name.to_string().to_case(Case::Snake);
 
+    let mut table_name_attr_used = false;
+
     //Use name provided by the user if it exists
     if let Some(attr_data) = get_attributes!(item, #[sql(table_name = __unknown__)])
         .into_iter()
@@ -76,9 +80,50 @@ pub fn table(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::TokenS
         let lit_str: LitStr = syn::parse2(attr_data.clone())
             .context("Invalid table name provided, expected string with  quotes")?;
         table_name = lit_str.value();
+        table_name_attr_used = true;
     }
+    #[cfg(feature = "migrations")]
+    let no_version = has_attributes!(item, #[sql(no_version)]);
+
+    // Determine if migrations should be skipped
+    #[cfg(not(feature = "migrations"))]
+    let skip_migrations = true;
+
+    #[cfg(feature = "migrations")]
+    let skip_migrations = no_version;
 
     let compilation_data = CompilationData::load(Vec::<String>::new(), false)?;
+
+    #[cfg(feature = "check_duplicate_table_names")]
+    if let Some(entries) = compilation_data.used_table_names.get(&table_name) {
+        if entries.len() > 1 {
+            let mut lines = entries
+                .iter()
+                .map(|entry| format!("- {} (file: {})", entry.struct_name, entry.filename))
+                .collect::<Vec<_>>();
+            lines.sort();
+
+            if table_name_attr_used {
+                anyhow::bail!(
+                    "Multiple tables use the same table name `{}`.\n\
+Each table name must be unique.\n\
+Found in:\n{}\n\
+Tip: change `#[sql(table_name = ...)]`",
+                    table_name,
+                    lines.join("\n")
+                );
+            } else {
+                anyhow::bail!(
+                    "Multiple tables use the same table name `{}`.\n\
+Each table name must be unique.\n\
+Found in:\n{}\n\
+Tip: Use `#[sql(table_name = ...)]` or rename one of the structs",
+                    table_name,
+                    lines.join("\n")
+                );
+            }
+        }
+    }
 
     let supported_drivers = super::supported_drivers(&item, &compilation_data)?;
 
@@ -86,8 +131,10 @@ pub fn table(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::TokenS
         .iter()
         .any(|d| d.to_token_stream().to_string().ends_with("Sqlite"));
 
+    #[cfg(feature = "migrations")]
     let mut table_version = None;
 
+    #[cfg(feature = "migrations")]
     for version in get_attributes!(item, #[sql(version = __unknown__)]) {
         if table_version.is_some() {
             anyhow::bail!("Only one version attribute is allowed");
@@ -100,46 +147,66 @@ pub fn table(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::TokenS
         table_version = Some(n);
     }
 
-    #[no_context_inputs]
-    let table_version =
-        table_version.with_context(context!("#[sql(version = x)] attribute is required"))?;
+    #[cfg(feature = "migrations")]
+    if no_version && table_version.is_some() {
+        return Err(syn::Error::new_spanned(
+            &item.ident,
+            "#[sql(no_version)] and #[sql(version = ...)] are mutually exclusive. \
+             Use #[sql(no_version)] to disable migrations, or #[sql(version = ...)] to enable them, but not both."
+        ).into());
+    }
 
-    //Sqlite doesn't support unsigned integers, so we need to do this
-    let table_version_i64 = table_version as i64;
-
-    let unique_id=get_attributes!(item, #[sql(unique_id = __unknown__)]).into_iter().next().context("Sql build macro is required (reload VS Code or save if unique id is already generated)")?;
-    let unique_id: LitStr = syn::parse2(unique_id.clone()).context("Unique id should be string")?;
-
-    let converted_to_version = TableDataVersion::from_struct(&item, table_name.clone())?;
-
-    //Generate migrations
-    //Check if old version is the same, show error otherwise
-
-    let migrations = if let Some(table_data) = compilation_data.tables.get(&unique_id.value()) {
-        let migrations = compilation_data.generate_migrations(
-            &unique_id.value(),
-            &converted_to_version,
-            table_version,
-            &sql_crate,
-            &item_name.to_token_stream(),
-        )?;
-
-        if let Some(this_version) = table_data.saved_versions.get(&table_version)
-            && this_version != &converted_to_version
-        {
-            return Err(anyhow::anyhow!(
-                    "When you're done with making changes to the table, don't forget to update the version number in the #[sql(version = x)] attribute!"
-                )).with_context(context!("table in easy_sql.ron: {:?}\r\n\r\nnew table structure: {:?}",this_version,converted_to_version));
-        }
-
-        migrations
+    #[cfg(feature = "migrations")]
+    let (table_version_i64, migrations, unique_id) = if skip_migrations {
+        (0i64, quote! { Vec::new() }, quote! { "" })
     } else {
-        anyhow::bail!(
-            "Table with unique id {} not found in the compilation data (try to save the file)\r\n=====\r\nDEBUG: Compilation data expected location: `{}`",
-            unique_id.value(),
-            CompilationData::data_location()?.display()
-        );
+        #[no_context_inputs]
+        let table_version =
+            table_version.with_context(context!("Either #[sql(version = x)] (enable migrations) or #[sql(no_version)] (skip migrations) attribute is required"))?;
+
+        //Sqlite doesn't support unsigned integers, so we need to do this
+        let table_version_i64 = table_version as i64;
+
+        let unique_id_attr=get_attributes!(item, #[sql(unique_id = __unknown__)]).into_iter().next().context("Sql build macro is required (reload VS Code or save if unique id is already generated)")?;
+        let unique_id_lit: LitStr =
+            syn::parse2(unique_id_attr.clone()).context("Unique id should be string")?;
+
+        let converted_to_version = TableDataVersion::from_struct(&item, table_name.clone())?;
+
+        let migrations = if let Some(table_data) =
+            compilation_data.tables.get(&unique_id_lit.value())
+        {
+            let migrations = compilation_data.generate_migrations(
+                &unique_id_lit.value(),
+                &converted_to_version,
+                table_version,
+                &sql_crate,
+                &item_name.to_token_stream(),
+            )?;
+
+            if let Some(this_version) = table_data.saved_versions.get(&table_version)
+                && this_version != &converted_to_version
+            {
+                return Err(anyhow::anyhow!(
+                        "When you're done with making changes to the table, don't forget to update the version number in the #[sql(version = x)] attribute!"
+                    )).with_context(context!("table in easy_sql.ron: {:?}\r\n\r\nnew table structure: {:?}",this_version,converted_to_version));
+            }
+
+            migrations
+        } else {
+            anyhow::bail!(
+                "Table with unique id {} not found in the compilation data (try to save the file)\r\n=====\r\nDEBUG: Compilation data expected location: `{}`",
+                unique_id_lit.value(),
+                CompilationData::data_location()?.display()
+            );
+        };
+
+        let unique_id = unique_id_lit.to_token_stream();
+        (table_version_i64, migrations, unique_id)
     };
+
+    #[cfg(not(feature = "migrations"))]
+    let (table_version_i64, migrations, unique_id) = (0i64, quote! { Vec::new() }, quote! { "" });
 
     let mut result_builder = TokensBuilder::default();
 
@@ -340,52 +407,69 @@ pub fn table(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::TokenS
             foreign_keys_converted
         };
 
+        let create_table = quote! {
+            <#driver as #sql_crate::Driver>::create_table(
+                    conn,
+                    #table_name,
+                    vec![
+                        #(
+                        #sql_crate::TableField{
+                            name: #field_names_str,
+                            data_type: #field_types,
+                            is_unique: #is_unique,
+                            is_not_null: #is_not_null,
+                            default: #default_values,
+                            is_auto_increment: #is_auto_increment_list,
+                        },
+                        )*
+                    ],
+                    vec![#(#primary_keys),*],
+                    {
+                        vec![#(#foreign_keys),*]
+                        .into_iter()
+                        .collect()
+                    },
+                ).await?;
+        };
+
+        let setup_body = if skip_migrations {
+            // Without migrations, just create the table without version tracking
+            quote! {
+                #create_table
+                Ok(())
+            }
+        } else {
+            // With migrations, use version tracking and migrations
+            quote! {
+                use #macro_support::Context;
+
+                let current_version_number = #sql_crate::EasySqlTables_get_version!(#driver, *conn,#unique_id);
+
+                if let Some(current_version_number) = current_version_number{
+                    use #sql_crate::EasyExecutor;
+
+                    #migrations
+                }else{
+                    // Create table and create version in EasySqlTables
+                    #create_table
+                    #sql_crate::EasySqlTables_create!(#driver, *conn, #unique_id.to_string(), #table_version_i64);
+                }
+
+                Ok(())
+            }
+        };
+
         result_builder.add(quote! {
             impl #sql_crate::DatabaseSetup<#driver> for #item_name {
 
                 async fn setup(
                     conn: &mut (impl #sql_crate::EasyExecutor<#driver> + Send + Sync),
                 ) -> #macro_support::Result<()> {
-                    use #macro_support::Context;
-
-                    let current_version_number = #sql_crate::EasySqlTables_get_version!(#driver, *conn,#unique_id);
-
-                    if let Some(current_version_number) = current_version_number{
-                        use #sql_crate::EasyExecutor;
-
-                        #migrations
-                    }else{
-                        // Create table and create version in EasySqlTables
-                        <#driver as #sql_crate::Driver>::create_table(
-                            conn,
-                            #table_name,
-                            vec![
-                                #(
-                                #sql_crate::TableField{
-                                    name: #field_names_str,
-                                    data_type: #field_types,
-                                    is_unique: #is_unique,
-                                    is_not_null: #is_not_null,
-                                    default: #default_values,
-                                    is_auto_increment: #is_auto_increment_list,
-                                },
-                                )*
-                            ],
-                            vec![#(#primary_keys),*],
-                            {
-                                vec![#(#foreign_keys),*]
-                                .into_iter()
-                                .collect()
-                            },
-                        ).await?;
-                        #sql_crate::EasySqlTables_create!(#driver, *conn, #unique_id.to_string(), #table_version_i64);
-                    }
-
-                    Ok(())
+                    #setup_body
                 }
             }
 
-        }    );
+        });
     }
 
     result_builder.add(quote! {

@@ -1,10 +1,12 @@
 #!/bin/bash
 
 # test-specific.sh - Run specific test(s) for sqlite and postgres
-# Usage: ./test-specific.sh [--math] [--use-output-columns] <test_name_pattern>
+# Usage: ./test-specific.sh [--math] [--use-output-columns] [--migrations] [--check-duplicate-table-names] <test_name_pattern>
 # Example: ./test-specific.sh test_insert
 # Example: ./test-specific.sh --math test_function_sqrt
 # Example: ./test-specific.sh --use-output-columns test_custom_select
+# Example: ./test-specific.sh --migrations test_insert
+# Example: ./test-specific.sh --check-duplicate-table-names test_insert
 
 set +e
 
@@ -18,6 +20,8 @@ NC='\033[0m' # No Color
 # Parse arguments
 USE_MATH=false
 USE_OUTPUT_COLUMNS=false
+USE_MIGRATIONS=false
+USE_CHECK_DUPLICATE_TABLE_NAMES=false
 TEST_PATTERN=""
 
 while [[ $# -gt 0 ]]; do
@@ -30,6 +34,14 @@ while [[ $# -gt 0 ]]; do
             USE_OUTPUT_COLUMNS=true
             shift
             ;;
+        --migrations)
+            USE_MIGRATIONS=true
+            shift
+            ;;
+        --check-duplicate-table-names)
+            USE_CHECK_DUPLICATE_TABLE_NAMES=true
+            shift
+            ;;
         *)
             TEST_PATTERN="$1"
             shift
@@ -40,13 +52,15 @@ done
 # Check if test pattern is provided
 if [ -z "$TEST_PATTERN" ]; then
     echo -e "${RED}Error: No test pattern provided${NC}"
-    echo "Usage: $0 [--math] [--use-output-columns] <test_name_pattern>"
+    echo "Usage: $0 [--math] [--use-output-columns] [--migrations] [--check-duplicate-table-names] <test_name_pattern>"
     echo ""
     echo "Examples:"
     echo "  $0 test_insert"
     echo "  $0 --math test_function_sqrt"
     echo "  $0 --use-output-columns test_custom_select"
-    echo "  $0 --math --use-output-columns test_query"
+    echo "  $0 --migrations test_insert"
+    echo "  $0 --check-duplicate-table-names test_insert"
+    echo "  $0 --math --use-output-columns --migrations test_query"
     exit 1
 fi
 
@@ -64,6 +78,20 @@ FEATURES=""
 if [ "$USE_OUTPUT_COLUMNS" = true ]; then
     FEATURES="use_output_columns"
 fi
+if [ "$USE_MIGRATIONS" = true ]; then
+    if [ -n "$FEATURES" ]; then
+        FEATURES="$FEATURES,migrations"
+    else
+        FEATURES="migrations"
+    fi
+fi
+if [ "$USE_CHECK_DUPLICATE_TABLE_NAMES" = true ]; then
+    if [ -n "$FEATURES" ]; then
+        FEATURES="$FEATURES,check_duplicate_table_names"
+    else
+        FEATURES="check_duplicate_table_names"
+    fi
+fi
 
 # Setup environment
 if [ "$USE_MATH" = true ]; then
@@ -76,6 +104,7 @@ fi
 echo -e "${BLUE}╔════════════════════════════════════════════════════════════════╗${NC}"
 echo -e "${BLUE}║         Testing: ${TEST_PATTERN}${NC}"
 echo -e "${BLUE}║         Math: ${USE_MATH} | use_output_columns: ${USE_OUTPUT_COLUMNS}${NC}"
+echo -e "${BLUE}║         migrations: ${USE_MIGRATIONS} | check_duplicate_table_names: ${USE_CHECK_DUPLICATE_TABLE_NAMES}${NC}"
 echo -e "${BLUE}╚════════════════════════════════════════════════════════════════╝${NC}"
 echo ""
 

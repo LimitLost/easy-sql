@@ -22,3 +22,5 @@ anyhow = { version = "1" }
 default = ["data"]
 data = ["ron", "easy-macros"]
 build=[]
+check_duplicate_table_names = []
+migrations = []
