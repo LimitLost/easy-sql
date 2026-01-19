@@ -189,7 +189,7 @@ fn struct_table_handle(
     }
     //Unique Id
     #[cfg(feature = "migrations")]
-    let newly_created = if unique_id.is_none() && version_test.is_none() {
+    let newly_created = if unique_id.is_none() && version_test.is_none() && !_no_version {
         //Create unique_id
         let generated = context_info.compilation_data.generate_unique_id();
         context_info
