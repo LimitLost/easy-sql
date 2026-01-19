@@ -6,3 +6,5 @@ use crate::drivers::sqlite::{Database, Sqlite as TestDriver};
 
 mod impl_macros;
 mod macros;
+#[cfg(feature = "migrations")]
+mod migrations;
