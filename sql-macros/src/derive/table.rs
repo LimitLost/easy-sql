@@ -338,18 +338,20 @@ Tip: Use `#[sql(table_name = ...)]` or rename one of the structs",
             let binary_field = if has_attributes!(field, #[sql(bytes)]) {
                 field_types.push(quote! {
                     {
-                        use #macro_support::TypeInfo;
-
-                        <Vec<u8> as #macro_support::Type<#sql_crate::InternalDriver<#driver>>>::type_info().name().to_owned()
+                        #macro_support::TypeInfo::name(
+                            &<Vec<u8> as #macro_support::Type<#sql_crate::InternalDriver<#driver>>>::type_info(),
+                        )
+                        .to_owned()
                     }
                 });
                 true
             } else {
                 field_types.push(quote! {
                     {
-                        use #macro_support::TypeInfo;
-
-                        <#field_type as #macro_support::Type<#sql_crate::InternalDriver<#driver>>>::type_info().name().to_owned()
+                        #macro_support::TypeInfo::name(
+                            &<#field_type as #macro_support::Type<#sql_crate::InternalDriver<#driver>>>::type_info(),
+                        )
+                        .to_owned()
                     }
                 });
 
@@ -378,22 +380,22 @@ Tip: Use `#[sql(table_name = ...)]` or rename one of the structs",
                     );
 
                     //Convert provided default value to bytes
-                    default_values.push(
-                        quote! {
-                            {
-                                use #macro_support::Context as _;
+                    default_values.push(quote! {
+                        {
+                            //Check if default value has valid type for the current column
+                            let _ = ||{
+                                let mut table_instance = #macro_support::never_any::<#item_name>();
+                                table_instance.#field_name = #default_value;
+                            };
 
-                                //Check if default value has valid type for the current column
-                                let _ = ||{
-                                    let mut table_instance = #macro_support::never_any::<#item_name>();
-                                    table_instance.#field_name = #default_value;
-                                };
+                            let default_v = #macro_support::Context::context(
+                                #sql_crate::to_binary(#default_value),
+                                #error_context,
+                            )?;
 
-                                let default_v = #sql_crate::to_binary(#default_value).context(#error_context)?;
-
-                                Some(#sql_crate::ToDefault::to_default(default_v))
-                            }
-                        });
+                            Some(#sql_crate::ToDefault::to_default(default_v))
+                        }
+                    });
                 } else {
                     default_values.push(quote! {
                         {
@@ -479,13 +481,11 @@ Tip: Use `#[sql(table_name = ...)]` or rename one of the structs",
         } else {
             // With migrations, use version tracking and migrations
             quote! {
-                use #macro_support::Context;
+                type _EasySqlMigrationDriver = #driver;
 
                 let current_version_number = #sql_crate::EasySqlTables_get_version!(#driver, *conn,#unique_id);
 
                 if let Some(current_version_number) = current_version_number{
-                    use #sql_crate::EasyExecutor;
-
                     #migrations
                 }else{
                     // Create table and create version in EasySqlTables

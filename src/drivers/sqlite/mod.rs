@@ -11,7 +11,6 @@ mod to_convert_impl;
 mod to_default_impl;
 
 mod alter_table;
-pub use alter_table::*;
 mod create_table;
 pub use create_table::*;
 mod table_exists;

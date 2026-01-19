@@ -1,22 +1,21 @@
-use super::Sqlite;
 use anyhow::Context;
 use easy_macros::{always_context, context};
 
-use super::table_field_definition;
+use super::{Postgres, table_field_definition};
 use crate::{AlterTable, AlterTableSingle, EasyExecutor, SetupSql};
 
 #[always_context]
-impl SetupSql<Sqlite> for AlterTable {
+impl SetupSql<Postgres> for AlterTable {
     type Output = ();
 
-    async fn query(self, exec: &mut impl EasyExecutor<Sqlite>) -> anyhow::Result<Self::Output> {
+    async fn query(self, exec: &mut impl EasyExecutor<Postgres>) -> anyhow::Result<Self::Output> {
         let mut queries_done = Vec::new();
 
         for alter in self.alters {
             match alter {
                 AlterTableSingle::RenameTable { new_table_name } => {
                     let query = format!(
-                        "ALTER TABLE {} RENAME TO {}",
+                        "ALTER TABLE \"{}\" RENAME TO \"{}\"",
                         self.table_name, new_table_name
                     );
 
@@ -36,13 +35,13 @@ impl SetupSql<Sqlite> for AlterTable {
                 AlterTableSingle::AddColumn { column } => {
                     let column_def = table_field_definition(column);
                     let column_def = column_def.trim_end_matches(',').trim_end();
-                    let query =
-                        format!("ALTER TABLE {} ADD COLUMN {}", self.table_name, column_def);
-
-                    let sqlx_query = sqlx::query(&query);
+                    let query = format!(
+                        "ALTER TABLE \"{}\" ADD COLUMN {}",
+                        self.table_name, column_def
+                    );
 
                     #[no_context]
-                    sqlx_query
+                    sqlx::query(&query)
                         .execute(exec.executor())
                         .await
                         .with_context(context!(
@@ -59,7 +58,7 @@ impl SetupSql<Sqlite> for AlterTable {
                     new_column_name,
                 } => {
                     let query = format!(
-                        "ALTER TABLE {} RENAME COLUMN {} TO {}",
+                        "ALTER TABLE \"{}\" RENAME COLUMN \"{}\" TO \"{}\"",
                         self.table_name, old_column_name, new_column_name
                     );
 

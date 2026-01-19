@@ -2,6 +2,7 @@ mod table_exists;
 pub use table_exists::*;
 mod create_table;
 pub use create_table::*;
+mod alter_table;
 mod database;
 pub use database::*;
 

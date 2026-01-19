@@ -19,6 +19,7 @@ impl HasTable<EasySqlTables> for EasySqlTables {}
 #[macro_export]
 macro_rules! EasySqlTables_create {
     ($driver:path, $conn:expr, $table_id:expr, $version:expr) => {
+        use $crate::macro_support::Context;
         let inserted = $crate::EasySqlTables {
             table_id: $table_id,
             version: $version,
@@ -35,6 +36,7 @@ macro_rules! EasySqlTables_create {
 #[macro_export]
 macro_rules! EasySqlTables_update_version {
     ($driver:path, $conn:expr, $table_id:expr, $new_version:expr) => {{
+        use $crate::macro_support::Context;
 
         $crate::query!($conn, UPDATE $crate::EasySqlTables SET version = { $new_version } WHERE table_id = { $table_id })
             .await
