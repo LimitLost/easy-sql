@@ -25,6 +25,21 @@ declare -a FAILED_CONFIGS
 declare -a PASSED_CONFIGS
 declare -a ALL_CONFIGS
 
+print_error_context() {
+    local output="$1"
+    echo "$output" | awk '
+        /error\[E[0-9]+\]|^error:/{
+            print;
+            lines=10;
+            next;
+        }
+        lines > 0 {
+            print;
+            lines--;
+        }
+    '
+}
+
 # Function to print section header
 print_header() {
     echo -e "\n${BLUE}================================================${NC}"
@@ -102,7 +117,11 @@ run_test() {
     echo -e "${BLUE}[BUILD]${NC} cargo build --no-default-features --features \"$features\""
     local build_output=$(cargo build --no-default-features --features "$features" 2>&1)
     local build_status=$?
-    echo "$build_output" | grep -E "(Compiling|Finished|error)" | tail -10
+    if echo "$build_output" | grep -q "error"; then
+        print_error_context "$build_output"
+    else
+        echo "$build_output" | tail -10
+    fi
     
     # Also check if build output contains "error" to catch compile errors
     if echo "$build_output" | grep -q "^error"; then
@@ -114,7 +133,11 @@ run_test() {
         echo -e "${BLUE}[TEST]${NC} cargo test --no-default-features --features \"$features\""
         local test_output=$(cargo test --no-default-features --features "$features" 2>&1)
         local test_status=$?
-        echo "$test_output" | tail -20
+        if echo "$test_output" | grep -q "error"; then
+            print_error_context "$test_output"
+        else
+            echo "$test_output" | tail -20
+        fi
         
         # Also check if test output contains "error" to catch test errors
         if echo "$test_output" | grep -q "^error"; then
@@ -130,7 +153,7 @@ run_test() {
         fi
     else
         echo -e "${RED}Build failed${NC}"
-        echo "$build_output" | tail -20
+        print_error_context "$build_output"
         print_result 1 "$config_name" "$env_info"
         return 1
     fi
@@ -214,7 +237,11 @@ echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━�
 echo -e "${BLUE}[BUILD]${NC} cargo build --no-default-features"
 build_output=$(cargo build --no-default-features 2>&1)
 build_status=$?
-echo "$build_output" | grep -E "(Compiling|Finished|error)" | tail -10
+if echo "$build_output" | grep -q "error"; then
+    print_error_context "$build_output"
+else
+    echo "$build_output" | tail -10
+fi
 
 # Also check if build output contains "error" to catch compile errors
 if echo "$build_output" | grep -q "^error"; then
@@ -225,7 +252,11 @@ if [ $build_status -eq 0 ]; then
     echo -e "${BLUE}[TEST]${NC} cargo test --no-default-features"
     test_output=$(cargo test --no-default-features 2>&1)
     test_status=$?
-    echo "$test_output" | tail -20
+    if echo "$test_output" | grep -q "error"; then
+        print_error_context "$test_output"
+    else
+        echo "$test_output" | tail -20
+    fi
     
     # Also check if test output contains "error" to catch test errors
     if echo "$test_output" | grep -q "^error"; then
@@ -239,7 +270,7 @@ if [ $build_status -eq 0 ]; then
     fi
 else
     echo -e "${RED}Build failed${NC}"
-    echo "$build_output" | tail -20
+    print_error_context "$build_output"
     print_result 1 "No features" "[without LIBSQLITE3_FLAGS]"
 fi
 
@@ -250,7 +281,11 @@ export LIBSQLITE3_FLAGS="-DSQLITE_ENABLE_MATH_FUNCTIONS"
 echo -e "${BLUE}[BUILD]${NC} cargo build --no-default-features"
 build_output=$(cargo build --no-default-features 2>&1)
 build_status=$?
-echo "$build_output" | grep -E "(Compiling|Finished|error)" | tail -10
+if echo "$build_output" | grep -q "error"; then
+    print_error_context "$build_output"
+else
+    echo "$build_output" | tail -10
+fi
 
 # Also check if build output contains "error" to catch compile errors
 if echo "$build_output" | grep -q "^error"; then
@@ -261,7 +296,11 @@ if [ $build_status -eq 0 ]; then
     echo -e "${BLUE}[TEST]${NC} cargo test --no-default-features"
     test_output=$(cargo test --no-default-features 2>&1)
     test_status=$?
-    echo "$test_output" | tail -20
+    if echo "$test_output" | grep -q "error"; then
+        print_error_context "$test_output"
+    else
+        echo "$test_output" | tail -20
+    fi
     
     # Also check if test output contains "error" to catch test errors
     if echo "$test_output" | grep -q "^error"; then
@@ -275,7 +314,7 @@ if [ $build_status -eq 0 ]; then
     fi
 else
     echo -e "${RED}Build failed${NC}"
-    echo "$build_output" | tail -20
+    print_error_context "$build_output"
     print_result 1 "No features" "[with LIBSQLITE3_FLAGS]"
 fi
 unset LIBSQLITE3_FLAGS

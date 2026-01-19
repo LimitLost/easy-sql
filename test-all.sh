@@ -66,6 +66,21 @@ FAILED_TESTS=0
 # Arrays to store results
 declare -a FAILED_CONFIGS
 
+print_error_context() {
+    local output="$1"
+    echo "$output" | awk '
+        /error\[E[0-9]+\]|^error:/{
+            print;
+            lines=10;
+            next;
+        }
+        lines > 0 {
+            print;
+            lines--;
+        }
+    '
+}
+
 # Build features string
 FEATURES=""
 if [ "$USE_OUTPUT_COLUMNS" = true ]; then
@@ -120,8 +135,8 @@ run_all_tests() {
     
     if [ $build_status -ne 0 ]; then
         echo -e "${RED}✗ Build failed${NC}"
-        # Show compilation errors
-        echo "$build_output" | grep -E "error\[E[0-9]+\]" | head -10
+        # Show compilation errors with context
+        print_error_context "$build_output"
         FAILED_CONFIGS+=("$db_name")
         ((FAILED_TESTS++))
         ((TOTAL_TESTS++))
@@ -149,7 +164,7 @@ run_all_tests() {
         # Try to detect compilation errors
         if echo "$test_output" | grep -q "error\[E"; then
             echo -e "${RED}Compilation errors detected:${NC}"
-            echo "$test_output" | grep -E "error\[E[0-9]+\]" | head -5
+            print_error_context "$test_output"
         fi
         FAILED_CONFIGS+=("$db_name (no tests ran)")
         ((FAILED_TESTS++))
