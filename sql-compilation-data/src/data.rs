@@ -7,7 +7,11 @@ use std::{
 use anyhow::{self, Context};
 use quote::ToTokens;
 #[cfg(feature = "migrations")]
-use {easy_macros::TokensBuilder, proc_macro2::TokenStream, quote::quote};
+use {
+    easy_macros::TokensBuilder,
+    proc_macro2::{Span, TokenStream},
+    quote::quote,
+};
 
 use easy_macros::{
     always_context, get_attributes, has_attributes, token_stream_to_consistent_string,
@@ -281,6 +285,7 @@ impl CompilationData {
 
         for (version_number, version_data) in table_data.saved_versions.iter() {
             let mut changes_needed = Vec::new();
+            let mut rename_table = None;
 
             if version_number == &latest_version_number {
                 continue;
@@ -317,14 +322,12 @@ impl CompilationData {
             if version_data.table_name != latest_version.table_name {
                 let new_name = latest_version.table_name.as_str();
 
-                // Rename table
-                changes_needed.push(quote! {
+                rename_table = Some(quote! {
                     #sql_crate::AlterTableSingle::RenameTable{
                         new_table_name: #new_name,
                     }
                 });
             }
-
             // Check for old column change
             for (old_field, new_field) in
                 version_data.fields.iter().zip(latest_version.fields.iter())
@@ -334,7 +337,6 @@ impl CompilationData {
                     let old_name = old_field.name.as_str();
                     let new_name = new_field.name.as_str();
 
-                    // Rename field
                     changes_needed.push(quote! {
                         #sql_crate::AlterTableSingle::RenameColumn{
                             old_column_name: #old_name,
@@ -382,57 +384,26 @@ impl CompilationData {
                 }
 
                 let field_name = new_field.name.as_str();
+                let field_ident = syn::Ident::new(field_name, Span::call_site());
                 let data_type: syn::Type = syn::parse_str(new_field.field_type.as_str())?;
                 let is_not_null = !new_field.field_type.starts_with("Option<");
                 let is_unique = new_field.is_unique;
 
                 let default_value = if let Some(default_value) = new_field.default.as_deref() {
                     let default_expr: syn::Expr = syn::parse_str(default_value)?;
-                    if new_field.ty_to_bytes {
-                        let error_context = format!(
-                            "Converting default value `{default_value}` to bytes for field `{field_name}`, table_unique_id: `{current_unique_id}` migrating from version: `{version_number}` to version: `{latest_version_number}`",
-                        );
-                        //For compatibility sake
-                        let default_value = default_expr;
 
-                        //Convert provided default value to bytes
-                        quote! {
-                            {
-                                //Test if default value to_bytes will be successful
-                                //Even in release mode, just in case, it's low cost anyway
-                                #sql_crate::to_bytes(#default_value).context(#error_context)?;
+                    //For compatibility sake
+                    let default_value = default_expr;
 
-                                #sql_crate::lazy_static!{
-                                    static ref DEFAULT_VALUE: #sql_crate::SqlValueMaybeRef<'static> = #sql_crate::to_bytes(#default_value).unwrap().into();
-                                }
+                    quote! {
+                        {
+                            //Check if default value has valid type for the current column
+                            let _= ||{
+                                let mut table_instance = #macro_support::never_any::<#item_name>();
+                                table_instance.#field_ident = #default_value;
+                            };
 
-                                //Check if default value has valid type for the current column
-                                #sql_crate::never::never_fn(||{
-                                    let mut table_instance = #sql_crate::never::never_any::<#item_name>();
-                                    table_instance.#field_name = #default_value;
-                                });
-
-                                Some(&*DEFAULT_VALUE)
-                            }
-                        }
-                    } else {
-                        //For compatibility sake
-                        let default_value = default_expr;
-
-                        quote! {
-                            {
-                                #sql_crate::lazy_static!{
-                                    static ref DEFAULT_VALUE: #sql_crate::SqlValueMaybeRef<'static> = (#default_value).into();
-                                }
-
-                                //Check if default value has valid type for the current column
-                                #sql_crate::never::never_fn(||{
-                                    let mut table_instance = #sql_crate::never::never_any::<#item_name>();
-                                    table_instance.#field_name = #default_value;
-                                });
-
-                                Some(&*DEFAULT_VALUE)
-                            }
+                            Some(#sql_crate::ToDefault::to_default(#default_value))
                         }
                     }
                 } else {
@@ -446,29 +417,37 @@ impl CompilationData {
                     #sql_crate::AlterTableSingle::AddColumn{
                         column: #sql_crate::TableField {
                             name: #field_name,
-                            data_type: <#data_type as #macro_support::Type<#sql_crate::InternalDriver<D>>>::type_info()
-                            .name()
-                            .to_owned(),
+                            data_type: {
+                                #macro_support::TypeInfo::name(
+                                    &<#data_type as #macro_support::Type<#sql_crate::InternalDriver<_EasySqlMigrationDriver>>>::type_info(),
+                                )
+                                .to_owned()
+                            },
                             is_unique: #is_unique,
                             is_not_null: #is_not_null,
                             default: #default_value,
+                            is_auto_increment: false,
                         }
                     }
                 });
             }
 
+            if let Some(rename_table) = rename_table {
+                changes_needed.push(rename_table);
+            }
+
             //Generate Migration (if needed)
             if !changes_needed.is_empty() {
                 let version_number = *version_number;
-                let table_name = latest_version.table_name.as_str();
+                let table_name = version_data.table_name.as_str();
 
                 result.add(quote! {
                     if current_version_number == #version_number{
-                        conn.query_setup(#sql_crate::AlterTable{
+                        #sql_crate::EasyExecutor::query_setup(conn, #sql_crate::AlterTable{
                             table_name: #table_name,
                             alters: vec![#(#changes_needed),*],
                         }).await?;
-                        #sql_crate::EasySqlTables::update_version(conn, #table_name, #latest_version_number).await?;
+                        #sql_crate::EasySqlTables_update_version!(_EasySqlMigrationDriver, *conn, #current_unique_id, #latest_version_number);
                         return Ok(());
                     }
                 });
