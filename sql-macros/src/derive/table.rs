@@ -85,6 +85,19 @@ pub fn table(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::TokenS
     #[cfg(feature = "migrations")]
     let no_version = has_attributes!(item, #[sql(no_version)]);
 
+    #[cfg(feature = "migrations")]
+    let mut version_test: Option<LitInt> = None;
+
+    #[cfg(feature = "migrations")]
+    for attr_data in get_attributes!(item, #[sql(version_test = __unknown__)]) {
+        if version_test.is_some() {
+            anyhow::bail!("Only one version_test attribute is allowed");
+        }
+        let parsed: LitInt =
+            syn::parse2(attr_data.clone()).context("Expected version_test to be an integer")?;
+        version_test = Some(parsed);
+    }
+
     // Determine if migrations should be skipped
     #[cfg(not(feature = "migrations"))]
     let skip_migrations = true;
@@ -148,7 +161,7 @@ Tip: Use `#[sql(table_name = ...)]` or rename one of the structs",
     }
 
     #[cfg(feature = "migrations")]
-    if no_version && table_version.is_some() {
+    if no_version && (table_version.is_some() || version_test.is_some()) {
         return Err(syn::Error::new_spanned(
             &item.ident,
             "#[sql(no_version)] and #[sql(version = ...)] are mutually exclusive. \
@@ -157,9 +170,24 @@ Tip: Use `#[sql(table_name = ...)]` or rename one of the structs",
     }
 
     #[cfg(feature = "migrations")]
+    if version_test.is_some() && table_version.is_some() {
+        return Err(syn::Error::new_spanned(
+            &item.ident,
+            "#[sql(version_test = ...)] replaces #[sql(version = ...)] and they cannot be used together."
+        ).into());
+    }
+
+    #[cfg(feature = "migrations")]
     let (table_version_i64, migrations, unique_id) = if skip_migrations {
         (0i64, quote! { Vec::new() }, quote! { "" })
     } else {
+        if let Some(version_test) = &version_test {
+            let test_version = version_test
+                .base10_parse::<i64>()
+                .context("Expected base10 int for version_test")?;
+            table_version = Some(test_version);
+        }
+
         #[no_context_inputs]
         let table_version =
             table_version.with_context(context!("Either #[sql(version = x)] (enable migrations) or #[sql(no_version)] (skip migrations) attribute is required"))?;
@@ -167,7 +195,17 @@ Tip: Use `#[sql(table_name = ...)]` or rename one of the structs",
         //Sqlite doesn't support unsigned integers, so we need to do this
         let table_version_i64 = table_version as i64;
 
-        let unique_id_attr=get_attributes!(item, #[sql(unique_id = __unknown__)]).into_iter().next().context("Sql build macro is required (reload VS Code or save if unique id is already generated)")?;
+        let unique_id_attr = get_attributes!(item, #[sql(unique_id = __unknown__)])
+            .into_iter()
+            .next();
+
+        if version_test.is_some() && unique_id_attr.is_none() {
+            anyhow::bail!(
+                "#[sql(unique_id = ...)] is required when using #[sql(version_test = ...)]"
+            );
+        }
+
+        let unique_id_attr = unique_id_attr.context("Sql build macro is required (reload VS Code or save if unique id is already generated)")?;
         let unique_id_lit: LitStr =
             syn::parse2(unique_id_attr.clone()).context("Unique id should be string")?;
 

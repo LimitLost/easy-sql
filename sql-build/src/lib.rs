@@ -21,6 +21,7 @@ use easy_macros::{all_syntax_cases, always_context, context, get_attributes, has
 use sql_compilation_data::CompilationData;
 #[cfg(feature = "check_duplicate_table_names")]
 use {sql_compilation_data::TableNameData, std::path::PathBuf};
+
 #[derive(Debug)]
 struct SearchData {
     ///When parsing rust files
@@ -155,6 +156,20 @@ fn struct_table_handle(
     #[cfg(feature = "migrations")]
     let skip_migrations = _no_version;
 
+    #[cfg(feature = "migrations")]
+    let mut version_test: Option<LitInt> = None;
+
+    #[cfg(feature = "migrations")]
+    for attr_data in get_attributes!(item, #[sql(version_test = __unknown__)]) {
+        if version_test.is_some() {
+            anyhow::bail!("Only one version_test attribute is allowed");
+        }
+
+        let parsed: LitInt =
+            syn::parse2(attr_data.clone()).context("Expected version_test to be an integer")?;
+        version_test = Some(parsed);
+    }
+
     //Check is unique_id present
     let mut unique_id = None;
     for attr_data in get_attributes!(item, #[sql(unique_id = __unknown__)]) {
@@ -168,9 +183,13 @@ fn struct_table_handle(
         let lit_str: LitStr = syn::parse2(attr_data.clone())?;
         unique_id = Some(lit_str.value());
     }
+    #[cfg(feature = "migrations")]
+    if version_test.is_some() && unique_id.is_none() {
+        anyhow::bail!("#[sql(unique_id = ...)] is required when using #[sql(version_test = ...)]");
+    }
     //Unique Id
     #[cfg(feature = "migrations")]
-    let newly_created = if unique_id.is_none() {
+    let newly_created = if unique_id.is_none() && version_test.is_none() {
         //Create unique_id
         let generated = context_info.compilation_data.generate_unique_id();
         context_info
@@ -207,24 +226,35 @@ fn struct_table_handle(
 
     #[cfg(feature = "check_duplicate_table_names")]
     {
-        let file_name = context_info
-            .current_file_relative
-            .clone()
-            .unwrap_or_else(|| "<unknown file>".to_string());
+        #[cfg(feature = "migrations")]
+        let is_version_test = version_test.is_some();
+        #[cfg(not(feature = "migrations"))]
+        let is_version_test = false;
 
-        context_info
-            .compilation_data
-            .used_table_names
-            .entry(table_name.clone())
-            .or_insert_with(Vec::new)
-            .push(TableNameData {
-                filename: file_name,
-                struct_name: item.ident.to_string(),
-            });
+        if !is_version_test {
+            let file_name = context_info
+                .current_file_relative
+                .clone()
+                .unwrap_or_else(|| "<unknown file>".to_string());
+
+            context_info
+                .compilation_data
+                .used_table_names
+                .entry(table_name.clone())
+                .or_insert_with(Vec::new)
+                .push(TableNameData {
+                    filename: file_name,
+                    struct_name: item.ident.to_string(),
+                });
+        }
     }
 
     #[cfg(feature = "migrations")]
     {
+        if skip_migrations {
+            return Ok(());
+        }
+
         let unique_id = unique_id.unwrap();
 
         //Check if table version has changed
@@ -234,6 +264,19 @@ fn struct_table_handle(
             version = Some(lit_int.base10_parse::<i64>()?);
         }
 
+        if version_test.is_some() && version.is_some() {
+            anyhow::bail!(
+                "#[sql(version_test = ...)] replaces #[sql(version = ...)] and they cannot be used together"
+            );
+        }
+
+        let version = match (version, version_test.as_ref()) {
+            (Some(version), None) => Some(version),
+            (None, Some(version_test)) => Some(version_test.base10_parse::<i64>()?),
+            (None, None) => None,
+            (Some(_), Some(_)) => None,
+        };
+
         //Version attribute should exist. if it doesn't error by derive macro should be shown
         #[no_context]
         let version = version.context("Version attribute should exist")?;
@@ -241,8 +284,10 @@ fn struct_table_handle(
         //Generate table version data
         let version_data = TableDataVersion::from_struct(item, table_name.clone())?;
 
+        let is_version_test = version_test.is_some();
+
         //Migration check if data exists before
-        if !newly_created {
+        if !newly_created && !is_version_test {
             context_info
                 .compilation_data
                 .generate_migrations(&unique_id, &version_data, version, &quote! {}, &quote! {})
@@ -254,10 +299,19 @@ fn struct_table_handle(
         match context_info.compilation_data.tables.entry(unique_id) {
             Entry::Occupied(occupied_entry) => {
                 let table_data = occupied_entry.into_mut();
-                //Ignore when current version is smaller than the latest version (Error by derive macro)
-                if table_data.latest_version < version {
+                if let Some(existing) = table_data.saved_versions.get(&version) {
+                    if existing != &version_data {
+                        anyhow::bail!(
+                            "Version data mismatch for version {} in compilation data",
+                            version
+                        );
+                    }
+                } else {
                     table_data.saved_versions.insert(version, version_data);
+                    context_info.tables_updated = true;
+                }
 
+                if table_data.latest_version < version {
                     table_data.latest_version = version;
                     context_info.tables_updated = true;
                 }
