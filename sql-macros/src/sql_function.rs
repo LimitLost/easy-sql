@@ -51,11 +51,7 @@ impl Parse for ArgCount {
 
 /// Input for the custom_sql_function macro
 ///
-/// Syntax: custom_sql_function! {
-///     struct FunctionName;
-///     sql_name: "SQL_FUNCTION_NAME";
-///     args: 1 | 2 | Any;
-/// }
+/// Syntax: custom_sql_function!(FunctionName; "SQL_FUNCTION_NAME"; 1 | 2 | Any)
 struct SqlFunctionInput {
     struct_name: Ident,
     sql_name: String,
@@ -64,32 +60,20 @@ struct SqlFunctionInput {
 
 impl Parse for SqlFunctionInput {
     fn parse(input: ParseStream) -> syn::Result<Self> {
-        // Parse: struct StructName;
-        input.parse::<Token![struct]>()?;
+        // Parse: FunctionName;
         let struct_name: Ident = input.parse()?;
         input.parse::<Token![;]>()?;
 
-        // Parse: sql_name: "FUNCTION_NAME";
-        let sql_name_ident: Ident = input.parse()?;
-        if sql_name_ident != "sql_name" {
-            return Err(syn::Error::new(
-                sql_name_ident.span(),
-                "Expected 'sql_name'",
-            ));
-        }
-        input.parse::<Token![:]>()?;
+        // Parse: "FUNCTION_NAME";
         let sql_name_lit: LitStr = input.parse()?;
         let sql_name = sql_name_lit.value();
         input.parse::<Token![;]>()?;
 
-        // Parse: args: N | M | Any;
-        let args_ident: Ident = input.parse()?;
-        if args_ident != "args" {
-            return Err(syn::Error::new(args_ident.span(), "Expected 'args'"));
-        }
-        input.parse::<Token![:]>()?;
+        // Parse: N | M | Any
         let arg_count: ArgCount = input.parse()?;
-        input.parse::<Token![;]>()?;
+        if !input.is_empty() {
+            input.parse::<Token![;]>()?;
+        }
 
         Ok(SqlFunctionInput {
             struct_name,
@@ -99,19 +83,6 @@ impl Parse for SqlFunctionInput {
     }
 }
 
-/// Procedural macro for defining custom SQL functions
-///
-/// # Example
-/// ```rust
-/// custom_sql_function! {
-///     struct MyCustomFunc;
-///     sql_name: "MY_CUSTOM_FUNCTION";
-///     args: 2;
-/// }
-///
-/// // Generates a macro_rules! macro called `my_custom_func!` that can be used in queries:
-/// // query!(&mut conn, SELECT * FROM Table WHERE my_custom_func!(field1, field2) > 10)
-/// ```
 pub fn custom_sql_function_impl(input: TokenStream) -> TokenStream {
     let SqlFunctionInput {
         struct_name,
@@ -119,68 +90,69 @@ pub fn custom_sql_function_impl(input: TokenStream) -> TokenStream {
         arg_count,
     } = parse_macro_input!(input as SqlFunctionInput);
 
-    // Generate the macro_rules! macro name (lowercase version of struct name)
-    let macro_name = Ident::new(&struct_name.to_string().to_lowercase(), struct_name.span());
+    let function_name = struct_name.to_string().to_lowercase();
+    let macro_name = Ident::new(&function_name, struct_name.span());
+    let sql_name_lit = LitStr::new(&sql_name, struct_name.span());
 
-    // Generate argument count validation
-    let arg_validation = match arg_count {
-        ArgCount::Exact(n) => {
-            let error_msg = format!("{} expects exactly {} argument(s)", sql_name, n);
+    let arg_error_msg = match &arg_count {
+        ArgCount::Exact(count) => format!("{} expects exactly {} argument(s)", sql_name, count),
+        ArgCount::Multiple(values) => format!(
+            "{} expects {} argument(s)",
+            sql_name,
+            values
+                .iter()
+                .map(|v| v.to_string())
+                .collect::<Vec<_>>()
+                .join(" or ")
+        ),
+        ArgCount::Any => String::new(),
+    };
+
+    let build_arm_for_count = |count: usize| {
+        if count == 0 {
             quote! {
-                const _: () = {
-                    const ARG_COUNT: usize = $crate::count_args!($($args),*);
-                    const EXPECTED: usize = #n;
-                    if ARG_COUNT != EXPECTED {
-                        panic!(#error_msg);
-                    }
-                };
+                () => ( #sql_name_lit );
+            }
+        } else {
+            let arg_idents: Vec<Ident> = (0..count)
+                .map(|idx| Ident::new(&format!("arg{}", idx), struct_name.span()))
+                .collect();
+            let arg_patterns = arg_idents.iter().map(|ident| quote! { $ #ident : expr });
+            quote! {
+                (#(#arg_patterns),* $(,)?) => ( #sql_name_lit );
             }
         }
-        ArgCount::Multiple(counts) => {
-            let counts_list = counts
-                .iter()
-                .map(|c| c.to_string())
-                .collect::<Vec<_>>()
-                .join(" or ");
-            let error_msg = format!("{} expects {} argument(s)", sql_name, counts_list);
-            let count_checks = counts.iter().map(|c| {
-                quote! { ARG_COUNT == #c }
-            });
+    };
+
+    let macro_arms = match &arg_count {
+        ArgCount::Exact(count) => {
+            let arm = build_arm_for_count(*count);
             quote! {
-                const _: () = {
-                    const ARG_COUNT: usize = $crate::count_args!($($args),*);
-                    if !(#(#count_checks)||*) {
-                        panic!(#error_msg);
-                    }
-                };
+                #arm
+                ($($args:expr),* $(,)?) => ( compile_error!(#arg_error_msg) );
+            }
+        }
+        ArgCount::Multiple(values) => {
+            let arms = values.iter().map(|count| build_arm_for_count(*count));
+            quote! {
+                #(#arms)*
+                ($($args:expr),* $(,)?) => ( compile_error!(#arg_error_msg) );
             }
         }
         ArgCount::Any => {
             quote! {
-                // No validation needed for Any
+                ($($args:expr),* $(,)?) => ( #sql_name_lit );
             }
         }
     };
 
     let output = quote! {
-        /// Generated SQL function struct
-        #[doc = concat!("Represents the SQL function: ", #sql_name)]
-        pub struct #struct_name;
-
-        /// Macro for using the SQL function in queries
+        /// Macro used by `query!` to emit the SQL function name and validate argument count.
         #[macro_export]
         macro_rules! #macro_name {
-            ($($args:expr),* $(,)?) => {{
-                #arg_validation
-
-                // Generate function call syntax that the parser will recognize
-                // This creates an identifier followed by parentheses with arguments
-                $crate::__sql_function_call!(#sql_name, $($args),*)
-            }};
+            #macro_arms
         }
 
-        // Re-export the macro
-        pub use #macro_name;
     };
 
     output.into()

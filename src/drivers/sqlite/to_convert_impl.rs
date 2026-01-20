@@ -1,6 +1,6 @@
 use anyhow::Context;
 use easy_macros::{always_context, context};
-use sqlx::{Executor, Row as SqlxRow};
+use sqlx::Executor;
 
 /// Current Driver
 type CDriver = super::Sqlite;

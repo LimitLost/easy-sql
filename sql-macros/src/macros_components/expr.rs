@@ -658,7 +658,22 @@ impl Value {
                 "{}".to_string()
             }
             Value::FunctionCall { name, args } => {
-                let func_name = name.to_string().to_uppercase();
+                let func_name_str = name.to_string();
+                let builtin_fn_data = builtin_functions::get_builtin_fn(&func_name_str);
+                let (func_name, is_count) = if builtin_fn_data.is_some() {
+                    let func_name = func_name_str.to_uppercase();
+                    (func_name.clone(), func_name == "COUNT")
+                } else {
+                    let macro_name = func_name_str.to_lowercase();
+                    let macro_ident = proc_macro2::Ident::new_raw(&macro_name, name.span());
+                    let dummy_args = (0..args.len())
+                        .map(|_| quote_spanned! {name.span()=> ()})
+                        .collect::<Vec<_>>();
+                    current_format_params.push(quote_spanned! {name.span()=>
+                        #macro_ident!(#(#dummy_args),*)
+                    });
+                    ("{}".to_string(), false)
+                };
                 let mut arg_strings = Vec::new();
 
                 for arg in args {
@@ -671,7 +686,7 @@ impl Value {
                         current_format_params,
                         before_param_n,
                         before_format,
-                        func_name.to_uppercase() == "COUNT",
+                        is_count,
                         for_custom_select,
                         output_ty,
                         main_table_type,

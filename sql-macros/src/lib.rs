@@ -218,31 +218,32 @@ pub fn sql_convenience(attr: TokenStream, item: TokenStream) -> anyhow::Result<T
 ///
 /// # Syntax
 /// ```rust
-/// custom_sql_function! {
-///     struct FunctionName;
-///     sql_name: "SQL_FUNCTION_NAME";
-///     args: 1 | 2 | Any;
-/// }
+/// custom_sql_function!(FunctionName; "SQL_FUNCTION_NAME"; 1 | 2 | Any);
 /// ```
 ///
 /// # Arguments
-/// - `struct`: The Rust struct name for the function (PascalCase recommended)
-/// - `sql_name`: The actual SQL function name to be used in queries
+/// - `FunctionName`: The Rust struct name for the function
+/// - `"SQL_FUNCTION_NAME"`: The SQL function name emitted in queries
 /// - `args`: Argument count specification:
 ///   - A number (e.g., `2`) for exact argument count
 ///   - Multiple numbers separated by `|` (e.g., `1 | 2`) for multiple allowed counts
 ///   - `Any` for any number of arguments
 ///
-/// # Example
+/// # Examples
 /// ```rust
-/// custom_sql_function! {
-///     struct JsonExtract;
-///     sql_name: "JSON_EXTRACT";
-///     args: 2;
-/// }
+/// // Exact argument count
+/// custom_sql_function!(JsonExtract; "JSON_EXTRACT"; 2);
 ///
-/// // Usage in query:
-/// query!(&mut conn, SELECT * FROM Table WHERE json_extract!(data, "$.field") = "value")
+/// // Multiple allowed counts
+/// custom_sql_function!(Slice; "SUBSTR"; 2 | 3);
+///
+/// // Any number of arguments
+/// custom_sql_function!(Coalesce_Any; "COALESCE"; Any);
+///
+/// // Usage in query: (Any case can be used)
+/// query!(&mut conn, SELECT * FROM Table WHERE JsonExtract(data, "$.field") = "value")
+/// query!(&mut conn, SELECT * FROM Table WHERE slice(name, 2, 3) = "ell")
+/// query!(&mut conn, SELECT * FROM Table WHERE coalesce_Any(name, "fallback") = "value")
 /// ```
 #[proc_macro]
 #[always_context]

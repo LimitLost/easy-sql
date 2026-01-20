@@ -239,10 +239,10 @@ CompilationData(
                 struct_name: "CompileFailTable",
             ),
         ],
-        "custom_func_test_table": [
+        "custom_function_test_table": [
             TableNameData(
                 filename: "src/tests/general/macros/custom_sql_functions.rs",
-                struct_name: "CustomFuncTestTable",
+                struct_name: "CustomFunctionTestTable",
             ),
         ],
         "custom_select_table": [
