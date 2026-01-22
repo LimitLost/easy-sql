@@ -478,6 +478,10 @@ pub fn sql_output_base(
             }
         }
 
+        impl #sql_crate::OutputData<#table> for #item_name {
+            type SelectProvider = Self;
+        }
+
         #trait_impl
         #custom_select_impl
     })

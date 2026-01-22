@@ -92,6 +92,34 @@ impl ProvidedDrivers {
         }
     }
 
+    pub fn query_add_selected_with_args(
+        &self,
+        sql_crate: &TokenStream,
+        table_type: &syn::Type,
+        output_type: &syn::Type,
+        output_arg_tokens: Vec<TokenStream>,
+    ) -> TokenStream {
+        match self {
+            ProvidedDrivers::Single(driver) | ProvidedDrivers::SingleWithChecks { driver, .. } => {
+                quote! {
+                    query.push_str(&<#output_type as #sql_crate::OutputData<#table_type>>::SelectProvider::__easy_sql_select::<#driver>(
+                        _easy_sql_d,
+                        #(#output_arg_tokens),*
+                    ));
+                }
+            }
+            ProvidedDrivers::MultipleWithConn { conn, .. } => {
+                quote! {
+                    query.push_str(&<#output_type as #sql_crate::OutputData<#table_type>>::SelectProvider::__easy_sql_select_driver_from_conn(
+                        &(#conn),
+                        _easy_sql_d,
+                        #(#output_arg_tokens),*
+                    ));
+                }
+            }
+        }
+    }
+
     pub fn query_insert_data(
         &self,
         sql_crate: &TokenStream,

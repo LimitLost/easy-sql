@@ -1,11 +1,87 @@
 use easy_macros::always_context;
 use proc_macro2::{Span, TokenStream};
-use quote::{ToTokens, quote};
+use quote::{ToTokens, format_ident, quote};
 
 use super::{
-    DeleteQuery, ExistsQuery, InsertQuery, ProvidedDrivers, SelectQuery, UpdateQuery,
-    group_by_clause, having_clause, limit_clause, order_by_clause, set_clause, where_clause,
+    DeleteQuery, ExistsQuery, InsertQuery, ProvidedDrivers, ReturningData, SelectQuery,
+    UpdateQuery, group_by_clause, having_clause, limit_clause, order_by_clause, set_clause,
+    where_clause,
 };
+
+struct ReturningArgData {
+    arg_defs: Vec<TokenStream>,
+    arg_tokens: Vec<TokenStream>,
+}
+
+impl ReturningData {
+    fn build_arg_data(
+        &self,
+        sql_crate: &TokenStream,
+        driver: &ProvidedDrivers,
+        table_type: &syn::Type,
+        binds: &mut Vec<TokenStream>,
+        checks: &mut Vec<TokenStream>,
+        param_counter: &mut usize,
+        before_param_n: &mut TokenStream,
+        before_format: &mut Vec<TokenStream>,
+    ) -> ReturningArgData {
+        let mut arg_defs = Vec::new();
+        let mut arg_tokens = Vec::new();
+
+        let output_type_ts = self.output_type.to_token_stream();
+
+        if let Some(output_args) = &self.output_args {
+            checks.push(quote! {
+                let _ = || {
+                    fn __easy_sql_assert_with_args<T: #sql_crate::WithArgsSelect>() {}
+                    __easy_sql_assert_with_args::<<#output_type_ts as #sql_crate::OutputData<#table_type>>::SelectProvider>();
+                };
+            });
+
+            for (idx, arg) in output_args.iter().enumerate() {
+                let mut arg_format_params = Vec::new();
+                let arg_sql_template = arg.into_query_string(
+                    binds,
+                    checks,
+                    sql_crate,
+                    driver,
+                    param_counter,
+                    &mut arg_format_params,
+                    before_param_n,
+                    before_format,
+                    false,
+                    false,
+                    Some(&output_type_ts),
+                    Some(&table_type.to_token_stream()),
+                );
+                let arg_ident = format_ident!("__easy_sql_returning_arg_{}", idx);
+                let arg_def = if arg_format_params.is_empty() {
+                    quote! {
+                        let #arg_ident = #arg_sql_template.to_string();
+                    }
+                } else {
+                    quote! {
+                        let #arg_ident = format!(#arg_sql_template, #(#arg_format_params),*);
+                    }
+                };
+                arg_defs.push(arg_def);
+                arg_tokens.push(quote! { #arg_ident.as_str() });
+            }
+        } else {
+            checks.push(quote! {
+                let _ = || {
+                    fn __easy_sql_assert_normal<T: #sql_crate::NormalSelect>() {}
+                    __easy_sql_assert_normal::<<#output_type_ts as #sql_crate::OutputData<#table_type>>::SelectProvider>();
+                };
+            });
+        }
+
+        ReturningArgData {
+            arg_defs,
+            arg_tokens,
+        }
+    }
+}
 
 #[always_context]
 pub fn generate_select(
@@ -15,7 +91,7 @@ pub fn generate_select(
     sql_crate: &TokenStream,
     macro_input: &str,
 ) -> anyhow::Result<TokenStream> {
-    let output_type = select.output_type;
+    let output = select.output;
     let table_type = select.table_type;
     let table_type_tokens = table_type.to_token_stream();
     let distinct = select.distinct;
@@ -40,7 +116,21 @@ pub fn generate_select(
     let mut before_param_n = quote! {};
     let mut before_format = Vec::new();
 
-    // Convert output_type to TokenStream for passing to validation functions
+    let output_arg_data = output.build_arg_data(
+        sql_crate,
+        &driver,
+        &table_type,
+        &mut binds,
+        &mut checks,
+        &mut param_counter,
+        &mut before_param_n,
+        &mut before_format,
+    );
+    let output_arg_defs = output_arg_data.arg_defs;
+    let output_arg_tokens = output_arg_data.arg_tokens;
+
+    let output_type = output.output_type;
+    let output_args = output.output_args;
     let output_type_ts = output_type.to_token_stream();
 
     // Generate runtime code for WHERE clause
@@ -221,7 +311,11 @@ pub fn generate_select(
 
     let driver_arguments = driver.arguments(sql_crate);
     let identifier_delimiter = driver.identifier_delimiter(sql_crate);
-    let query_add_selected = driver.query_add_selected(sql_crate, &output_type, &table_type);
+    let query_add_selected = if output_args.is_some() {
+        driver.query_add_selected_with_args(sql_crate, &table_type, &output_type, output_arg_tokens)
+    } else {
+        driver.query_add_selected(sql_crate, &output_type, &table_type)
+    };
     let main_table_name = driver.table_name(sql_crate, &table_type);
     let table_joins = driver.table_joins(sql_crate, &table_type);
     let parameter_placeholder_base = driver.parameter_placeholder_base(sql_crate);
@@ -241,6 +335,8 @@ pub fn generate_select(
                 #(#before_format)*
                 let mut query = String::from(#query_base_str);
                 #parameter_placeholder_base
+
+                #(#output_arg_defs)*
 
                 // Add output columns
                 #query_add_selected
@@ -290,9 +386,36 @@ pub fn generate_insert(
         "sql query! macro input: {}"
     };
 
-    let (returning_select_sqlx, execute_ending, lazy_struct) = if let Some(returning_type) =
-        insert.returning
-    {
+    let (
+        returning_select_sqlx,
+        execute_ending,
+        lazy_struct,
+        returning_arg_defs,
+        returning_arg_binds,
+        returning_before_format,
+        returning_checks,
+    ) = if let Some(returning) = insert.returning {
+        let returning_type: syn::Type = returning.output_type.clone();
+        let returning_has_args = returning.output_args.is_some();
+        let mut returning_arg_binds = Vec::new();
+        let mut returning_before_format = Vec::new();
+        let mut returning_checks = Vec::new();
+        let mut returning_param_counter = 0usize;
+        let mut returning_before_param_n = quote! {current_arg_n + };
+
+        let returning_arg_data = returning.build_arg_data(
+            sql_crate,
+            &driver,
+            &table_type,
+            &mut returning_arg_binds,
+            &mut returning_checks,
+            &mut returning_param_counter,
+            &mut returning_before_param_n,
+            &mut returning_before_format,
+        );
+        let returning_arg_defs = returning_arg_data.arg_defs;
+        let returning_arg_tokens = returning_arg_data.arg_tokens;
+
         if let Some(driver) = lazy_mode_driver {
             let fetch_internals = |executor: TokenStream| {
                 quote! {
@@ -316,11 +439,23 @@ pub fn generate_insert(
             let fetch_internals_normal = fetch_internals(quote! {into_executor});
             let fetch_internals_mut = fetch_internals(quote! {executor});
 
-            (
+            let returning_select_sqlx = if returning_has_args {
+                quote! {
+                    query.push_str(" RETURNING ");
+                    query.push_str(&<#returning_type as #sql_crate::OutputData<#table_type>>::SelectProvider::__easy_sql_select::<#driver>(
+                        _easy_sql_d,
+                        #(#returning_arg_tokens),*
+                    ));
+                }
+            } else {
                 quote! {
                     query.push_str(" RETURNING ");
                     <#returning_type as #sql_crate::Output<#table_type, #driver>>::select_sqlx(&mut query);
-                },
+                }
+            };
+
+            (
+                returning_select_sqlx,
                 quote! {
                     #macro_support::Result::<LazyQueryResult>::Ok(LazyQueryResult { builder })
                 },
@@ -366,10 +501,22 @@ pub fn generate_insert(
                         }
                     }
                 },
+                returning_arg_defs,
+                returning_arg_binds,
+                returning_before_format,
+                quote! {#(#returning_checks)*},
             )
         } else {
-            let query_add_selected =
-                driver.query_add_selected(sql_crate, &returning_type, &table_type);
+            let query_add_selected = if returning_has_args {
+                driver.query_add_selected_with_args(
+                    sql_crate,
+                    &table_type,
+                    &returning_type,
+                    returning_arg_tokens,
+                )
+            } else {
+                driver.query_add_selected(sql_crate, &returning_type, &table_type)
+            };
             (
                 quote! {
                     query.push_str(" RETURNING ");
@@ -380,6 +527,10 @@ pub fn generate_insert(
                     #macro_support::query_execute::<#table_type,#returning_type,_>(&mut (#connection),built_query).await.with_context(|| format!(#debug_format_str, #macro_input))
                 },
                 quote! {},
+                returning_arg_defs,
+                returning_arg_binds,
+                returning_before_format,
+                quote! {#(#returning_checks)*},
             )
         }
     } else {
@@ -394,6 +545,10 @@ pub fn generate_insert(
                 let built_query = builder.build();
                 #macro_support::query_execute_no_output(&mut (#connection),built_query).await.with_context(|| format!(#debug_format_str, #macro_input))
             },
+            quote! {},
+            Vec::new(),
+            Vec::new(),
+            Vec::new(),
             quote! {},
         )
     };
@@ -411,7 +566,7 @@ pub fn generate_insert(
             #lazy_struct
 
             async {
-                use #macro_support::{Context,FutureExt};
+                use #macro_support::{Arguments,Context,FutureExt};
                 use #sql_crate::ToConvert;
 
                     let mut _easy_sql_args = #driver_arguments;
@@ -419,6 +574,8 @@ pub fn generate_insert(
                     let mut current_arg_n = 0;
                     let _easy_sql_d = #identifier_delimiter;
                     #parameter_placeholder_base
+
+                    #returning_checks
 
                     query.push_str(#main_table_name);
                     query.push_str(" (");
@@ -446,7 +603,11 @@ pub fn generate_insert(
                     }
                     query.pop(); // Remove last comma
 
+                    #(#returning_before_format)*
+                    #(#returning_arg_defs)*
                     #returning_select_sqlx
+
+                    #(#returning_arg_binds)*
 
                     let mut builder = #macro_support::QueryBuilder::with_arguments(query, _easy_sql_args);
 
@@ -556,10 +717,35 @@ pub fn generate_update(
         "sql query! macro input: {}"
     };
 
-    let (returning_select_sqlx, execute) = if let Some(returning_type) = update.returning {
+    let (returning_select_sqlx, execute, returning_arg_defs) = if let Some(returning) =
+        update.returning
+    {
+        let returning_type: syn::Type = returning.output_type.clone();
+        let returning_has_args = returning.output_args.is_some();
+        let returning_arg_data = returning.build_arg_data(
+            sql_crate,
+            &driver,
+            &table_type,
+            &mut all_binds,
+            &mut checks,
+            &mut param_counter,
+            &mut before_param_n,
+            &mut before_format,
+        );
+        let returning_arg_defs = returning_arg_data.arg_defs;
+        let returning_arg_tokens = returning_arg_data.arg_tokens;
+
         if let Some(connection) = connection {
-            let query_add_selected =
-                driver.query_add_selected(sql_crate, &returning_type, &table_type);
+            let query_add_selected = if returning_has_args {
+                driver.query_add_selected_with_args(
+                    sql_crate,
+                    &table_type,
+                    &returning_type,
+                    returning_arg_tokens,
+                )
+            } else {
+                driver.query_add_selected(sql_crate, &returning_type, &table_type)
+            };
             (
                 quote! {
                     query.push_str(" RETURNING ");
@@ -572,6 +758,7 @@ pub fn generate_update(
                         .await
                         .with_context(|| format!(#debug_format_str, #macro_input))
                 },
+                returning_arg_defs,
             )
         } else {
             let fetch_internals = |executor: TokenStream| {
@@ -608,11 +795,23 @@ pub fn generate_update(
                     to_convert_single_impl(#macro_support::never_any::<#returning_type>());
                 }
             });
-            (
+            let returning_select_sqlx = if returning_has_args {
+                quote! {
+                    query.push_str(" RETURNING ");
+                    query.push_str(&<#returning_type as #sql_crate::OutputData<#table_type>>::SelectProvider::__easy_sql_select::<#lazy_mode_driver>(
+                        _easy_sql_d,
+                        #(#returning_arg_tokens),*
+                    ));
+                }
+            } else {
                 quote! {
                     query.push_str(" RETURNING ");
                     <#returning_type as #sql_crate::Output<#table_type, #lazy_mode_driver>>::select_sqlx(&mut query);
-                },
+                }
+            };
+
+            (
+                returning_select_sqlx,
                 quote! {
                     let mut builder = #macro_support::QueryBuilder::with_arguments(query, _easy_sql_args);
 
@@ -649,6 +848,7 @@ pub fn generate_update(
 
                     #macro_support::Result::<LazyQueryResult>::Ok(LazyQueryResult { builder })
                 },
+                returning_arg_defs,
             )
         }
     } else {
@@ -667,6 +867,7 @@ pub fn generate_update(
                     .await
                     .with_context(|| format!(#debug_format_str, #macro_input))
             },
+            Vec::new(),
         )
     };
 
@@ -708,6 +909,7 @@ pub fn generate_update(
                 // Add ALL parameter bindings
                 #(#all_binds)*
 
+                #(#returning_arg_defs)*
                 #returning_select_sqlx
 
                 #execute
@@ -769,10 +971,35 @@ pub fn generate_delete(
         "sql query! macro input: {}"
     };
 
-    let (returning_select_sqlx, execute) = if let Some(returning_type) = delete.returning {
+    let (returning_select_sqlx, execute, returning_arg_defs) = if let Some(returning) =
+        delete.returning
+    {
+        let returning_type: syn::Type = returning.output_type.clone();
+        let returning_has_args = returning.output_args.is_some();
+        let returning_arg_data = returning.build_arg_data(
+            sql_crate,
+            &driver,
+            &table_type,
+            &mut binds,
+            &mut checks,
+            &mut param_counter,
+            &mut before_param_n,
+            &mut before_format,
+        );
+        let returning_arg_defs = returning_arg_data.arg_defs;
+        let returning_arg_tokens = returning_arg_data.arg_tokens;
+
         if let Some(connection) = connection {
-            let query_add_selected =
-                driver.query_add_selected(sql_crate, &returning_type, &table_type);
+            let query_add_selected = if returning_has_args {
+                driver.query_add_selected_with_args(
+                    sql_crate,
+                    &table_type,
+                    &returning_type,
+                    returning_arg_tokens,
+                )
+            } else {
+                driver.query_add_selected(sql_crate, &returning_type, &table_type)
+            };
             (
                 quote! {
                     query.push_str(" RETURNING ");
@@ -785,6 +1012,7 @@ pub fn generate_delete(
                         .await
                         .with_context(|| format!(#debug_format_str, #macro_input))
                 },
+                returning_arg_defs,
             )
         } else {
             let fetch_internals = |executor: TokenStream| {
@@ -821,11 +1049,23 @@ pub fn generate_delete(
                     to_convert_single_impl(#macro_support::never_any::<#returning_type>());
                 }
             });
-            (
+            let returning_select_sqlx = if returning_has_args {
+                quote! {
+                    query.push_str(" RETURNING ");
+                    query.push_str(&<#returning_type as #sql_crate::OutputData<#table_type>>::SelectProvider::__easy_sql_select::<#lazy_mode_driver>(
+                        _easy_sql_d,
+                        #(#returning_arg_tokens),*
+                    ));
+                }
+            } else {
                 quote! {
                     query.push_str(" RETURNING ");
                     <#returning_type as #sql_crate::Output<#table_type, #lazy_mode_driver>>::select_sqlx(&mut query);
-                },
+                }
+            };
+
+            (
+                returning_select_sqlx,
                 quote! {
                     let mut builder = #macro_support::QueryBuilder::with_arguments(query, _easy_sql_args);
 
@@ -862,6 +1102,7 @@ pub fn generate_delete(
 
                     #macro_support::Result::<LazyQueryResult>::Ok(LazyQueryResult { builder })
                 },
+                returning_arg_defs,
             )
         }
     } else {
@@ -881,6 +1122,7 @@ pub fn generate_delete(
                     .await
                     .with_context(|| format!(#debug_format_str, #macro_input))
             },
+            Vec::new(),
         )
     };
 
@@ -918,6 +1160,7 @@ pub fn generate_delete(
                     #(#binds)*
                 }
 
+                #(#returning_arg_defs)*
                 #returning_select_sqlx
 
                 #execute

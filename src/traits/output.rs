@@ -23,3 +23,18 @@ pub trait Output<Table, D: Driver>: Sized {
     fn select_sqlx(current_query: &mut String);
     fn convert(data: Self::DataToConvert) -> anyhow::Result<Self>;
 }
+
+pub trait OutputData<Table> {
+    type SelectProvider;
+}
+
+impl<T: OutputData<Table>, Table> OutputData<Table> for Vec<T> {
+    type SelectProvider = T::SelectProvider;
+}
+
+impl<T: OutputData<Table>, Table> OutputData<Table> for Option<T> {
+    type SelectProvider = T::SelectProvider;
+}
+impl<Table> OutputData<Table> for () {
+    type SelectProvider = ();
+}

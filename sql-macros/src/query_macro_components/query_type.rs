@@ -17,7 +17,7 @@ pub enum QueryType {
 /// SELECT OutputType FROM TableType [WHERE ...] [ORDER BY ...] [LIMIT ...]
 #[derive(Debug, Clone)]
 pub struct SelectQuery {
-    pub output_type: syn::Type,
+    pub output: ReturningData,
     pub table_type: syn::Type,
     pub where_clause: Option<Expr>,
     pub order_by: Option<Vec<OrderBy>>,
@@ -32,7 +32,7 @@ pub struct SelectQuery {
 pub struct InsertQuery {
     pub table_type: syn::Type,
     pub values: syn::Expr,
-    pub returning: Option<syn::Type>,
+    pub returning: Option<ReturningData>,
 }
 
 /// UPDATE TableType SET field = value [WHERE ...] [RETURNING OutputType]
@@ -41,7 +41,7 @@ pub struct UpdateQuery {
     pub table_type: syn::Type,
     pub set_clause: SetClause,
     pub where_clause: Option<Expr>,
-    pub returning: Option<syn::Type>,
+    pub returning: Option<ReturningData>,
 }
 #[derive(Debug, Clone)]
 pub enum SetClause {
@@ -54,7 +54,43 @@ pub enum SetClause {
 pub struct DeleteQuery {
     pub table_type: syn::Type,
     pub where_clause: Option<Expr>,
-    pub returning: Option<syn::Type>,
+    pub returning: Option<ReturningData>,
+}
+
+#[derive(Debug, Clone)]
+pub struct ReturningData {
+    pub output_type: syn::Type,
+    pub output_args: Option<Vec<Expr>>,
+}
+
+#[always_context]
+impl Parse for ReturningData {
+    fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
+        let output_type = input.parse::<syn::Type>()?;
+        let output_args = if input.peek(syn::token::Paren) {
+            let inside_paren;
+            syn::parenthesized!(inside_paren in input);
+            let mut args = Vec::new();
+            while !inside_paren.is_empty() {
+                let arg: Expr = inside_paren.parse()?;
+                args.push(arg);
+
+                if inside_paren.peek(syn::Token![,]) {
+                    inside_paren.parse::<syn::Token![,]>()?;
+                } else {
+                    break;
+                }
+            }
+            Some(args)
+        } else {
+            None
+        };
+
+        Ok(ReturningData {
+            output_type,
+            output_args,
+        })
+    }
 }
 
 /// EXISTS TableType [WHERE ...] [GROUP BY ...] [HAVING ...] [ORDER BY ...] [LIMIT ...]
@@ -105,7 +141,7 @@ impl Parse for SelectQuery {
             input.parse::<keyword::distinct>()?;
         }
 
-        let output_type = input.parse::<syn::Type>()?;
+        let output = input.parse::<ReturningData>()?;
 
         input.parse::<keyword::from>()?;
         let table_type = input.parse::<syn::Type>()?;
@@ -162,7 +198,7 @@ impl Parse for SelectQuery {
         }
 
         Ok(SelectQuery {
-            output_type,
+            output,
             table_type,
             where_clause,
             order_by,
@@ -192,7 +228,7 @@ impl Parse for InsertQuery {
             let lookahead = input.lookahead1();
             if lookahead.peek(keyword::returning) {
                 input.parse::<keyword::returning>()?;
-                returning = Some(input.parse::<syn::Type>()?);
+                returning = Some(input.parse::<ReturningData>()?);
             } else {
                 return Err(lookahead.error());
             }
@@ -236,7 +272,7 @@ impl Parse for UpdateQuery {
                 where_clause = Some(input.parse()?);
             } else if returning.is_none() && lookahead.peek(keyword::returning) {
                 input.parse::<keyword::returning>()?;
-                returning = Some(input.parse::<syn::Type>()?);
+                returning = Some(input.parse::<ReturningData>()?);
             } else {
                 return Err(lookahead.error());
             }
@@ -269,7 +305,7 @@ impl Parse for DeleteQuery {
                 where_clause = Some(input.parse()?);
             } else if returning.is_none() && lookahead.peek(keyword::returning) {
                 input.parse::<keyword::returning>()?;
-                returning = Some(input.parse::<syn::Type>()?);
+                returning = Some(input.parse::<ReturningData>()?);
             } else {
                 return Err(lookahead.error());
             }
