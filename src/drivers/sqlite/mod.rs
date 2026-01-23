@@ -16,7 +16,7 @@ pub use create_table::*;
 mod table_exists;
 pub use table_exists::*;
 
-use crate::{Driver, EasyExecutor, TableField};
+use crate::{AllowsNoPrimaryKey, Driver, EasyExecutor, TableField};
 
 #[derive(Debug)]
 pub struct Sqlite;
@@ -66,6 +66,9 @@ impl Driver for Sqlite {
         Ok(())
     }
 }
+
+#[always_context]
+impl AllowsNoPrimaryKey for Sqlite {}
 
 #[always_context]
 pub fn table_field_definition(field: TableField) -> String {

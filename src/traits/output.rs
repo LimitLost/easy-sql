@@ -13,6 +13,9 @@ pub trait ToConvert<D: Driver> {
         Self: Sized;
 }
 #[always_context]
+#[diagnostic::on_unimplemented(
+    message = "Only types representing single row are allowed as output in query_lazy! calls."
+)]
 pub trait ToConvertSingle<D: Driver>: ToConvert<D> + sqlx::Row {}
 
 #[always_context]

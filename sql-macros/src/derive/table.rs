@@ -23,7 +23,6 @@ use crate::{
 mod keywords {
     syn::custom_keyword!(cascade);
 }
-
 struct ForeignKeyParsed {
     table_struct: syn::Path,
     cascade: bool,
@@ -139,10 +138,6 @@ Tip: Use `#[sql(table_name = ...)]` or rename one of the structs",
     }
 
     let supported_drivers = super::supported_drivers(&item, &compilation_data)?;
-
-    let sqlite = supported_drivers
-        .iter()
-        .any(|d| d.to_token_stream().to_string().ends_with("Sqlite"));
 
     #[cfg(feature = "migrations")]
     let mut table_version = None;
@@ -417,17 +412,41 @@ Tip: Use `#[sql(table_name = ...)]` or rename one of the structs",
             }
         }
 
-        if primary_keys.is_empty() {
-            anyhow::bail!(
-                "No primary key found, please add #[sql(primary_key)] to one of the fields (Sqlite always has one)"
-            );
-        }
+        let primary_key_check = if primary_keys.is_empty() {
+            quote! {
+                let _ = || {
+                    fn __easy_sql_assert<T: #sql_crate::AllowsNoPrimaryKey>() {}
+                    __easy_sql_assert::<#driver>();
+                };
+            }
+        } else {
+            quote! {}
+        };
 
-        if sqlite && primary_keys.len() != 1 && is_auto_increment_list.iter().any(|v| *v) {
-            anyhow::bail!(
-                "Auto increment is only supported for single primary key (Sqlite contrains this limitation)"
-            );
-        }
+        let auto_increment_pk_check = if primary_keys.len() != 1
+            && is_auto_increment_list.iter().any(|v| *v)
+        {
+            quote! {
+                let _ = || {
+                    fn __easy_sql_assert<T: #sql_crate::SupportsAutoIncrementCompositePrimaryKey>() {}
+                    __easy_sql_assert::<#driver>();
+                };
+            }
+        } else {
+            quote! {}
+        };
+
+        let multi_auto_increment_check = if is_auto_increment_list.iter().filter(|v| **v).count() > 1
+        {
+            quote! {
+                let _ = || {
+                    fn __easy_sql_assert<T: #sql_crate::SupportsMultipleAutoIncrementColumns>() {}
+                    __easy_sql_assert::<#driver>();
+                };
+            }
+        } else {
+            quote! {}
+        };
 
         // Foreign keys converted
         let foreign_keys = {
@@ -475,6 +494,9 @@ Tip: Use `#[sql(table_name = ...)]` or rename one of the structs",
         let setup_body = if skip_migrations {
             // Without migrations, just create the table without version tracking
             quote! {
+                #primary_key_check
+                #auto_increment_pk_check
+                #multi_auto_increment_check
                 #create_table
                 Ok(())
             }
@@ -489,6 +511,9 @@ Tip: Use `#[sql(table_name = ...)]` or rename one of the structs",
                     #migrations
                 }else{
                     // Create table and create version in EasySqlTables
+                    #primary_key_check
+                    #auto_increment_pk_check
+                    #multi_auto_increment_check
                     #create_table
                     #sql_crate::EasySqlTables_create!(#driver, *conn, #unique_id.to_string(), #table_version_i64);
                 }

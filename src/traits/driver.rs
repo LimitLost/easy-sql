@@ -49,3 +49,21 @@ pub trait DriverValue<'a, IDriver: sqlx::Database>:
 {
     fn to_default(&self) -> anyhow::Result<String>;
 }
+
+#[always_context]
+#[diagnostic::on_unimplemented(
+    message = "Driver `{Self}` does not support auto-increment columns when the table uses a composite primary key. Remove #[sql(auto_increment)] or use a single-column primary key for this driver."
+)]
+pub trait SupportsAutoIncrementCompositePrimaryKey: Driver {}
+
+#[always_context]
+#[diagnostic::on_unimplemented(
+    message = "Driver `{Self}` requires a primary key for tables. Add #[sql(primary_key)] to at least one field."
+)]
+pub trait AllowsNoPrimaryKey: Driver {}
+
+#[always_context]
+#[diagnostic::on_unimplemented(
+    message = "Driver `{Self}` does not support multiple auto-increment columns in the same table. Remove #[sql(auto_increment)] from all but one column."
+)]
+pub trait SupportsMultipleAutoIncrementColumns: Driver {}
