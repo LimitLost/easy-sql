@@ -8,7 +8,7 @@ pub trait Insert<'a, Table, D: Driver> {
     fn insert_columns() -> Vec<String>;
 
     /// Returns (new arguments list, number of inserted rows)
-    fn insert_values_sqlx(
+    fn insert_values(
         self,
         args_list: DriverArguments<'a, D>,
     ) -> anyhow::Result<(DriverArguments<'a, D>, usize)>;
@@ -20,14 +20,14 @@ impl<'a, Table, T: Insert<'a, Table, D>, D: Driver> Insert<'a, Table, D> for Vec
         T::insert_columns()
     }
 
-    fn insert_values_sqlx(
+    fn insert_values(
         self,
         args_list: DriverArguments<'a, D>,
     ) -> anyhow::Result<(DriverArguments<'a, D>, usize)> {
         let mut args = args_list;
         let mut item_count = 0;
         for item in self.into_iter() {
-            let (new_args, new_count) = item.insert_values_sqlx(
+            let (new_args, new_count) = item.insert_values(
                 #[context(no)]
                 args,
             )?;
@@ -47,14 +47,14 @@ where
         T::insert_columns()
     }
 
-    fn insert_values_sqlx(
+    fn insert_values(
         self,
         args_list: DriverArguments<'a, D>,
     ) -> anyhow::Result<(DriverArguments<'a, D>, usize)> {
         let mut args = args_list;
         let mut item_count = 0;
         for item in self.iter() {
-            let (new_args, new_count) = item.insert_values_sqlx(
+            let (new_args, new_count) = item.insert_values(
                 #[context(no)]
                 args,
             )?;
@@ -74,14 +74,14 @@ where
         T::insert_columns()
     }
 
-    fn insert_values_sqlx(
+    fn insert_values(
         self,
         args_list: DriverArguments<'a, D>,
     ) -> anyhow::Result<(DriverArguments<'a, D>, usize)> {
         let mut args = args_list;
         let mut item_count = 0;
         for item in self.iter() {
-            let (new_args, new_count) = item.insert_values_sqlx(
+            let (new_args, new_count) = item.insert_values(
                 #[context(no)]
                 args,
             )?;

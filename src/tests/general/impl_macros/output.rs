@@ -36,7 +36,7 @@ where
     type UsedForChecks = Self;
     type DataToConvert = DriverRow<D>;
 
-    fn select_sqlx(current_query: &mut String) {
+    fn select(current_query: &mut String) {
         current_query.push_str("field1, field2, field3");
     }
     //Remove in derive

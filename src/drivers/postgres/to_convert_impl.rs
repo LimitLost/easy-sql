@@ -81,8 +81,8 @@ where
     type DataToConvert = Vec<Row>;
     type UsedForChecks = T::UsedForChecks;
 
-    fn select_sqlx(current_query: &mut String) {
-        T::select_sqlx(current_query);
+    fn select(current_query: &mut String) {
+        T::select(current_query);
     }
 
     fn convert(data: Vec<Row>) -> anyhow::Result<Self> {
@@ -103,8 +103,8 @@ where
     type DataToConvert = Option<Row>;
     type UsedForChecks = T::UsedForChecks;
 
-    fn select_sqlx(current_query: &mut String) {
-        T::select_sqlx(current_query);
+    fn select(current_query: &mut String) {
+        T::select(current_query);
     }
 
     fn convert(data: Option<Row>) -> anyhow::Result<Self> {
@@ -122,7 +122,7 @@ impl<Table> Output<Table, CDriver> for () {
     type DataToConvert = ();
     type UsedForChecks = ();
 
-    fn select_sqlx(current_query: &mut String) {
+    fn select(current_query: &mut String) {
         current_query.push('1');
     }
 

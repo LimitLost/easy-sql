@@ -207,9 +207,9 @@ pub fn set_clause(
             format_str.push_str(" SET ");
             let query_update_data = driver.query_update_data(sql_crate, main_table_type, type_expr);
             let result = quote! {
-                // Use Update trait's updates_sqlx method to add SET arguments
+                // Use Update trait's updates method to add SET arguments
                 let mut current_arg_n = #param_counter;
-                _easy_sql_args = #query_update_data.context("Update::updates_sqlx failed")?;
+                _easy_sql_args = #query_update_data.context("Update::updates failed")?;
             };
             *before_param_n = quote! { current_arg_n + #before_param_n};
             *param_counter = 0;

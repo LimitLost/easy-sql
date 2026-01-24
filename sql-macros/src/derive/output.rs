@@ -183,7 +183,7 @@ pub fn sql_output_base(
         }
     }
 
-    let select_sqlx_str = regular_fields
+    let select_str = regular_fields
         .iter()
         .map(|field| {
             let field_name = field.ident.as_ref().unwrap();
@@ -192,21 +192,21 @@ pub fn sql_output_base(
         .collect::<Vec<_>>()
         .join(", ");
 
-    let select_sqlx_str_call = if !select_sqlx_str.is_empty() {
+    let select_str_call = if !select_str.is_empty() {
         quote! {
             current_query.push_str(&format!(
-                #select_sqlx_str
+                #select_str
             ));
         }
     } else {
         quote! {}
     };
 
-    let select_sqlx_joined = joined_fields.iter().enumerate().map(|(i, joined_field)| {
+    let select_joined = joined_fields.iter().enumerate().map(|(i, joined_field)| {
         let ref_table = &joined_field.table;
         let table_field = &joined_field.table_field;
 
-        let comma = if i == 0 && select_sqlx_str.is_empty() {
+        let comma = if i == 0 && select_str.is_empty() {
             ""
         } else {
             ", "
@@ -227,9 +227,9 @@ pub fn sql_output_base(
         }
     });
 
-    // Generate the body for select_sqlx method
-    // Note: select_sqlx is only called when NormalSelect trait is implemented (no args)
-    let select_sqlx_body = if has_custom_select && !has_custom_select_args {
+    // Generate the body for select method
+    // Note: select is only called when NormalSelect trait is implemented (no args)
+    let select_body = if has_custom_select && !has_custom_select_args {
         // When custom select exists WITHOUT args, delegate to __easy_sql_select
         quote! {
             current_query.push_str(&Self::__easy_sql_select::<D>(delimeter));
@@ -238,8 +238,8 @@ pub fn sql_output_base(
         // Otherwise, build the select list from regular and joined fields
         // (This covers both: no custom select at all, or custom select with args)
         quote! {
-            #select_sqlx_str_call
-            #(#select_sqlx_joined)*
+            #select_str_call
+            #(#select_joined)*
         }
     };
 
@@ -454,10 +454,10 @@ pub fn sql_output_base(
             type DataToConvert = #sql_crate::DriverRow<D>;
             type UsedForChecks = Self;
 
-            fn select_sqlx(current_query: &mut String) {
+            fn select(current_query: &mut String) {
                 use #macro_support::Context;
                 let delimeter = <D as #sql_crate::Driver>::identifier_delimiter();
-                #select_sqlx_body
+                #select_body
             }
 
             fn convert(data: #sql_crate::DriverRow<D>) -> #macro_support::Result<Self> {

@@ -29,7 +29,7 @@ where
     for<'x> i64: sqlx::Encode<'x, InternalDriver<D>>,
     i64: sqlx::Type<InternalDriver<D>>,
 {
-    fn updates_sqlx(
+    fn updates(
         self,
         mut args_list: crate::DriverArguments<'a, D>,
         current_query: &mut String,
@@ -87,7 +87,7 @@ struct ExampleStruct2 {
 #[always_context]
 #[no_context]
 impl<'a> Update<'a, ExampleTableStruct, TestDriver> for ExampleStruct2 {
-    fn updates_sqlx(
+    fn updates(
         self,
         mut args_list: crate::DriverArguments<'a, TestDriver>,
         current_query: &mut String,

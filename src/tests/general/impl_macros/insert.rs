@@ -58,7 +58,7 @@ where
         ]
     }
 
-    fn insert_values_sqlx(
+    fn insert_values(
         self,
         args_list: DriverArguments<'a, D>,
     ) -> anyhow::Result<(DriverArguments<'a, D>, usize)> {
@@ -116,7 +116,7 @@ impl<'a> Insert<'a, ExampleTableStruct, TestDriver> for &'a ExampleStruct {
         ]
     }
 
-    fn insert_values_sqlx(
+    fn insert_values(
         self,
         mut args_list: DriverArguments<'a, TestDriver>,
     ) -> anyhow::Result<(DriverArguments<'a, TestDriver>, usize)> {

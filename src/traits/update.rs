@@ -4,7 +4,7 @@ use crate::{Driver, DriverArguments};
 
 #[always_context]
 pub trait Update<'a, Table, D: Driver>: Sized {
-    fn updates_sqlx(
+    fn updates(
         self,
         args_list: DriverArguments<'a, D>,
         current_query: &mut String,

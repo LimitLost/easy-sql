@@ -23,7 +23,7 @@ pub trait Output<Table, D: Driver>: Sized {
     type DataToConvert: ToConvert<D>;
     type UsedForChecks;
 
-    fn select_sqlx(current_query: &mut String);
+    fn select(current_query: &mut String);
     fn convert(data: Self::DataToConvert) -> anyhow::Result<Self>;
 }
 

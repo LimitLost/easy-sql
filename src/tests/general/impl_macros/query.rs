@@ -135,7 +135,7 @@ async fn _test_insert() -> anyhow::Result<()> {
                 query.push_str(") VALUES");
 
                 let (new_args, count) = to_insert
-                    .insert_values_sqlx(args)
+                    .insert_values(args)
                     .context("Failed to get insert values")?;
                 args = new_args;
 

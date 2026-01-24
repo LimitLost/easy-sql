@@ -62,7 +62,7 @@ async fn _test_select() -> anyhow::Result<Vec<ExampleOutput>> {
         let current_arg_n = 0;
         let mut _easy_sql_d = TestDriver::identifier_delimiter();
         // Build query
-        <ExampleOutput as Output<ExampleTable, TestDriver>>::select_sqlx(&mut query);
+        <ExampleOutput as Output<ExampleTable, TestDriver>>::select(&mut query);
         query.push_str(" FROM ");
         query.push_str(<ExampleTable as Table<TestDriver>>::table_name());
         query.push_str(&format!(

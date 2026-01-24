@@ -53,7 +53,7 @@ pub fn query_add_selected<T, O: Output<T, D>, D: Driver>(
 ) where
     DriverRow<D>: ToConvert<D>,
 {
-    O::select_sqlx(query);
+    O::select(query);
 }
 
 #[always_context(skip(!))]
@@ -65,9 +65,9 @@ pub fn query_insert_data<'a, Table, D: Driver, T: Insert<'a, Table, D>>(
     _exec: &impl crate::EasyExecutor<D>,
 ) -> anyhow::Result<(Vec<String>, DriverArguments<'a, D>, usize)> {
     to_insert
-        .insert_values_sqlx(args)
+        .insert_values(args)
         .map(|(new_args, count)| (T::insert_columns(), new_args, count))
-        .context("Insert::insert_values_sqlx failed")
+        .context("Insert::insert_values failed")
 }
 
 #[always_context(skip(!))]
@@ -80,9 +80,9 @@ pub fn query_insert_data_selected_driver<'a, Table, D: Driver, T: Insert<'a, Tab
     args: DriverArguments<'a, D>,
 ) -> anyhow::Result<(Vec<String>, DriverArguments<'a, D>, usize)> {
     to_insert
-        .insert_values_sqlx(args)
+        .insert_values(args)
         .map(|(new_args, count)| (T::insert_columns(), new_args, count))
-        .context("Insert::insert_values_sqlx failed")
+        .context("Insert::insert_values failed")
 }
 
 #[always_context(skip(!))]
@@ -96,8 +96,8 @@ pub fn query_update_data<'a, Table, D: Driver, T: Update<'a, Table, D>>(
     _exec: &impl crate::EasyExecutor<D>,
 ) -> anyhow::Result<DriverArguments<'a, D>> {
     update_data
-        .updates_sqlx(args, current_query, parameter_n)
-        .context("Update::updates_sqlx failed")
+        .updates(args, current_query, parameter_n)
+        .context("Update::updates failed")
 }
 #[always_context(skip(!))]
 #[inline(always)]
@@ -111,8 +111,8 @@ pub fn query_update_data_selected_driver<'a, Table, D: Driver, T: Update<'a, Tab
     parameter_n: &mut usize,
 ) -> anyhow::Result<DriverArguments<'a, D>> {
     update_data
-        .updates_sqlx(args, current_query, parameter_n)
-        .context("Update::updates_sqlx failed")
+        .updates(args, current_query, parameter_n)
+        .context("Update::updates failed")
 }
 
 ///This function extracts Driver from connection (that's the only reason why it exists instead of direct call)

@@ -120,7 +120,7 @@ pub fn sql_insert_base(
                 ]
             }
 
-            fn insert_values_sqlx(
+            fn insert_values(
                 self,
                 mut args_list: #sql_crate::DriverArguments<'a, D>,
             ) -> #macro_support::Result<(#sql_crate::DriverArguments<'a, D>, usize)> {
@@ -149,7 +149,7 @@ pub fn sql_insert_base(
                 ]
             }
 
-            fn insert_values_sqlx(
+            fn insert_values(
                 self,
                 mut args_list: #sql_crate::DriverArguments<'a, D>,
             ) -> #macro_support::Result<(#sql_crate::DriverArguments<'a, D>, usize)> {

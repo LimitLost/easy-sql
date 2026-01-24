@@ -387,7 +387,7 @@ pub fn generate_insert(
     };
 
     let (
-        returning_select_sqlx,
+        returning_select,
         execute_ending,
         lazy_struct,
         returning_arg_defs,
@@ -439,7 +439,7 @@ pub fn generate_insert(
             let fetch_internals_normal = fetch_internals(quote! {into_executor});
             let fetch_internals_mut = fetch_internals(quote! {executor});
 
-            let returning_select_sqlx = if returning_has_args {
+            let returning_select = if returning_has_args {
                 quote! {
                     query.push_str(" RETURNING ");
                     query.push_str(&<#returning_type as #sql_crate::OutputData<#table_type>>::SelectProvider::__easy_sql_select::<#driver>(
@@ -450,12 +450,12 @@ pub fn generate_insert(
             } else {
                 quote! {
                     query.push_str(" RETURNING ");
-                    <#returning_type as #sql_crate::Output<#table_type, #driver>>::select_sqlx(&mut query);
+                    <#returning_type as #sql_crate::Output<#table_type, #driver>>::select(&mut query);
                 }
             };
 
             (
-                returning_select_sqlx,
+                returning_select,
                 quote! {
                     #macro_support::Result::<LazyQueryResult>::Ok(LazyQueryResult { builder })
                 },
@@ -605,7 +605,7 @@ pub fn generate_insert(
 
                     #(#returning_before_format)*
                     #(#returning_arg_defs)*
-                    #returning_select_sqlx
+                    #returning_select
 
                     #(#returning_arg_binds)*
 
@@ -717,8 +717,7 @@ pub fn generate_update(
         "sql query! macro input: {}"
     };
 
-    let (returning_select_sqlx, execute, returning_arg_defs) = if let Some(returning) =
-        update.returning
+    let (returning_select, execute, returning_arg_defs) = if let Some(returning) = update.returning
     {
         let returning_type: syn::Type = returning.output_type.clone();
         let returning_has_args = returning.output_args.is_some();
@@ -795,7 +794,7 @@ pub fn generate_update(
                     to_convert_single_impl(#macro_support::never_any::<#returning_type>());
                 }
             });
-            let returning_select_sqlx = if returning_has_args {
+            let returning_select = if returning_has_args {
                 quote! {
                     query.push_str(" RETURNING ");
                     query.push_str(&<#returning_type as #sql_crate::OutputData<#table_type>>::SelectProvider::__easy_sql_select::<#lazy_mode_driver>(
@@ -806,12 +805,12 @@ pub fn generate_update(
             } else {
                 quote! {
                     query.push_str(" RETURNING ");
-                    <#returning_type as #sql_crate::Output<#table_type, #lazy_mode_driver>>::select_sqlx(&mut query);
+                    <#returning_type as #sql_crate::Output<#table_type, #lazy_mode_driver>>::select(&mut query);
                 }
             };
 
             (
-                returning_select_sqlx,
+                returning_select,
                 quote! {
                     let mut builder = #macro_support::QueryBuilder::with_arguments(query, _easy_sql_args);
 
@@ -910,7 +909,7 @@ pub fn generate_update(
                 #(#all_binds)*
 
                 #(#returning_arg_defs)*
-                #returning_select_sqlx
+                #returning_select
 
                 #execute
             }
@@ -971,8 +970,7 @@ pub fn generate_delete(
         "sql query! macro input: {}"
     };
 
-    let (returning_select_sqlx, execute, returning_arg_defs) = if let Some(returning) =
-        delete.returning
+    let (returning_select, execute, returning_arg_defs) = if let Some(returning) = delete.returning
     {
         let returning_type: syn::Type = returning.output_type.clone();
         let returning_has_args = returning.output_args.is_some();
@@ -1049,7 +1047,7 @@ pub fn generate_delete(
                     to_convert_single_impl(#macro_support::never_any::<#returning_type>());
                 }
             });
-            let returning_select_sqlx = if returning_has_args {
+            let returning_select = if returning_has_args {
                 quote! {
                     query.push_str(" RETURNING ");
                     query.push_str(&<#returning_type as #sql_crate::OutputData<#table_type>>::SelectProvider::__easy_sql_select::<#lazy_mode_driver>(
@@ -1060,12 +1058,12 @@ pub fn generate_delete(
             } else {
                 quote! {
                     query.push_str(" RETURNING ");
-                    <#returning_type as #sql_crate::Output<#table_type, #lazy_mode_driver>>::select_sqlx(&mut query);
+                    <#returning_type as #sql_crate::Output<#table_type, #lazy_mode_driver>>::select(&mut query);
                 }
             };
 
             (
-                returning_select_sqlx,
+                returning_select,
                 quote! {
                     let mut builder = #macro_support::QueryBuilder::with_arguments(query, _easy_sql_args);
 
@@ -1161,7 +1159,7 @@ pub fn generate_delete(
                 }
 
                 #(#returning_arg_defs)*
-                #returning_select_sqlx
+                #returning_select
 
                 #execute
             }

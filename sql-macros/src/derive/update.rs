@@ -112,7 +112,7 @@ pub fn sql_update_base(
         impl<'a,D:#sql_crate::Driver> #sql_crate::Update<'a,#table, D> for #item_name
         where #(#where_clauses_types)* {
 
-            fn updates_sqlx(
+            fn updates(
                 self,
                 mut args_list: #sql_crate::DriverArguments<'a, D>,
                 current_query: &mut String,
@@ -151,7 +151,7 @@ pub fn sql_update_base(
         impl<'a,D:#sql_crate::Driver> #sql_crate::Update<'a,#table, D> for &'a #item_name
         where #(#where_clauses_types)* {
 
-            fn updates_sqlx(
+            fn updates(
                 self,
                 mut args_list: #sql_crate::DriverArguments<'a, D>,
                 current_query: &mut String,

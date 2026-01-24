@@ -78,7 +78,7 @@ impl ProvidedDrivers {
         match self {
             ProvidedDrivers::Single(driver) | ProvidedDrivers::SingleWithChecks { driver, .. } => {
                 quote_spanned! {output_type.span()=>
-                    <#output_type as #sql_crate::Output<#table_type, #driver>>::select_sqlx(&mut query);
+                    <#output_type as #sql_crate::Output<#table_type, #driver>>::select(&mut query);
                 }
             }
             ProvidedDrivers::MultipleWithConn { drivers: _, conn } => {
