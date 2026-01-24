@@ -1,5 +1,6 @@
 use crate::TableField;
 
+#[non_exhaustive]
 pub enum AlterTableSingle {
     RenameTable {
         new_table_name: &'static str,

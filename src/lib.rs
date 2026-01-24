@@ -3,8 +3,6 @@ mod database_structs;
 #[cfg(feature = "not_build")]
 mod easy_executor;
 #[cfg(feature = "not_build")]
-mod query;
-#[cfg(feature = "not_build")]
 mod traits;
 
 #[cfg(feature = "not_build")]
@@ -13,9 +11,7 @@ mod drivers;
 pub use drivers::*;
 
 #[cfg(feature = "not_build")]
-pub use {
-    database_structs::*, easy_executor::*, query::*, sql_macros::*, sqlx::Row as SqlxRow, traits::*,
-};
+pub use {database_structs::*, easy_executor::*, sql_macros::*, sqlx::Row as SqlxRow, traits::*};
 
 #[cfg(feature = "not_build")]
 use {easy_macros::always_context, serde::de::DeserializeOwned};
