@@ -97,6 +97,13 @@ pub fn table(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::TokenS
         version_test = Some(parsed);
     }
 
+    #[cfg(not(feature = "migrations"))]
+    if !get_attributes!(item, #[sql(version = __unknown__)]).is_empty() {
+        anyhow::bail!(
+            "The #[sql(version = ...)] attribute requires the `migrations` feature to be enabled."
+        );
+    }
+
     // Determine if migrations should be skipped
     #[cfg(not(feature = "migrations"))]
     let skip_migrations = true;
@@ -436,7 +443,8 @@ Tip: Use `#[sql(table_name = ...)]` or rename one of the structs",
             quote! {}
         };
 
-        let multi_auto_increment_check = if is_auto_increment_list.iter().filter(|v| **v).count() > 1
+        let multi_auto_increment_check = if is_auto_increment_list.iter().filter(|v| **v).count()
+            > 1
         {
             quote! {
                 let _ = || {
