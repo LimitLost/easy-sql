@@ -15,8 +15,7 @@ use sql_compilation_data::CompilationData;
 
 use crate::{
     CUSTOM_SELECT_ALIAS_PREFIX,
-    macros_components::{expr::Expr, joined_field::JoinedField},
-    query_macro_components::ProvidedDrivers,
+    macros_components::{ProvidedDrivers, expr::Expr, joined_field::JoinedField},
     sql_crate,
 };
 

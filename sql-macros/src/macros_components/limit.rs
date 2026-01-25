@@ -1,4 +1,4 @@
-use crate::query_macro_components::ProvidedDrivers;
+use super::ProvidedDrivers;
 use ::{
     proc_macro2::TokenStream,
     quote::{quote, quote_spanned},

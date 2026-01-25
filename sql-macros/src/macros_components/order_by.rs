@@ -1,6 +1,5 @@
-use crate::query_macro_components::ProvidedDrivers;
-
 use super::{
+    ProvidedDrivers,
     expr::Expr,
     keyword::{self},
 };

@@ -1,5 +1,5 @@
 use crate::{
-    query_macro_components::{
+    macros_components::{
         ProvidedDrivers, QueryType, generate_delete, generate_insert, generate_select,
         generate_update,
     },

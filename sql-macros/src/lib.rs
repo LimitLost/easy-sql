@@ -1,8 +1,5 @@
-mod builtin_functions;
 mod macros;
 mod macros_components;
-mod query_macro_components;
-mod sql_function;
 
 mod derive;
 
@@ -241,5 +238,5 @@ pub fn table_debug(item: TokenStream) -> anyhow::Result<TokenStream> {
 #[always_context]
 #[anyhow_result]
 pub fn custom_sql_function(input: TokenStream) -> anyhow::Result<TokenStream> {
-    Ok(sql_function::custom_sql_function_impl(input))
+    Ok(macros::custom_sql_function_impl(input))
 }

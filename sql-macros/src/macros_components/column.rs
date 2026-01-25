@@ -1,4 +1,4 @@
-use crate::query_macro_components::ProvidedDrivers;
+use super::ProvidedDrivers;
 use ::{
     quote::ToTokens,
     syn::{self, Token, parse::Parse, punctuated::Punctuated, spanned::Spanned},

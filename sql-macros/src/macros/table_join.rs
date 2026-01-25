@@ -8,8 +8,7 @@ use syn::Path;
 use syn::punctuated::Punctuated;
 use syn::{self, parse::Parse};
 
-use crate::macros_components::expr::Expr;
-use crate::query_macro_components::ProvidedDrivers;
+use crate::macros_components::{Expr, ProvidedDrivers};
 use crate::sql_crate;
 
 use crate::macros_components::keyword;
