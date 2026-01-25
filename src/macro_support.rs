@@ -4,6 +4,7 @@ pub use anyhow::{Context, Error, Result};
 use easy_macros::always_context;
 pub use easy_macros::context;
 pub use futures_core::Stream;
+use serde::de::DeserializeOwned;
 use sqlx::IntoArguments;
 pub use sqlx::{
     Arguments, ColumnIndex, Decode, Encode, Executor, QueryBuilder, Type, TypeInfo, query::Query,
@@ -175,4 +176,31 @@ where
         <DriverRow<D> as sqlx::Row>::try_get(&row, 0).context("SqlxRow::try_get failed")?;
 
     Ok(exists)
+}
+
+#[always_context]
+/// Used by #[sql(bytes)]
+pub fn from_binary<T: DeserializeOwned>(slice: &[u8]) -> anyhow::Result<T> {
+    #[no_context]
+    let (result, _) = bincode::serde::decode_from_slice(slice, bincode::config::standard())?;
+
+    Ok(result)
+}
+
+#[always_context]
+/// Used by #[sql(bytes)]
+pub fn from_binary_vec<T: DeserializeOwned>(v: Vec<u8>) -> anyhow::Result<T> {
+    #[no_context]
+    let (result, _) = bincode::serde::decode_from_slice(&v, bincode::config::standard())?;
+
+    Ok(result)
+}
+
+#[always_context]
+/// Used by #[sql(bytes)]
+pub fn to_binary<T: serde::Serialize>(value: T) -> anyhow::Result<Vec<u8>> {
+    #[no_context]
+    let result = bincode::serde::encode_to_vec(value, bincode::config::standard())?;
+
+    Ok(result)
 }
