@@ -11,10 +11,7 @@ use ::{
     anyhow::{self, Context},
     proc_macro2::LineColumn,
     quote::ToTokens,
-    syn::{
-        self, ItemFn, ItemImpl, ItemTrait, LitStr, Macro, Meta, punctuated::Punctuated,
-        spanned::Spanned,
-    },
+    syn::{self, LitStr, punctuated::Punctuated, spanned::Spanned},
 };
 use convert_case::{Case, Casing};
 use easy_macros::{all_syntax_cases, always_context, context, get_attributes, has_attributes};
@@ -27,8 +24,6 @@ struct SearchData {
     ///When parsing rust files
     errors_found: bool,
     found: bool,
-    ///Where to add `#[sql_convenience]`
-    updates: Vec<LineColumn>,
 
     //Table handling
     created_unique_ids: Vec<(String, LineColumn)>,
@@ -52,7 +47,6 @@ impl SearchData {
         SearchData {
             errors_found: false,
             found: false,
-            updates: Vec::new(),
             created_unique_ids: Vec::new(),
             compilation_data,
             found_existing_tables_ids: Vec::new(),
@@ -71,7 +65,6 @@ impl SearchData {
         SearchData {
             errors_found: false,
             found: false,
-            updates: Vec::new(),
             created_unique_ids: Vec::new(),
             compilation_data,
             found_existing_tables_ids: Vec::new(),
@@ -89,13 +82,8 @@ all_syntax_cases! {
     }
     default_cases=>{
         fn struct_table_handle_wrapper(item: &mut syn::ItemStruct, context_info: &mut SearchData);
-
-        fn macro_check(item: &mut Macro, context_info: &mut SearchData);
     }
     special_cases=>{
-        fn item_fn_check(item: &mut ItemFn, context_info: &mut SearchData);
-        fn trait_check(item: &mut ItemTrait, context_info: &mut SearchData);
-        fn impl_check(item: &mut ItemImpl, context_info: &mut SearchData);
     }
 }
 
@@ -342,62 +330,6 @@ fn struct_table_handle_wrapper(item: &mut syn::ItemStruct, context_info: &mut Se
     }
 }
 
-fn macro_check(item: &mut Macro, context_info: &mut SearchData) {
-    let path = item.path.to_token_stream().to_string();
-    match path.as_str() {
-        "sql" | "easy_sql::sql" => {
-            context_info.found = true;
-        }
-        _ => {}
-    }
-}
-
-fn trait_check(item: &mut ItemTrait, context_info: &mut SearchData) {
-    for item in item.items.iter_mut() {
-        macro_search_trait_item_handle(item, context_info);
-    }
-
-    if context_info.found && !has_sql_convenience(&item.attrs) {
-        context_info.updates.push(item.span().start());
-        context_info.found = false;
-    }
-}
-
-fn impl_check(item: &mut ItemImpl, context_info: &mut SearchData) {
-    for item in item.items.iter_mut() {
-        macro_search_impl_item_handle(item, context_info);
-    }
-
-    if context_info.found && !has_sql_convenience(&item.attrs) {
-        context_info.updates.push(item.span().start());
-        context_info.found = false;
-    }
-}
-
-fn item_fn_check(item: &mut ItemFn, context_info: &mut SearchData) {
-    macro_search_block_handle(&mut item.block, context_info);
-
-    if context_info.found && !has_sql_convenience(&item.attrs) {
-        context_info.updates.push(item.span().start());
-        context_info.found = false;
-    }
-}
-
-fn has_sql_convenience(attrs: &[syn::Attribute]) -> bool {
-    for attr in attrs {
-        if let Meta::Path(path) = &attr.meta {
-            let path_str = path
-                .to_token_stream()
-                .to_string()
-                .replace(|c: char| c.is_whitespace(), "");
-            if let "sql_convenience" | "easy_sql::sql_convenience" = path_str.as_str() {
-                return true;
-            }
-        }
-    }
-    false
-}
-
 #[always_context]
 fn handle_item(item: &mut syn::Item, updates: &mut SearchData) -> anyhow::Result<()> {
     macro_search_item_handle(item, updates);
@@ -459,26 +391,6 @@ fn handle_file(file_path: impl AsRef<Path>, search_data: &mut SearchData) -> any
             &mut item,
             search_data,
         )?;
-    }
-
-    // Create #[sql_convenience] in the file (if needed)
-    if !search_data.updates.is_empty() {
-        let mut updates = search_data.updates.drain(..).collect::<Vec<_>>();
-        //Sort our lines (reverse order)
-        updates.sort_by(|a, b| b.line.cmp(&a.line));
-
-        //Uses span position info to add #[sql_convenience] to every item on the list
-        for start_pos in updates.into_iter() {
-            //1 indexed
-            let line = start_pos.line;
-            //Find position based on line
-            let line_bytes_end = line_pos(&contents, line - 1)?;
-
-            contents.insert_str(line_bytes_end, "#[sql_convenience]\r\n");
-        }
-
-        let mut file = std::fs::File::create(file_path).unwrap();
-        file.write_all(contents.as_bytes()).unwrap();
     }
 
     //Create unique ids in the file (if needed)

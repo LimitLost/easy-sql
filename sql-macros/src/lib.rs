@@ -2,7 +2,6 @@ mod builtin_functions;
 mod macros;
 mod macros_components;
 mod query_macro_components;
-mod sql_convenience_attr;
 mod sql_function;
 
 mod derive;
@@ -205,13 +204,6 @@ pub fn table_debug(item: TokenStream) -> anyhow::Result<TokenStream> {
     let output = derive::table(item)?;
 
     panic!("{}", output);
-}
-
-#[always_context]
-#[proc_macro_attribute]
-#[anyhow_result]
-pub fn sql_convenience(attr: TokenStream, item: TokenStream) -> anyhow::Result<TokenStream> {
-    sql_convenience_attr::sql_convenience(attr, item)
 }
 
 /// Define a custom SQL function that can be used in query! macros.
