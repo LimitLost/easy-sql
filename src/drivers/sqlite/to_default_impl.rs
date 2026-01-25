@@ -38,37 +38,42 @@ impl ToDefault<D> for &str {
         format!("'{}'", escape_sql(self))
     }
 }
-
+#[cfg(feature = "chrono")]
 impl ToDefault<D> for chrono::NaiveDate {
     fn to_default(self) -> String {
         format!("'{}'", self.format("%F"))
     }
 }
 
+#[cfg(feature = "chrono")]
 impl ToDefault<D> for &chrono::NaiveDate {
     fn to_default(self) -> String {
         format!("'{}'", self.format("%F"))
     }
 }
 
+#[cfg(feature = "chrono")]
 impl ToDefault<D> for chrono::NaiveDateTime {
     fn to_default(self) -> String {
         format!("'{}'", self.format("%F %T%.f"))
     }
 }
 
+#[cfg(feature = "chrono")]
 impl ToDefault<D> for &chrono::NaiveDateTime {
     fn to_default(self) -> String {
         format!("'{}'", self.format("%F %T%.f"))
     }
 }
 
+#[cfg(feature = "chrono")]
 impl ToDefault<D> for chrono::NaiveTime {
     fn to_default(self) -> String {
         format!("'{}'", self.format("%T%.f"))
     }
 }
 
+#[cfg(feature = "chrono")]
 impl ToDefault<D> for &chrono::NaiveTime {
     fn to_default(self) -> String {
         format!("'{}'", self.format("%T%.f"))

@@ -1,11 +1,7 @@
 use std::{borrow::Cow, time::Duration};
 
-use bigdecimal::BigDecimal;
-use chrono::TimeDelta;
 use pg_escape::quote_literal;
-use rust_decimal::Decimal;
 use sqlx::postgres::types::PgInterval;
-use uuid::Uuid;
 
 use crate::{ToDefault, impl_to_default_to_string_with_ref};
 
@@ -86,31 +82,35 @@ impl ToDefault<D> for &PgInterval {
     }
 }
 
-impl ToDefault<D> for BigDecimal {
+#[cfg(feature = "bigdecimal")]
+impl ToDefault<D> for bigdecimal::BigDecimal {
     fn to_default(self) -> String {
         format!("{self}::numeric",)
     }
 }
 
-impl ToDefault<D> for &BigDecimal {
+#[cfg(feature = "bigdecimal")]
+impl ToDefault<D> for &bigdecimal::BigDecimal {
+    fn to_default(self) -> String {
+        format!("{self}::numeric",)
+    }
+}
+#[cfg(feature = "rust_decimal")]
+impl ToDefault<D> for rust_decimal::Decimal {
     fn to_default(self) -> String {
         format!("{self}::numeric",)
     }
 }
 
-impl ToDefault<D> for Decimal {
+#[cfg(feature = "rust_decimal")]
+impl ToDefault<D> for &rust_decimal::Decimal {
     fn to_default(self) -> String {
         format!("{self}::numeric",)
     }
 }
 
-impl ToDefault<D> for &Decimal {
-    fn to_default(self) -> String {
-        format!("{self}::numeric",)
-    }
-}
-
-impl ToDefault<D> for TimeDelta {
+#[cfg(feature = "chrono")]
+impl ToDefault<D> for chrono::TimeDelta {
     fn to_default(self) -> String {
         format!(
             "'{} seconds {} microseconds'::interval",
@@ -120,7 +120,8 @@ impl ToDefault<D> for TimeDelta {
     }
 }
 
-impl ToDefault<D> for &TimeDelta {
+#[cfg(feature = "chrono")]
+impl ToDefault<D> for &chrono::TimeDelta {
     fn to_default(self) -> String {
         format!(
             "'{} seconds {} microseconds'::interval",
@@ -159,48 +160,55 @@ impl ToDefault<D> for &[u8] {
     }
 }
 
+#[cfg(feature = "chrono")]
 impl ToDefault<D> for chrono::NaiveDate {
     fn to_default(self) -> String {
         format!("'{}'::date", self.format("%Y-%m-%d"))
     }
 }
 
+#[cfg(feature = "chrono")]
 impl ToDefault<D> for &chrono::NaiveDate {
     fn to_default(self) -> String {
         format!("'{}'::date", self.format("%Y-%m-%d"))
     }
 }
 
+#[cfg(feature = "chrono")]
 impl ToDefault<D> for chrono::NaiveDateTime {
     fn to_default(self) -> String {
         format!("'{}'::timestamp", self.format("%Y-%m-%d %H:%M:%S%.f"))
     }
 }
 
+#[cfg(feature = "chrono")]
 impl ToDefault<D> for &chrono::NaiveDateTime {
     fn to_default(self) -> String {
         format!("'{}'::timestamp", self.format("%Y-%m-%d %H:%M:%S%.f"))
     }
 }
 
+#[cfg(feature = "chrono")]
 impl ToDefault<D> for chrono::NaiveTime {
     fn to_default(self) -> String {
         format!("'{}'::time", self.format("%H:%M:%S%.f"))
     }
 }
 
+#[cfg(feature = "chrono")]
 impl ToDefault<D> for &chrono::NaiveTime {
     fn to_default(self) -> String {
         format!("'{}'::time", self.format("%H:%M:%S%.f"))
     }
 }
-
-impl ToDefault<D> for Uuid {
+#[cfg(feature = "uuid")]
+impl ToDefault<D> for uuid::Uuid {
     fn to_default(self) -> String {
         format!("'{}'::uuid", self)
     }
 }
-impl ToDefault<D> for &Uuid {
+#[cfg(feature = "uuid")]
+impl ToDefault<D> for &uuid::Uuid {
     fn to_default(self) -> String {
         format!("'{}'::uuid", self)
     }

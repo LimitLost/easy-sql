@@ -9,7 +9,6 @@ proc-macro = true
 [dependencies]
 easy-macros = { version="1.0.2", features = ["full"] }
 convert_case = "0.8.0"
-replace_with = "0.1.7"
 sql-compilation-data = { path = "../sql-compilation-data" }
 
 syn = { version = "2.0", features = ["full","extra-traits"] }

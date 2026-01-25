@@ -5,13 +5,9 @@ version = "0.9.0" # Table Join and Exists is required for 1.0.0
 license = "Apache-2.0"
 
 [dependencies]
-sqlx = {version = "0.8", features = [
-  "runtime-tokio",
-  "uuid",
-  "bigdecimal",
-  "rust_decimal",
-  "chrono",
-], optional = true}
+
+sqlx = {version = "0.8"}
+
 pg_escape = {version = "0.1.1", optional = true}
 
 uuid = {version = "*", features = ["serde"], optional = true}
@@ -19,71 +15,59 @@ uuid = {version = "*", features = ["serde"], optional = true}
 bigdecimal = {version = "*", features = ["serde-json"], optional = true}
 # Add serde impl to decimal
 rust_decimal = {version = "1.37.1", features = ["serde-str"], optional = true}
-
-# Used in Table derive macro (and tests)
-lazy_static = {version="*", optional = true}
-
-easy-macros = {version="1.0.2", features = ["general","easy-sql"], optional = true}
-
-anyhow = {version="1",optional = true}
+easy-macros = {version="1.0.2", features = ["always-context"]}
 chrono = {version = "*", features = ["serde"], optional = true}
 
-bincode = {version = "2", features = ["serde"], optional = true}
-serde = {version = "1", features = ["derive"], optional = true}
 
-futures = {version="0.3.31", optional = true}
-futures-core = {version="0.3.31", optional = true}
-pin-project = {version="1", optional = true}
-tokio = {version = "1", features = ["sync"], optional = true}
+anyhow = {version = "1"}
 
-sql-build = {path = "./sql-build", optional = true}
-sql-compilation-data = {path = "./sql-compilation-data", default-features = false, optional = true}
-sql-macros = {path = "./sql-macros", optional = true}
+# Used for handling binary 
+bincode = {version = "2", features = ["serde"]}
+serde = {version = "1", features = ["derive"]}
 
+# Used by generated code by query_lazy! macro
+futures-core = {version = "0.3.31"}
+
+sql-compilation-data = {path = "./sql-compilation-data", default-features = false}
+sql-macros = {path = "./sql-macros"}
 
 [dev-dependencies]
-tokio = {version = "1", features = ["full"]}
 dotenvy = "0.15"
+tokio = {version = "1", features = ["full"]}
 tracing = "0.1"
-tracing-subscriber = { version = "0.3", features = ["fmt", "env-filter"] } 
+tracing-subscriber = {version = "0.3", features = ["fmt", "env-filter"]}
+lazy_static = {version = "*"}
+futures = {version = "0.3.31"}
+
+sqlx = {version = "0.8", features = [
+  "runtime-tokio",
+]}
 
 [build-dependencies]
 easy-macros = {version="1.0.2", features = ["build"]}
-sql-build = {path = "./sql-build"}
-regex="*"
+regex = "*"
+sql-build = {path = "./sql-build", features = ["migrations"]}
 
 [features]
-build = ["dep:sql-build"]
 default = ["check_duplicate_table_names"]
-ipnet = ["sqlx/ipnet"]
-not_build = [
-  "dep:sqlx",
-  "dep:uuid",
-  "dep:bigdecimal",
-  "dep:rust_decimal",
-  "dep:lazy_static",
-  "dep:easy-macros",
-  "dep:anyhow",
-  "dep:chrono",
-  "dep:bincode",
-  "dep:serde",
-  "dep:futures",
-  "dep:futures-core",
-  "dep:pin-project",
-  "dep:tokio",
-  "dep:sql-compilation-data",
-  "dep:sql-macros",
-]
-postgres = ["sqlx/postgres", "dep:pg_escape", "not_build"]
-sqlite = ["sqlx/sqlite", "not_build"]
+postgres = ["sqlx/postgres", "dep:pg_escape"]
+sqlite = ["sqlx/sqlite"]
+
 use_output_columns = ["sql-macros/use_output_columns"]
 migrations = [
-  "sql-build?/migrations",
-  "sql-macros?/migrations",
-  "sql-compilation-data?/migrations",
+  "sql-macros/migrations",
+  "sql-compilation-data/migrations",
 ]
 check_duplicate_table_names = [
-  "sql-macros?/check_duplicate_table_names",
-  "sql-build?/check_duplicate_table_names",
-  "sql-compilation-data?/check_duplicate_table_names",
+  "sql-macros/check_duplicate_table_names",
+  "sql-compilation-data/check_duplicate_table_names",
 ]
+
+# Adds ToDefault implementation for BigDecimal
+bigdecimal=["sqlx/bigdecimal", "dep:bigdecimal"]
+# Adds ToDefault implementation for Decimal from rust_decimal
+rust_decimal=["sqlx/rust_decimal", "dep:rust_decimal"]
+# Adds ToDefault implementation for IpNet
+ipnet = ["sqlx/ipnet"]
+uuid = ["sqlx/uuid","dep:uuid"]
+chrono = ["sqlx/chrono","dep:chrono"]

@@ -566,7 +566,7 @@ pub fn generate_insert(
             #lazy_struct
 
             async {
-                use #macro_support::{Arguments,Context,FutureExt};
+                use #macro_support::{Arguments,Context};
                 use #sql_crate::ToConvert;
 
                     let mut _easy_sql_args = #driver_arguments;
@@ -884,7 +884,7 @@ pub fn generate_update(
             };
 
             async {
-                use #macro_support::{Context,FutureExt,Arguments};
+                use #macro_support::{Context,Arguments};
                 use #sql_crate::ToConvert;
 
                 let mut _easy_sql_args = #driver_arguments;
@@ -1138,7 +1138,7 @@ pub fn generate_delete(
             };
 
             async {
-                use #macro_support::{Context,FutureExt,Arguments};
+                use #macro_support::{Context,Arguments};
                 use #sql_crate::ToConvert;
 
                 let mut _easy_sql_args = #driver_arguments;

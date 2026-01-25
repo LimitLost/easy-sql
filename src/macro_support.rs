@@ -3,9 +3,7 @@
 pub use anyhow::{Context, Error, Result};
 use easy_macros::always_context;
 pub use easy_macros::context;
-pub use futures::FutureExt;
 pub use futures_core::Stream;
-pub use lazy_static::lazy_static;
 use sqlx::IntoArguments;
 pub use sqlx::{
     Arguments, ColumnIndex, Decode, Encode, Executor, QueryBuilder, Type, TypeInfo, query::Query,
