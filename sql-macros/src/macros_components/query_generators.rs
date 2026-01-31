@@ -874,7 +874,12 @@ pub fn generate_update(
     let parameter_placeholder_base = driver.parameter_placeholder_base(sql_crate);
     let identifier_delimiter = driver.identifier_delimiter(sql_crate);
     let main_table_name = driver.table_name(sql_crate, &table_type);
-    let table_joins = driver.table_joins(sql_crate, &table_type);
+    checks.push(quote! {
+        let _ = || {
+            fn __easy_sql_assert_not_joined<T: #sql_crate::NotJoinedTable>() {}
+            __easy_sql_assert_not_joined::<#table_type>();
+        };
+    });
 
     Ok(quote! {
         {
@@ -892,9 +897,6 @@ pub fn generate_update(
                 #parameter_placeholder_base
                 #(#before_format)*
                 let mut query = format!("UPDATE {}",#main_table_name);
-
-                // Handle potential table joins
-                #table_joins
 
                 query.push_str(&format!(#format_str, #(#format_params),*));
 
@@ -1127,7 +1129,12 @@ pub fn generate_delete(
     let driver_arguments = driver.arguments(sql_crate);
     let identifier_delimiter = driver.identifier_delimiter(sql_crate);
     let table_name = driver.table_name(sql_crate, &table_type);
-    let table_joins = driver.table_joins(sql_crate, &table_type);
+    checks.push(quote! {
+        let _ = || {
+            fn __easy_sql_assert_not_joined<T: #sql_crate::NotJoinedTable>() {}
+            __easy_sql_assert_not_joined::<#table_type>();
+        };
+    });
     let parameter_placeholder_base = driver.parameter_placeholder_base(sql_crate);
 
     Ok(quote! {
@@ -1147,9 +1154,6 @@ pub fn generate_delete(
                 #(#before_format)*
 
                 let mut query = format!("DELETE FROM {}", #table_name);
-
-                // Handle potential table joins
-                #table_joins
 
                 query.push_str(&format!(#format_str, #(#format_params),*));
 

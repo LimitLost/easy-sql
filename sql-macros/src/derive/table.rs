@@ -546,6 +546,8 @@ Tip: Use `#[sql(table_name = ...)]` or rename one of the structs",
     result_builder.add(quote! {
         impl #sql_crate::HasTable<#item_name> for #item_name{}
 
+        impl #sql_crate::NotJoinedTable for #item_name {}
+
         impl<EasySqlD:#sql_crate::Driver> #sql_crate::Table<EasySqlD> for #item_name {
 
             fn table_name() -> &'static str {

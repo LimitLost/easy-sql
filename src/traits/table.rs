@@ -12,3 +12,7 @@ pub trait Table<D: Driver>: Sized {
     /// Name and the first argument won't change, but return type and more arguments will be added in future
     fn table_joins(current_query: &mut String);
 }
+
+/// Marker trait for tables that are not created via table_join!.
+#[diagnostic::on_unimplemented(message = "UPDATE and DELETE queries do not support joined tables.")]
+pub trait NotJoinedTable {}
