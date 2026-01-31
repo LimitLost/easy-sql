@@ -1,6 +1,6 @@
 use std::fmt::Debug;
 
-use crate::{Driver, DriverConnection, HasTable, InternalDriver, Output};
+use crate::{Driver, DriverConnection, HasTable, InternalDriver, NotJoinedTable, Output};
 use easy_macros::always_context;
 use sql_macros::{Insert, Update};
 use sqlx::TypeInfo;
@@ -15,6 +15,8 @@ pub struct EasySqlTables {
 }
 
 impl HasTable<EasySqlTables> for EasySqlTables {}
+
+impl NotJoinedTable for EasySqlTables {}
 
 #[macro_export]
 macro_rules! EasySqlTables_create {
