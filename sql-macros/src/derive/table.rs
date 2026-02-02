@@ -391,7 +391,7 @@ Tip: Use `#[sql(table_name = ...)]` or rename one of the structs",
                             };
 
                             let default_v = #macro_support::Context::context(
-                                #sql_crate::to_binary(#default_value),
+                                #macro_support::to_binary(#default_value),
                                 #error_context,
                             )?;
 

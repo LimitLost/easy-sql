@@ -11,6 +11,29 @@ use crate::sql_crate;
 
 use super::ty_to_variant;
 
+fn option_inner_type(ty: &syn::Type) -> Option<&syn::Type> {
+    let type_path = match ty {
+        syn::Type::Path(type_path) => type_path,
+        _ => return None,
+    };
+
+    let segment = type_path.path.segments.last()?;
+    if segment.ident != "Option" {
+        return None;
+    }
+
+    let args = match &segment.arguments {
+        syn::PathArguments::AngleBracketed(args) => args,
+        _ => return None,
+    };
+
+    let first = args.args.first()?;
+    match first {
+        syn::GenericArgument::Type(inner) => Some(inner),
+        _ => None,
+    }
+}
+
 #[always_context]
 pub fn sql_update_base(
     item_name: &syn::Ident,
@@ -18,34 +41,36 @@ pub fn sql_update_base(
     table: &TokenStream,
     drivers: &[syn::Path],
 ) -> anyhow::Result<TokenStream> {
-    let field_names = fields
-        .iter()
-        .map(|field| field.ident.as_ref().unwrap())
-        .collect::<Vec<_>>();
-    let field_names_str = field_names
-        .iter()
-        .map(|field| field.to_string())
-        .collect::<Vec<_>>();
-
     let sql_crate = sql_crate();
     let macro_support = quote! { #sql_crate::macro_support };
 
-    let mut update_values = Vec::new();
-    let mut update_values_for_checks = Vec::new();
-    let mut update_values_debug = Vec::new();
-    let mut update_values_debug_ref = Vec::new();
+    let mut update_statements = Vec::new();
+    let mut update_statements_ref = Vec::new();
+    let mut validity_checks = Vec::new();
+    let mut driver_test_values = Vec::new();
+    let mut where_clauses_types = Vec::new();
 
     for field in fields.iter() {
         let field_name = field.ident.as_ref().unwrap();
-
+        let field_name_str = field_name.to_string();
+        let query_format = format!("{{delimeter}}{}{{delimeter}} = {{}}, ", field_name_str);
+        let field_ty = &field.ty;
         let bytes = has_attributes!(field, #[sql(bytes)]);
+        if bytes {
+            let bound_ty = quote! { Vec<u8> };
+            where_clauses_types.push(quote! {
+                for<'__easy_sql_x> #bound_ty: #macro_support::Encode<'__easy_sql_x, #sql_crate::InternalDriver<D>>,
+                #bound_ty: #macro_support::Type<#sql_crate::InternalDriver<D>>,
+            });
+        } else {
+            where_clauses_types.push(quote! {
+                for<'__easy_sql_x> #field_ty: #macro_support::Encode<'__easy_sql_x, #sql_crate::InternalDriver<D>>,
+                #field_ty: #macro_support::Type<#sql_crate::InternalDriver<D>>,
+            });
+        }
 
-        let ty_variant = ty_to_variant(
-            quote! {self},
-            field_name.to_token_stream(),
-            bytes,
-            &sql_crate,
-        )?;
+        let maybe_update =
+            has_attributes!(field, #[sql(maybe_update)]) || has_attributes!(field, #[sql(maybe)]);
 
         let ty_variant_for_checks = ty_to_variant(
             quote! {_self},
@@ -60,53 +85,225 @@ pub fn sql_update_base(
             "Binding field `{}` (= {{:?}}) to query failed",
             field_name.to_string()
         );
-        update_values_debug.push(quote! {
-            .context(#debug_format_str)
-        });
-        update_values_debug_ref.push(quote! {
-            .with_context(|| format!(#debug_format_str_ref, #ty_variant))
-        });
 
-        update_values.push(ty_variant);
-        update_values_for_checks.push(ty_variant_for_checks);
+        if maybe_update {
+            let outer = option_inner_type(&field.ty).with_context(|| {
+                format!(
+                    "#[sql(maybe_update)] / #[sql(maybe)] requires `{}` to be an Option<T> field",
+                    field_name
+                )
+            })?;
+            let (base_ty, nested_option) = if let Some(inner) = option_inner_type(outer) {
+                (inner.clone(), true)
+            } else {
+                (outer.clone(), false)
+            };
+
+            if nested_option {
+                if bytes {
+                    let bound_ty = quote! { Vec<u8> };
+                    where_clauses_types.push(quote! {
+                        for<'__easy_sql_x> #bound_ty: #macro_support::Encode<'__easy_sql_x, #sql_crate::InternalDriver<D>>,
+                        #bound_ty: #macro_support::Type<#sql_crate::InternalDriver<D>>,
+                    });
+                } else {
+                    let option_base_ty = quote! { Option<#base_ty> };
+                    where_clauses_types.push(quote! {
+                        for<'__easy_sql_x> #option_base_ty: #macro_support::Encode<'__easy_sql_x, #sql_crate::InternalDriver<D>>,
+                        #option_base_ty: #macro_support::Type<#sql_crate::InternalDriver<D>>,
+                    });
+                }
+            }
+
+            validity_checks.push(quote! {
+                {
+                    #[diagnostic::on_unimplemented(
+                        message = "#[sql(maybe_update)] / #[sql(maybe)] requires the table field to be Option<T>, and the update field to be either Option<T>, Option<Option<T>>, or T."
+                    )]
+                    trait __EasySqlMaybeUpdateCompatible {}
+                    impl __EasySqlMaybeUpdateCompatible for (Option<#base_ty>, Option<#base_ty>) {}
+                    impl __EasySqlMaybeUpdateCompatible for (Option<#base_ty>, Option<Option<#base_ty>>) {}
+                    impl __EasySqlMaybeUpdateCompatible for (Option<#base_ty>, #base_ty) {}
+
+                    fn __easy_sql_check_maybe_update<TableField, UpdateField>(
+                        _table_field: &TableField,
+                        _update_field: &UpdateField,
+                    )
+                    where
+                        (TableField, UpdateField): __EasySqlMaybeUpdateCompatible,
+                    {
+                    }
+
+                    __easy_sql_check_maybe_update(&table_instance.#field_name, &update_instance.#field_name);
+                }
+            });
+
+            let driver_value = if bytes {
+                quote! {
+                    #macro_support::to_binary(&#macro_support::never_any::<Option<#base_ty>>())?
+                }
+            } else {
+                quote! { #macro_support::never_any::<Option<#base_ty>>() }
+            };
+            driver_test_values.push(driver_value);
+
+            if nested_option {
+                let binding_expr = if bytes {
+                    quote! { #macro_support::to_binary(&value)? }
+                } else {
+                    quote! { value }
+                };
+                update_statements.push(quote! {
+                    if let Some(value) = self.#field_name {
+                        current_query.push_str(&format!(
+                            #query_format,
+                            <D as #sql_crate::Driver>::parameter_placeholder(*parameter_n)
+                        ));
+                        args_list
+                            .add(#binding_expr)
+                            .map_err(#macro_support::Error::from_boxed)
+                            .context(#debug_format_str)?;
+                        *parameter_n += 1;
+                    }
+                });
+
+                let binding_expr_ref = if bytes {
+                    quote! { #macro_support::to_binary(value)? }
+                } else {
+                    quote! { value }
+                };
+                update_statements_ref.push(quote! {
+                    if let Some(value) = &self.#field_name {
+                        current_query.push_str(&format!(
+                            #query_format,
+                            <D as #sql_crate::Driver>::parameter_placeholder(*parameter_n)
+                        ));
+                        args_list
+                            .add(#binding_expr_ref)
+                            .map_err(#macro_support::Error::from_boxed)
+                            .context(#debug_format_str)?;
+                        *parameter_n += 1;
+                    }
+                });
+            } else {
+                let binding_expr = if bytes {
+                    quote! { #macro_support::to_binary(&update_value)? }
+                } else {
+                    quote! { update_value }
+                };
+                update_statements.push(quote! {
+                    if let Some(value) = self.#field_name {
+                        current_query.push_str(&format!(
+                            #query_format,
+                            <D as #sql_crate::Driver>::parameter_placeholder(*parameter_n)
+                        ));
+                        let update_value = Some(value);
+                        args_list
+                            .add(#binding_expr)
+                            .map_err(#macro_support::Error::from_boxed)
+                            .context(#debug_format_str)?;
+                        *parameter_n += 1;
+                    }
+                });
+
+                let binding_expr_ref = if bytes {
+                    quote! { #macro_support::to_binary(&self.#field_name)? }
+                } else {
+                    quote! { &self.#field_name }
+                };
+                update_statements_ref.push(quote! {
+                    if self.#field_name.is_some() {
+                        current_query.push_str(&format!(
+                            #query_format,
+                            <D as #sql_crate::Driver>::parameter_placeholder(*parameter_n)
+                        ));
+                        args_list
+                            .add(#binding_expr_ref)
+                            .map_err(#macro_support::Error::from_boxed)
+                            .context(#debug_format_str)?;
+                        *parameter_n += 1;
+                    }
+                });
+            }
+        } else {
+            let ty_variant = ty_to_variant(
+                quote! {self},
+                field_name.to_token_stream(),
+                bytes,
+                &sql_crate,
+            )?;
+            let debug_value = if bytes {
+                quote! { &self.#field_name }
+            } else {
+                quote! { #ty_variant }
+            };
+
+            driver_test_values.push(ty_variant_for_checks.clone());
+
+            validity_checks.push(quote! {
+                {
+                    #[diagnostic::on_unimplemented(
+                        message = "Update fields must match table field types. You can update Option<T> columns with T or Option<T>."
+                    )]
+                    trait __EasySqlUpdateCompatible {}
+                    impl __EasySqlUpdateCompatible for (#field_ty, #field_ty) {}
+                    impl __EasySqlUpdateCompatible for (Option<#field_ty>, #field_ty) {}
+
+                    fn __easy_sql_check_update<TableField, UpdateField>(
+                        _table_field: &TableField,
+                        _update_field: &UpdateField,
+                    )
+                    where
+                        (TableField, UpdateField): __EasySqlUpdateCompatible,
+                    {
+                    }
+
+                    __easy_sql_check_update(&table_instance.#field_name, &update_instance.#field_name);
+                }
+            });
+
+            update_statements.push(quote! {
+                current_query.push_str(&format!(
+                    #query_format,
+                    <D as #sql_crate::Driver>::parameter_placeholder(*parameter_n)
+                ));
+                args_list
+                    .add(#ty_variant)
+                    .map_err(#macro_support::Error::from_boxed)
+                    .context(#debug_format_str)?;
+                *parameter_n += 1;
+            });
+
+            let binding_expr_ref = if bytes {
+                quote! { #macro_support::to_binary(&self.#field_name)? }
+            } else {
+                quote! { &self.#field_name }
+            };
+            update_statements_ref.push(quote! {
+                current_query.push_str(&format!(
+                    #query_format,
+                    <D as #sql_crate::Driver>::parameter_placeholder(*parameter_n)
+                ));
+                args_list
+                    .add(#binding_expr_ref)
+                    .map_err(#macro_support::Error::from_boxed)
+                    .with_context(|| format!(#debug_format_str_ref, #debug_value))?;
+                *parameter_n += 1;
+            });
+        }
     }
 
-    let sqlx_query_format_str = field_names_str
-        .iter()
-        .map(|field_name| format!("{{delimeter}}{}{{delimeter}} = {{}}", field_name))
-        .collect::<Vec<_>>()
-        .join(", ");
-    let sqlx_query_format_values = field_names_str
-        .iter()
-        .enumerate()
-        .map(|(i, _)| {
-            quote! {
-                <D as #sql_crate::Driver>::parameter_placeholder(*parameter_n + #i)
-            }
-        })
-        .collect::<Vec<_>>();
-
-    let driver_tests=drivers.iter().map(|driver|{
+    let driver_tests = drivers.iter().map(|driver| {
         quote! {
             let _=|mut args_list:#sql_crate::DriverArguments<'a, #driver>|{
                 let _self=#macro_support::never_any::<Self>();
                 #(
-                    args_list.add(#update_values_for_checks).map_err(#macro_support::Error::from_boxed)?;
+                    args_list.add(#driver_test_values).map_err(#macro_support::Error::from_boxed)?;
                 )*
                 #macro_support::Result::<()>::Ok(())
             };
         }
     });
-
-    let where_clauses_types=fields.iter().map(|field|{
-        let field_ty=&field.ty;
-        quote! {
-            for<'__easy_sql_x> #field_ty: #macro_support::Encode<'__easy_sql_x, #sql_crate::InternalDriver<D>>,
-            #field_ty: #macro_support::Type<#sql_crate::InternalDriver<D>>,
-        }
-    }).collect::<Vec<_>>();
-
-    let args_len = field_names.len();
 
     Ok(quote! {
         impl<'a,D:#sql_crate::Driver> #sql_crate::Update<'a,#table, D> for #item_name
@@ -125,25 +322,19 @@ pub fn sql_update_base(
                     let update_instance = #macro_support::never_any::<Self>();
                     let mut table_instance = #macro_support::never_any::<#table>();
 
-                    #(table_instance.#field_names = update_instance.#field_names;)*
+                    #(#validity_checks)*
                 };
 
                 #(#driver_tests)*
 
-                #(
-                    args_list.add(#update_values).map_err(#macro_support::Error::from_boxed)#update_values_debug?;
-                )*
-
                 let delimeter = <D as #sql_crate::Driver>::identifier_delimiter();
+                let current_query_start_len = current_query.len();
 
-                current_query.push_str(&format!(
-                    #sqlx_query_format_str,
-                    #(
-                        #sqlx_query_format_values,
-                    )*
-                ));
-
-                *parameter_n += #args_len;
+                #(#update_statements)*
+                if current_query.len() >= current_query_start_len + 2 {
+                    current_query.pop();
+                    current_query.pop();
+                }
                 Ok(args_list)
             }
         }
@@ -160,20 +351,14 @@ pub fn sql_update_base(
                 use #macro_support::{Arguments, Context as _};
                 // Validity check needs to be done only once
 
-                #(
-                    args_list.add(&#update_values).map_err(#macro_support::Error::from_boxed)#update_values_debug_ref?;
-                )*
-
                 let delimeter = <D as #sql_crate::Driver>::identifier_delimiter();
 
-                current_query.push_str(&format!(
-                    #sqlx_query_format_str,
-                    #(
-                        #sqlx_query_format_values,
-                    )*
-                ));
 
-                *parameter_n += #args_len;
+                #(#update_statements_ref)*
+
+                current_query.pop();
+                current_query.pop();
+
                 Ok(args_list)
             }
         }

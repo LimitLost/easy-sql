@@ -124,7 +124,7 @@ pub fn sql_output_base(
             );
 
             fields_quotes.push(Box::new(move |driver|quote! {
-                #field_name: #sql_crate::from_binary_vec( <#sql_crate::DriverRow<#driver> as #sql_crate::SqlxRow>::try_get(&data, #field_name_str).with_context(
+                #field_name: #macro_support::from_binary_vec( <#sql_crate::DriverRow<#driver> as #sql_crate::SqlxRow>::try_get(&data, #field_name_str).with_context(
                     #macro_support::context!(#context_str),
                 )?).with_context(
                     #macro_support::context!(#context_str2),
@@ -167,7 +167,7 @@ pub fn sql_output_base(
             );
 
             fields_quotes.push(Box::new(move |driver|quote! {
-                #field_name: #sql_crate::from_binary_vec( <#sql_crate::DriverRow<#driver> as #sql_crate::SqlxRow>::try_get(&data, #aliased_name).with_context(
+                #field_name: #macro_support::from_binary_vec( <#sql_crate::DriverRow<#driver> as #sql_crate::SqlxRow>::try_get(&data, #aliased_name).with_context(
                     #macro_support::context!(#context_str),
                 )?).with_context(
                     #macro_support::context!(#context_str2),
@@ -434,13 +434,26 @@ pub fn sql_output_base(
         }
     }).collect::<Vec<_>>();
 
-    let where_clauses_types=joined_fields.iter().map(|e|&e.field).chain( fields.iter()).map(|field|{
-        let field_ty=&field.ty;
-        quote! {
-            for<'__easy_sql_x> #field_ty: #macro_support::Decode<'__easy_sql_x, #sql_crate::InternalDriver<D>>,
-            #field_ty: #macro_support::Type<#sql_crate::InternalDriver<D>>,
-        }
-    });
+    let where_clauses_types = joined_fields
+        .iter()
+        .map(|e| &e.field)
+        .chain(fields.iter())
+        .map(|field| {
+            let bytes = has_attributes!(field, #[sql(bytes)]);
+            if bytes {
+                let bound_ty = quote! { Vec<u8> };
+                quote! {
+                    for<'__easy_sql_x> #bound_ty: #macro_support::Decode<'__easy_sql_x, #sql_crate::InternalDriver<D>>,
+                    #bound_ty: #macro_support::Type<#sql_crate::InternalDriver<D>>,
+                }
+            } else {
+                let field_ty = &field.ty;
+                quote! {
+                    for<'__easy_sql_x> #field_ty: #macro_support::Decode<'__easy_sql_x, #sql_crate::InternalDriver<D>>,
+                    #field_ty: #macro_support::Type<#sql_crate::InternalDriver<D>>,
+                }
+            }
+        });
 
     let fields_quotes = fields_quotes.into_iter().map(|f| f(&syn::parse_quote! {D}));
 

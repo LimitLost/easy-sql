@@ -4,6 +4,7 @@
 use super::*;
 use anyhow::Context;
 use easy_macros::{always_context /* always_context_debug as always_context */};
+use serde::{Deserialize, Serialize};
 use sql_macros::query;
 
 // ==============================================
@@ -370,6 +371,63 @@ async fn test_query_insert_multiple() -> anyhow::Result<()> {
 // 3. UPDATE QUERIES
 // ==============================================
 
+#[derive(Table, Debug, Clone)]
+#[sql(no_version)]
+struct MaybeUpdateTable {
+    #[sql(primary_key)]
+    #[sql(auto_increment)]
+    id: i32,
+    name: String,
+    optional_text: Option<String>,
+    optional_number: Option<i32>,
+}
+
+#[derive(Insert)]
+#[sql(table = MaybeUpdateTable)]
+#[sql(default = id)]
+struct MaybeUpdateInsert {
+    name: String,
+    optional_text: Option<String>,
+    optional_number: Option<i32>,
+}
+
+/// Test inserting Option<T> columns with T values
+#[always_context(skip(!))]
+#[tokio::test]
+async fn test_query_insert_option_table_from_value() -> anyhow::Result<()> {
+    let db = Database::setup_for_testing::<MaybeUpdateTable>().await?;
+    let mut conn = db.transaction().await?;
+
+    #[derive(Insert)]
+    #[sql(table = MaybeUpdateTable)]
+    #[sql(default = id)]
+    struct MaybeUpdateInsertValue {
+        name: String,
+        optional_text: String,
+        optional_number: i32,
+    }
+
+    let data = MaybeUpdateInsertValue {
+        name: "inserted".to_string(),
+        optional_text: "value".to_string(),
+        optional_number: 42,
+    };
+
+    query!(&mut conn, INSERT INTO MaybeUpdateTable VALUES {data}).await?;
+
+    let row: MaybeUpdateTable = query!(&mut conn,
+        SELECT MaybeUpdateTable FROM MaybeUpdateTable WHERE MaybeUpdateTable.id = 1
+    )
+    .await?;
+
+    assert_eq!(row.name, "inserted");
+    assert_eq!(row.optional_text, Some("value".to_string()));
+    assert_eq!(row.optional_number, Some(42));
+
+    conn.rollback().await?;
+    Ok(())
+}
+
 /// Test simple UPDATE
 #[always_context(skip(!))]
 #[tokio::test]
@@ -394,6 +452,315 @@ async fn test_query_update_single() -> anyhow::Result<()> {
     assert_eq!(result.str_field, "updated");
     assert!(!result.bool_field);
     assert_eq!(result.nullable_field, Some("new".to_string()));
+
+    conn.rollback().await?;
+    Ok(())
+}
+
+/// Test updating Option<T> columns with T values
+#[always_context(skip(!))]
+#[tokio::test]
+async fn test_query_update_option_table_from_value() -> anyhow::Result<()> {
+    let db = Database::setup_for_testing::<MaybeUpdateTable>().await?;
+    let mut conn = db.transaction().await?;
+
+    let data = MaybeUpdateInsert {
+        name: "original".to_string(),
+        optional_text: Some("keep".to_string()),
+        optional_number: Some(10),
+    };
+    query!(&mut conn, INSERT INTO MaybeUpdateTable VALUES {data}).await?;
+
+    #[derive(Update)]
+    #[sql(table = MaybeUpdateTable)]
+    struct UpdateOptionalFromValue {
+        name: String,
+        optional_text: String,
+    }
+
+    let update = UpdateOptionalFromValue {
+        name: "updated".to_string(),
+        optional_text: "changed".to_string(),
+    };
+    let update_ref = &update;
+
+    query!(&mut conn,
+        UPDATE MaybeUpdateTable SET {update_ref} WHERE MaybeUpdateTable.id = 1
+    )
+    .await?;
+
+    let row: MaybeUpdateTable = query!(&mut conn,
+        SELECT MaybeUpdateTable FROM MaybeUpdateTable WHERE MaybeUpdateTable.id = 1
+    )
+    .await?;
+
+    assert_eq!(row.name, "updated");
+    assert_eq!(row.optional_text, Some("changed".to_string()));
+
+    conn.rollback().await?;
+    Ok(())
+}
+
+/// Test maybe_update skips Option<T> None
+#[always_context(skip(!))]
+#[tokio::test]
+async fn test_query_update_maybe_update_option_skip_none() -> anyhow::Result<()> {
+    let db = Database::setup_for_testing::<MaybeUpdateTable>().await?;
+    let mut conn = db.transaction().await?;
+
+    let data = MaybeUpdateInsert {
+        name: "original".to_string(),
+        optional_text: Some("keep".to_string()),
+        optional_number: Some(10),
+    };
+    query!(&mut conn, INSERT INTO MaybeUpdateTable VALUES {data}).await?;
+
+    #[derive(Update)]
+    #[sql(table = MaybeUpdateTable)]
+    struct MaybeUpdateOption {
+        name: String,
+        #[sql(maybe_update)]
+        optional_text: Option<String>,
+    }
+
+    let update = MaybeUpdateOption {
+        name: "updated".to_string(),
+        optional_text: None,
+    };
+
+    query!(&mut conn,
+        UPDATE MaybeUpdateTable SET {update} WHERE MaybeUpdateTable.id = 1
+    )
+    .await?;
+
+    let row: MaybeUpdateTable = query!(&mut conn,
+        SELECT MaybeUpdateTable FROM MaybeUpdateTable WHERE MaybeUpdateTable.id = 1
+    )
+    .await?;
+
+    assert_eq!(row.name, "updated");
+    assert_eq!(row.optional_text, Some("keep".to_string()));
+
+    conn.rollback().await?;
+    Ok(())
+}
+
+/// Test maybe_update updates Option<T> Some
+#[always_context(skip(!))]
+#[tokio::test]
+async fn test_query_update_maybe_update_option_some() -> anyhow::Result<()> {
+    let db = Database::setup_for_testing::<MaybeUpdateTable>().await?;
+    let mut conn = db.transaction().await?;
+
+    let data = MaybeUpdateInsert {
+        name: "original".to_string(),
+        optional_text: Some("keep".to_string()),
+        optional_number: None,
+    };
+    query!(&mut conn, INSERT INTO MaybeUpdateTable VALUES {data}).await?;
+
+    #[derive(Update)]
+    #[sql(table = MaybeUpdateTable)]
+    struct MaybeUpdateOption {
+        name: String,
+        #[sql(maybe_update)]
+        optional_text: Option<String>,
+    }
+
+    let update = MaybeUpdateOption {
+        name: "updated".to_string(),
+        optional_text: Some("changed".to_string()),
+    };
+
+    query!(&mut conn,
+        UPDATE MaybeUpdateTable SET {update} WHERE MaybeUpdateTable.id = 1
+    )
+    .await?;
+
+    let row: MaybeUpdateTable = query!(&mut conn,
+        SELECT MaybeUpdateTable FROM MaybeUpdateTable WHERE MaybeUpdateTable.id = 1
+    )
+    .await?;
+
+    assert_eq!(row.optional_text, Some("changed".to_string()));
+
+    conn.rollback().await?;
+    Ok(())
+}
+
+/// Test maybe_update Option<Option<T>> sets NULL
+#[always_context(skip(!))]
+#[tokio::test]
+async fn test_query_update_maybe_update_option_option_set_null() -> anyhow::Result<()> {
+    let db = Database::setup_for_testing::<MaybeUpdateTable>().await?;
+    let mut conn = db.transaction().await?;
+
+    let data = MaybeUpdateInsert {
+        name: "original".to_string(),
+        optional_text: Some("keep".to_string()),
+        optional_number: Some(10),
+    };
+    query!(&mut conn, INSERT INTO MaybeUpdateTable VALUES {data}).await?;
+
+    #[derive(Update)]
+    #[sql(table = MaybeUpdateTable)]
+    struct MaybeUpdateOptionOption {
+        name: String,
+        #[sql(maybe_update)]
+        optional_text: Option<Option<String>>,
+    }
+
+    let update = MaybeUpdateOptionOption {
+        name: "updated".to_string(),
+        optional_text: Some(None),
+    };
+
+    query!(&mut conn,
+        UPDATE MaybeUpdateTable SET {update} WHERE MaybeUpdateTable.id = 1
+    )
+    .await?;
+
+    let row: MaybeUpdateTable = query!(&mut conn,
+        SELECT MaybeUpdateTable FROM MaybeUpdateTable WHERE MaybeUpdateTable.id = 1
+    )
+    .await?;
+
+    assert_eq!(row.optional_text, None);
+
+    conn.rollback().await?;
+    Ok(())
+}
+
+/// Test maybe_update  Option<T> Some(Some) updates on Nullable value
+#[always_context(skip(!))]
+#[tokio::test]
+async fn test_query_update_maybe_update_nullable_some_without_nesting() -> anyhow::Result<()> {
+    let db = Database::setup_for_testing::<MaybeUpdateTable>().await?;
+    let mut conn = db.transaction().await?;
+
+    let data = MaybeUpdateInsert {
+        name: "original".to_string(),
+        optional_text: Some("keep".to_string()),
+        optional_number: Some(10),
+    };
+    query!(&mut conn, INSERT INTO MaybeUpdateTable VALUES {data}).await?;
+
+    #[derive(Update)]
+    #[sql(table = MaybeUpdateTable)]
+    struct MaybeUpdateOptionOption {
+        name: String,
+        #[sql(maybe_update)]
+        optional_text: Option<String>,
+    }
+
+    let update = MaybeUpdateOptionOption {
+        name: "updated".to_string(),
+        optional_text: Some("changed".to_string()),
+    };
+
+    query!(&mut conn,
+        UPDATE MaybeUpdateTable SET {update} WHERE MaybeUpdateTable.id = 1
+    )
+    .await?;
+
+    let row: MaybeUpdateTable = query!(&mut conn,
+        SELECT MaybeUpdateTable FROM MaybeUpdateTable WHERE MaybeUpdateTable.id = 1
+    )
+    .await?;
+
+    assert_eq!(row.optional_text, Some("changed".to_string()));
+
+    conn.rollback().await?;
+    Ok(())
+}
+
+/// Test maybe_update Option<Option<T>> None skips update
+#[always_context(skip(!))]
+#[tokio::test]
+async fn test_query_update_maybe_update_option_option_skip() -> anyhow::Result<()> {
+    let db = Database::setup_for_testing::<MaybeUpdateTable>().await?;
+    let mut conn = db.transaction().await?;
+
+    let data = MaybeUpdateInsert {
+        name: "original".to_string(),
+        optional_text: Some("keep".to_string()),
+        optional_number: None,
+    };
+    query!(&mut conn, INSERT INTO MaybeUpdateTable VALUES {data}).await?;
+
+    #[derive(Update)]
+    #[sql(table = MaybeUpdateTable)]
+    struct MaybeUpdateOptionOption {
+        name: String,
+        #[sql(maybe_update)]
+        optional_text: Option<Option<String>>,
+    }
+
+    let update = MaybeUpdateOptionOption {
+        name: "updated".to_string(),
+        optional_text: None,
+    };
+
+    query!(&mut conn,
+        UPDATE MaybeUpdateTable SET {update} WHERE MaybeUpdateTable.id = 1
+    )
+    .await?;
+
+    let row: MaybeUpdateTable = query!(&mut conn,
+        SELECT MaybeUpdateTable FROM MaybeUpdateTable WHERE MaybeUpdateTable.id = 1
+    )
+    .await?;
+
+    assert_eq!(row.optional_text, Some("keep".to_string()));
+
+    conn.rollback().await?;
+    Ok(())
+}
+
+/// Test maybe_update across multiple fields
+#[always_context(skip(!))]
+#[tokio::test]
+async fn test_query_update_maybe_update_multiple_fields() -> anyhow::Result<()> {
+    let db = Database::setup_for_testing::<MaybeUpdateTable>().await?;
+    let mut conn = db.transaction().await?;
+
+    let data = MaybeUpdateInsert {
+        name: "original".to_string(),
+        optional_text: Some("keep".to_string()),
+        optional_number: Some(9),
+    };
+    query!(&mut conn, INSERT INTO MaybeUpdateTable VALUES {data}).await?;
+
+    #[derive(Update)]
+    #[sql(table = MaybeUpdateTable)]
+    struct MaybeUpdateMulti {
+        name: String,
+        #[sql(maybe_update)]
+        optional_text: Option<String>,
+        #[sql(maybe_update)]
+        optional_number: Option<i32>,
+    }
+
+    let update = MaybeUpdateMulti {
+        name: "multi".to_string(),
+        optional_text: Some("changed".to_string()),
+        optional_number: None,
+    };
+    let update_ref = &update;
+
+    query!(&mut conn,
+        UPDATE MaybeUpdateTable SET {update_ref} WHERE MaybeUpdateTable.id = 1
+    )
+    .await?;
+
+    let row: MaybeUpdateTable = query!(&mut conn,
+        SELECT MaybeUpdateTable FROM MaybeUpdateTable WHERE MaybeUpdateTable.id = 1
+    )
+    .await?;
+
+    assert_eq!(row.name, "multi");
+    assert_eq!(row.optional_text, Some("changed".to_string()));
+    assert_eq!(row.optional_number, Some(9));
 
     conn.rollback().await?;
     Ok(())
@@ -428,6 +795,249 @@ async fn test_query_update_multiple_rows() -> anyhow::Result<()> {
 
     assert_eq!(results.len(), 2);
     assert!(results.iter().all(|r| r.int_field == 100));
+
+    conn.rollback().await?;
+    Ok(())
+}
+
+// ==============================================
+// 3.1 BYTES QUERIES
+// ==============================================
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+struct BytesPayload {
+    label: String,
+    data: Vec<u8>,
+}
+
+#[derive(Table, Debug, Clone)]
+#[sql(no_version)]
+struct BytesTestTable {
+    #[sql(primary_key)]
+    #[sql(auto_increment)]
+    id: i32,
+    #[sql(bytes)]
+    payload: BytesPayload,
+    #[sql(bytes)]
+    optional_payload: Option<BytesPayload>,
+}
+
+#[derive(Insert, Update, Output, Debug, Clone, PartialEq)]
+#[sql(table = BytesTestTable)]
+#[sql(default = id)]
+struct BytesTestData {
+    #[sql(bytes)]
+    payload: BytesPayload,
+    #[sql(bytes)]
+    optional_payload: Option<BytesPayload>,
+}
+
+/// Test bytes roundtrip with payloads
+#[always_context(skip(!))]
+#[tokio::test]
+async fn test_query_bytes_roundtrip_payload() -> anyhow::Result<()> {
+    let db = Database::setup_for_testing::<BytesTestTable>().await?;
+    let mut conn = db.transaction().await?;
+
+    let payload = BytesPayload {
+        label: "payload".to_string(),
+        data: vec![10, 11, 12, 13],
+    };
+    let data = BytesTestData {
+        payload: payload.clone(),
+        optional_payload: Some(BytesPayload {
+            label: "optional".to_string(),
+            data: vec![9, 8, 7],
+        }),
+    };
+
+    query!(&mut conn, INSERT INTO BytesTestTable VALUES {data}).await?;
+
+    let row: BytesTestData = query!(&mut conn,
+        SELECT BytesTestData FROM BytesTestTable WHERE BytesTestTable.id = 1
+    )
+    .await?;
+
+    assert_eq!(row.payload, payload);
+    assert_eq!(
+        row.optional_payload,
+        Some(BytesPayload {
+            label: "optional".to_string(),
+            data: vec![9, 8, 7],
+        })
+    );
+
+    conn.rollback().await?;
+    Ok(())
+}
+
+/// Test bytes roundtrip with None and empty blobs
+#[always_context(skip(!))]
+#[tokio::test]
+async fn test_query_bytes_roundtrip_none_and_empty() -> anyhow::Result<()> {
+    let db = Database::setup_for_testing::<BytesTestTable>().await?;
+    let mut conn = db.transaction().await?;
+
+    let data = BytesTestData {
+        payload: BytesPayload {
+            label: "empty".to_string(),
+            data: Vec::new(),
+        },
+        optional_payload: None,
+    };
+
+    query!(&mut conn, INSERT INTO BytesTestTable VALUES {data}).await?;
+
+    let row: BytesTestData = query!(&mut conn,
+        SELECT BytesTestData FROM BytesTestTable WHERE BytesTestTable.id = 1
+    )
+    .await?;
+
+    assert_eq!(row.payload.data, Vec::<u8>::new());
+    assert_eq!(row.optional_payload, None);
+
+    conn.rollback().await?;
+    Ok(())
+}
+
+/// Test bytes update replacing payloads and raw bytes
+#[always_context(skip(!))]
+#[tokio::test]
+async fn test_query_bytes_update_payload() -> anyhow::Result<()> {
+    let db = Database::setup_for_testing::<BytesTestTable>().await?;
+    let mut conn = db.transaction().await?;
+
+    let data = BytesTestData {
+        payload: BytesPayload {
+            label: "start".to_string(),
+            data: vec![1],
+        },
+        optional_payload: Some(BytesPayload {
+            label: "optional".to_string(),
+            data: vec![2],
+        }),
+    };
+    query!(&mut conn, INSERT INTO BytesTestTable VALUES {data}).await?;
+
+    let updated = BytesTestData {
+        payload: BytesPayload {
+            label: "updated".to_string(),
+            data: vec![10, 20, 30],
+        },
+        optional_payload: None,
+    };
+
+    query!(&mut conn,
+        UPDATE BytesTestTable SET {updated} WHERE BytesTestTable.id = 1
+    )
+    .await?;
+
+    let row: BytesTestData = query!(&mut conn,
+        SELECT BytesTestData FROM BytesTestTable WHERE BytesTestTable.id = 1
+    )
+    .await?;
+
+    assert_eq!(row.payload.data, vec![10, 20, 30]);
+    assert_eq!(row.optional_payload, None);
+
+    conn.rollback().await?;
+    Ok(())
+}
+
+/// Test bytes update with large payloads
+#[always_context(skip(!))]
+#[tokio::test]
+async fn test_query_bytes_update_large_payload() -> anyhow::Result<()> {
+    let db = Database::setup_for_testing::<BytesTestTable>().await?;
+    let mut conn = db.transaction().await?;
+
+    let data = BytesTestData {
+        payload: BytesPayload {
+            label: "large".to_string(),
+            data: vec![1, 2, 3],
+        },
+        optional_payload: None,
+    };
+    query!(&mut conn, INSERT INTO BytesTestTable VALUES {data}).await?;
+
+    let large_blob = vec![42u8; 16 * 1024];
+    let updated = BytesTestData {
+        payload: BytesPayload {
+            label: "large".to_string(),
+            data: large_blob.clone(),
+        },
+        optional_payload: Some(BytesPayload {
+            label: "nested".to_string(),
+            data: vec![5, 6, 7],
+        }),
+    };
+
+    query!(&mut conn,
+        UPDATE BytesTestTable SET {updated} WHERE BytesTestTable.id = 1
+    )
+    .await?;
+
+    let row: BytesTestData = query!(&mut conn,
+        SELECT BytesTestData FROM BytesTestTable WHERE BytesTestTable.id = 1
+    )
+    .await?;
+
+    assert_eq!(row.payload.data, large_blob);
+    assert_eq!(row.optional_payload.as_ref().unwrap().data.len(), 3);
+
+    conn.rollback().await?;
+    Ok(())
+}
+
+/// Test bytes update with maybe_update on optional payload
+#[always_context(skip(!))]
+#[tokio::test]
+async fn test_query_bytes_maybe_update_optional_payload() -> anyhow::Result<()> {
+    let db = Database::setup_for_testing::<BytesTestTable>().await?;
+    let mut conn = db.transaction().await?;
+
+    let data = BytesTestData {
+        payload: BytesPayload {
+            label: "start".to_string(),
+            data: vec![1, 2, 3],
+        },
+        optional_payload: Some(BytesPayload {
+            label: "keep".to_string(),
+            data: vec![4, 5],
+        }),
+    };
+    query!(&mut conn, INSERT INTO BytesTestTable VALUES {data}).await?;
+
+    #[derive(Update)]
+    #[sql(table = BytesTestTable)]
+    struct BytesMaybeUpdate {
+        #[sql(bytes)]
+        payload: BytesPayload,
+        #[sql(bytes)]
+        #[sql(maybe_update)]
+        optional_payload: Option<Option<BytesPayload>>,
+    }
+
+    let updated = BytesMaybeUpdate {
+        payload: BytesPayload {
+            label: "updated".to_string(),
+            data: vec![9, 9],
+        },
+        optional_payload: Some(None),
+    };
+
+    query!(&mut conn,
+        UPDATE BytesTestTable SET {updated} WHERE BytesTestTable.id = 1
+    )
+    .await?;
+
+    let row: BytesTestData = query!(&mut conn,
+        SELECT BytesTestData FROM BytesTestTable WHERE BytesTestTable.id = 1
+    )
+    .await?;
+
+    assert_eq!(row.payload.label, "updated");
+    assert_eq!(row.optional_payload, None);
 
     conn.rollback().await?;
     Ok(())

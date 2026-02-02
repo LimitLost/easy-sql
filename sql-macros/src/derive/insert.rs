@@ -41,6 +41,7 @@ pub fn sql_insert_base(
     let macro_support = quote! { #sql_crate::macro_support };
 
     let mut insert_values = Vec::new();
+    let mut insert_values_ref = Vec::new();
     let mut insert_values_support = Vec::new();
     let mut insert_values_debug = Vec::new();
     let mut insert_values_debug_ref = Vec::new();
@@ -60,6 +61,11 @@ pub fn sql_insert_base(
             bytes,
             &sql_crate,
         )?;
+        let debug_value = if bytes {
+            quote! { &self.#field_name }
+        } else {
+            quote! { #mapped }
+        };
         let debug_format_str =
             format!("Binding field `{}` to query failed", field_name.to_string());
         let debug_format_str_ref = format!(
@@ -70,9 +76,15 @@ pub fn sql_insert_base(
             .context(#debug_format_str)
         });
         insert_values_debug_ref.push(quote! {
-            .with_context(|| format!(#debug_format_str_ref, #mapped))
+            .with_context(|| format!(#debug_format_str_ref, #debug_value))
         });
+        let mapped_ref = if bytes {
+            quote! { #macro_support::to_binary(&self.#field_name)? }
+        } else {
+            quote! { &self.#field_name }
+        };
         insert_values.push(mapped);
+        insert_values_ref.push(mapped_ref);
         insert_values_support.push(mapped_support);
     }
 
@@ -88,13 +100,25 @@ pub fn sql_insert_base(
         }
     });
 
-    let where_clauses_types=fields.iter().map(|field|{
-        let field_ty=&field.ty;
-        quote! {
-            for<'__easy_sql_x> #field_ty: #macro_support::Encode<'__easy_sql_x, #sql_crate::InternalDriver<D>>,
-            #field_ty: #macro_support::Type<#sql_crate::InternalDriver<D>>,
-        }
-    }).collect::<Vec<_>>();
+    let where_clauses_types = fields
+        .iter()
+        .map(|field| {
+            let bytes = has_attributes!(field, #[sql(bytes)]);
+            if bytes {
+                let bound_ty = quote! { Vec<u8> };
+                quote! {
+                    for<'__easy_sql_x> #bound_ty: #macro_support::Encode<'__easy_sql_x, #sql_crate::InternalDriver<D>>,
+                    #bound_ty: #macro_support::Type<#sql_crate::InternalDriver<D>>,
+                }
+            } else {
+                let field_ty = &field.ty;
+                quote! {
+                    for<'__easy_sql_x> #field_ty: #macro_support::Encode<'__easy_sql_x, #sql_crate::InternalDriver<D>>,
+                    #field_ty: #macro_support::Type<#sql_crate::InternalDriver<D>>,
+                }
+            }
+        })
+        .collect::<Vec<_>>();
 
     Ok(quote! {
         impl<'a,D:#sql_crate::Driver> #sql_crate::Insert<'a,#table,D> for #item_name
@@ -102,6 +126,34 @@ pub fn sql_insert_base(
             fn insert_columns() -> Vec<String> {
                 let _ = || {
                     //Check for validity
+                    #[diagnostic::on_unimplemented(
+                        message = "Insert fields must match table field types. You can insert T into Option<T> columns."
+                    )]
+                    trait __EasySqlInsertValue<TableField> {
+                        fn __easy_sql_insert_value(self) -> TableField;
+                    }
+
+                    impl<T> __EasySqlInsertValue<T> for T {
+                        fn __easy_sql_insert_value(self) -> T {
+                            self
+                        }
+                    }
+
+                    impl<T> __EasySqlInsertValue<Option<T>> for T {
+                        fn __easy_sql_insert_value(self) -> Option<T> {
+                            Some(self)
+                        }
+                    }
+
+                    fn __easy_sql_insert_value<TableField, InsertField>(
+                        value: InsertField,
+                    ) -> TableField
+                    where
+                        InsertField: __EasySqlInsertValue<TableField>,
+                    {
+                        value.__easy_sql_insert_value()
+                    }
+
                     let this_instance = #macro_support::never_any::<Self>();
 
                     #table {
@@ -109,7 +161,7 @@ pub fn sql_insert_base(
                             #defaults: Default::default(),
                         )*
                         #(
-                        #field_names: this_instance.#field_names,
+                        #field_names: __easy_sql_insert_value(this_instance.#field_names),
                         )*
                     }
                 };
@@ -157,7 +209,7 @@ pub fn sql_insert_base(
 
                 use #macro_support::Arguments;
                 #(
-                    args_list.add(&#insert_values).map_err(#macro_support::Error::from_boxed)#insert_values_debug_ref?;
+                    args_list.add(#insert_values_ref).map_err(#macro_support::Error::from_boxed)#insert_values_debug_ref?;
                 )*
                 Ok((args_list, 1))
             }
