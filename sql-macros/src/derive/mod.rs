@@ -28,7 +28,7 @@ fn ty_to_variant(
 ) -> anyhow::Result<TokenStream> {
     if bytes {
         Ok(quote! {
-            #crate_prefix::to_binary(&#current_self.#field_name)?
+            #crate_prefix::macro_support::to_binary(&#current_self.#field_name)?
         })
     } else {
         Ok(quote! {
