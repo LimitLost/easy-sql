@@ -140,9 +140,12 @@ fn struct_table_handle(
     // Check for no_version attribute
     let _no_version = has_attributes!(item, #[sql(no_version)]);
 
+    #[cfg(feature = "migrations")]
+    let has_version_attr = !get_attributes!(item, #[sql(version = __unknown__)]).is_empty();
+
     // Skip migrations if no_version is set
     #[cfg(feature = "migrations")]
-    let skip_migrations = _no_version;
+    let skip_migrations = _no_version || !has_version_attr;
 
     #[cfg(feature = "migrations")]
     let mut version_test: Option<LitInt> = None;
@@ -177,18 +180,19 @@ fn struct_table_handle(
     }
     //Unique Id
     #[cfg(feature = "migrations")]
-    let newly_created = if unique_id.is_none() && version_test.is_none() && !_no_version {
-        //Create unique_id
-        let generated = context_info.compilation_data.generate_unique_id();
-        context_info
-            .created_unique_ids
-            .push((generated.clone(), item.struct_token.span().start()));
+    let newly_created =
+        if unique_id.is_none() && version_test.is_none() && !_no_version && has_version_attr {
+            //Create unique_id
+            let generated = context_info.compilation_data.generate_unique_id();
+            context_info
+                .created_unique_ids
+                .push((generated.clone(), item.struct_token.span().start()));
 
-        unique_id = Some(generated);
-        true
-    } else {
-        false
-    };
+            unique_id = Some(generated);
+            true
+        } else {
+            false
+        };
 
     if let Some(unique_id) = unique_id.clone() {
         context_info
