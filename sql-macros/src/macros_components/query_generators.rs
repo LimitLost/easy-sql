@@ -320,9 +320,15 @@ pub fn generate_select(
     let table_joins = driver.table_joins(sql_crate, &table_type);
     let parameter_placeholder_base = driver.parameter_placeholder_base(sql_crate);
 
+    let async_block = if lazy_mode_driver.is_some() {
+        quote! {}
+    } else {
+        quote! {async}
+    };
+
     Ok(quote! {
         {
-            async {
+            #async_block {
                 use {#sql_crate::ToConvert,#macro_support::{Context,Arguments}};
 
                 // Safety checks closure
@@ -561,11 +567,17 @@ pub fn generate_insert(
 
     let query_insert_data = driver.query_insert_data(sql_crate, &table_type, values);
 
+    let async_block = if lazy_mode_driver.is_some() {
+        quote! {}
+    } else {
+        quote! {async}
+    };
+
     Ok(quote! {
         {
             #lazy_struct
 
-            async {
+            #async_block {
                 use #macro_support::{Arguments,Context};
                 use #sql_crate::ToConvert;
 
@@ -881,6 +893,12 @@ pub fn generate_update(
         };
     });
 
+    let async_block = if lazy_mode_driver.is_some() {
+        quote! {}
+    } else {
+        quote! {async}
+    };
+
     Ok(quote! {
         {
             // Safety checks closure
@@ -888,7 +906,7 @@ pub fn generate_update(
                 #(#checks)*
             };
 
-            async {
+            #async_block {
                 use #macro_support::{Context,Arguments};
                 use #sql_crate::ToConvert;
 
@@ -1137,6 +1155,12 @@ pub fn generate_delete(
     });
     let parameter_placeholder_base = driver.parameter_placeholder_base(sql_crate);
 
+    let async_block = if lazy_mode_driver.is_some() {
+        quote! {}
+    } else {
+        quote! {async}
+    };
+
     Ok(quote! {
         {
             // Safety checks closure
@@ -1144,7 +1168,7 @@ pub fn generate_delete(
                 #(#checks)*
             };
 
-            async {
+            #async_block {
                 use #macro_support::{Context,Arguments};
                 use #sql_crate::ToConvert;
 

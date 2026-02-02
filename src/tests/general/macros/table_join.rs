@@ -890,8 +890,7 @@ async fn test_table_join_with_query_lazy() -> anyhow::Result<()> {
     // Use query_lazy! for streaming
     let mut lazy_query = query_lazy!(
         SELECT UserPostOutput FROM UsersWithPosts WHERE true ORDER BY PostsTable.id
-    )
-    .await?;
+    )?;
     let mut stream = lazy_query.fetch(&mut conn);
 
     let mut count = 0;
@@ -925,8 +924,7 @@ async fn test_table_join_query_lazy_left_join() -> anyhow::Result<()> {
         SELECT UserOptionalPostOutput FROM UsersWithOptionalPosts
         WHERE true
         ORDER BY UsersTable.id
-    )
-    .await?;
+    )?;
     let mut stream = lazy_query.fetch(&mut conn);
 
     let mut results = Vec::new();

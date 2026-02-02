@@ -7,13 +7,6 @@ use easy_macros::always_context;
 use futures::StreamExt;
 use sql_macros::{query, query_lazy};
 
-// Note: query_lazy! generates query builders that can be executed later
-// The main difference from query! is:
-// 1. No connection parameter in macro call
-// 2. Returns a builder/closure instead of executing immediately
-// 3. Can be reused multiple times
-// 4. Does NOT support EXISTS (requires immediate execution)
-
 /// Test query_lazy! with SELECT (basic usage)
 #[always_context(skip(!))]
 #[tokio::test]
@@ -25,7 +18,7 @@ async fn test_query_lazy_select_basic() -> anyhow::Result<()> {
 
     // Create lazy query (returns LazyQueryResult struct)
     let mut lazy_query =
-        query_lazy!(SELECT ExprTestData FROM ExprTestTable WHERE ExprTestTable.id = 1).await?;
+        query_lazy!(SELECT ExprTestData FROM ExprTestTable WHERE ExprTestTable.id = 1)?;
 
     // Execute the lazy query - fetch() returns a Stream
     let mut result_stream = lazy_query.fetch(&mut conn);
@@ -63,9 +56,9 @@ async fn test_query_lazy_con_not_borrowed_forever_check() -> anyhow::Result<()> 
 
     // Each lazy query can only be used once
     let mut lazy_query1 =
-        query_lazy!(SELECT ExprTestData FROM ExprTestTable WHERE ExprTestTable.id = 1).await?;
+        query_lazy!(SELECT ExprTestData FROM ExprTestTable WHERE ExprTestTable.id = 1)?;
     let mut lazy_query2 =
-        query_lazy!(SELECT ExprTestData FROM ExprTestTable WHERE ExprTestTable.id = 1).await?;
+        query_lazy!(SELECT ExprTestData FROM ExprTestTable WHERE ExprTestTable.id = 1)?;
 
     // Execute first query
     let result1 = {
@@ -110,8 +103,7 @@ async fn test_query_lazy_select_multiple() -> anyhow::Result<()> {
     // query_lazy! returns single row stream, so we collect manually
     let mut lazy_query = query_lazy!(
         SELECT ExprTestData FROM ExprTestTable WHERE int_field > 5
-    )
-    .await?;
+    )?;
 
     let mut results = Vec::new();
     {
@@ -149,8 +141,7 @@ async fn test_query_lazy_select_complex() -> anyhow::Result<()> {
         SELECT ExprTestData FROM ExprTestTable
         ORDER BY int_field DESC
         LIMIT 2
-    )
-    .await?;
+    )?;
 
     let mut results = Vec::new();
     {
@@ -179,7 +170,7 @@ async fn test_query_lazy_insert() -> anyhow::Result<()> {
     let data = default_expr_test_data();
     // query_lazy! requires RETURNING clause for INSERT
     let mut lazy_insert =
-        query_lazy!(INSERT INTO ExprTestTable VALUES {data} RETURNING ExprTestData).await?;
+        query_lazy!(INSERT INTO ExprTestTable VALUES {data} RETURNING ExprTestData)?;
 
     // Execute the insert - fetch() returns a Stream
     let returned = {
@@ -219,8 +210,7 @@ async fn test_query_lazy_update() -> anyhow::Result<()> {
         SET int_field = {new_value}
         WHERE id = 1
         RETURNING ExprTestData
-    )
-    .await?;
+    )?;
 
     let updated = {
         let mut stream = lazy_update.fetch(&mut conn);
@@ -257,8 +247,7 @@ async fn test_query_lazy_delete() -> anyhow::Result<()> {
         DELETE FROM ExprTestTable
         WHERE int_field > 15
         RETURNING ExprTestData
-    )
-    .await?;
+    )?;
 
     let mut deleted_rows = Vec::new();
     {
@@ -307,8 +296,7 @@ async fn test_query_lazy_variable_capture() -> anyhow::Result<()> {
     let threshold = 15;
     let mut lazy_query = query_lazy!(
         SELECT ExprTestData FROM ExprTestTable WHERE int_field > {threshold}
-    )
-    .await?;
+    )?;
 
     let mut results = Vec::new();
     {
@@ -338,7 +326,7 @@ async fn test_query_lazy_storage() -> anyhow::Result<()> {
 
     // Store lazy query in a variable
     let mut my_query =
-        query_lazy!(SELECT ExprTestData FROM ExprTestTable WHERE ExprTestTable.id = 1).await?;
+        query_lazy!(SELECT ExprTestData FROM ExprTestTable WHERE ExprTestTable.id = 1)?;
 
     // Get result from query
     let result = {
@@ -376,8 +364,7 @@ async fn test_query_lazy_complex_where() -> anyhow::Result<()> {
         WHERE (int_field >= 10 AND int_field <= 30)
           AND str_field = "test"
           AND bool_field = true
-    )
-    .await?;
+    )?;
 
     let mut results = Vec::new();
     {
@@ -405,8 +392,7 @@ async fn test_query_lazy_with_returning() -> anyhow::Result<()> {
     let data = default_expr_test_data();
     let mut lazy_insert = query_lazy!(
         INSERT INTO ExprTestTable VALUES {data} RETURNING ExprTestData
-    )
-    .await?;
+    )?;
 
     let returned = {
         let mut stream = lazy_insert.fetch(&mut conn);
@@ -440,8 +426,7 @@ async fn test_query_lazy_multiple_sequential() -> anyhow::Result<()> {
         SET int_field = {new_value}
         WHERE id = 1
         RETURNING ExprTestData
-    )
-    .await?;
+    )?;
 
     let updated = {
         let mut stream = lazy_update.fetch(&mut conn);
@@ -454,7 +439,7 @@ async fn test_query_lazy_multiple_sequential() -> anyhow::Result<()> {
 
     // Verify with SELECT
     let mut lazy_select =
-        query_lazy!(SELECT ExprTestData FROM ExprTestTable WHERE ExprTestTable.id = 1).await?;
+        query_lazy!(SELECT ExprTestData FROM ExprTestTable WHERE ExprTestTable.id = 1)?;
     let result = {
         let mut stream = lazy_select.fetch(&mut conn);
         let result_option = stream.next().await;
@@ -479,9 +464,7 @@ async fn test_query_lazy_cross_scope() -> anyhow::Result<()> {
 
     // Define lazy query with a captured variable (must outlive the query)
     let filter_value = 1;
-    let mut lazy_query =
-        query_lazy!(SELECT ExprTestData FROM ExprTestTable WHERE ExprTestTable.id = {filter_value})
-            .await?;
+    let mut lazy_query = query_lazy!(SELECT ExprTestData FROM ExprTestTable WHERE ExprTestTable.id = {filter_value})?;
 
     // Execute in different scope
     let result = {
