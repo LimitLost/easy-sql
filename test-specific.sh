@@ -144,6 +144,7 @@ run_test() {
         echo -e "${RED}✗ Build failed${NC}"
         # Show compilation errors with context
         print_error_context "$build_output"
+        echo "$build_output" | tail -200
         FAILED_CONFIGS+=("$db_name")
         ((FAILED_TESTS++))
         ((TOTAL_TESTS++))
@@ -153,7 +154,12 @@ run_test() {
     # Run tests (capture output)
     local test_output=$(cargo test --no-default-features --features "$test_features" "$TEST_PATTERN" 2>&1)
     local test_status=$?
-    
+
+    local has_compile_error=false
+    if echo "$test_output" | grep -qE "error\[E[0-9]+\]|^error:|could not compile"; then
+        has_compile_error=true
+    fi
+
     # Parse results
     local passed=$(echo "$test_output" | grep -oP '\d+(?= passed)' | head -1)
     local failed=$(echo "$test_output" | grep -oP '\d+(?= failed)' | head -1)
@@ -167,19 +173,24 @@ run_test() {
     
     # Check if any tests ran
     if [ "$passed" -eq 0 ] && [ "$failed" -eq 0 ]; then
-        # Check if it's a compilation error or just no matching tests
-        if echo "$test_output" | grep -q "error\[E"; then
-            echo -e "${RED}✗ Compilation failed with use_output_columns${NC}"
-            print_error_context "$test_output"
-            FAILED_CONFIGS+=("$db_name (compilation failed)")
+        if [ $test_status -ne 0 ]; then
+            if [ "$has_compile_error" = true ]; then
+                echo -e "${RED}✗ Compilation failed${NC}"
+                print_error_context "$test_output"
+                echo "$test_output" | tail -200
+            else
+                echo -e "${RED}✗ Tests failed before execution${NC}"
+                echo "$test_output" | tail -200
+            fi
+            FAILED_CONFIGS+=("$db_name (test failure)")
             ((FAILED_TESTS++))
             ((TOTAL_TESTS++))
             return 1
-        else
-            echo -e "${YELLOW}⚠ No tests matched pattern${NC}"
-            ((TOTAL_TESTS++))
-            return 0
         fi
+        echo -e "${YELLOW}⚠ No tests matched pattern${NC}"
+        echo "$test_output" | tail -200
+        ((TOTAL_TESTS++))
+        return 0
     fi
     
     # Show results
@@ -192,7 +203,12 @@ run_test() {
         ((FAILED_TESTS++))
         
         # Show failure details
-        echo "$test_output" | grep -A 50 "^failures:" | grep -B 50 "^test result:" || echo "$test_output" | tail -20
+        if [ "$has_compile_error" = true ]; then
+            print_error_context "$test_output"
+            echo "$test_output" | tail -200
+        else
+            echo "$test_output" | grep -A 50 "^failures:" | grep -B 50 "^test result:" || echo "$test_output" | tail -200
+        fi
     fi
     
     ((TOTAL_TESTS++))

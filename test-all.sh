@@ -137,6 +137,7 @@ run_all_tests() {
         echo -e "${RED}✗ Build failed${NC}"
         # Show compilation errors with context
         print_error_context "$build_output"
+        echo "$build_output" | tail -200
         FAILED_CONFIGS+=("$db_name")
         ((FAILED_TESTS++))
         ((TOTAL_TESTS++))
@@ -147,6 +148,11 @@ run_all_tests() {
     local test_output=$(cargo test --no-default-features --features "$test_features" 2>&1)
     local test_status=$?
     
+    local has_compile_error=false
+    if echo "$test_output" | grep -qE "error\[E[0-9]+\]|^error:|could not compile"; then
+        has_compile_error=true
+    fi
+
     # Parse results
     local passed=$(echo "$test_output" | grep -oP '\d+(?= passed)' | head -1)
     local failed=$(echo "$test_output" | grep -oP '\d+(?= failed)' | head -1)
@@ -160,12 +166,16 @@ run_all_tests() {
     
     # Check if no tests ran (likely compilation failure)
     if [ "$passed" -eq 0 ] && [ "$failed" -eq 0 ]; then
-        echo -e "${YELLOW}⚠ No tests ran - likely compilation failure with use_output_columns${NC}"
-        # Try to detect compilation errors
-        if echo "$test_output" | grep -q "error\[E"; then
-            echo -e "${RED}Compilation errors detected:${NC}"
-            print_error_context "$test_output"
+        echo -e "${YELLOW}⚠ No tests ran - likely compilation failure${NC}"
+        if [ $test_status -ne 0 ]; then
+            if [ "$has_compile_error" = true ]; then
+                echo -e "${RED}Compilation errors detected:${NC}"
+                print_error_context "$test_output"
+            else
+                echo -e "${RED}Tests failed before execution${NC}"
+            fi
         fi
+        echo "$test_output" | tail -200
         FAILED_CONFIGS+=("$db_name (no tests ran)")
         ((FAILED_TESTS++))
         ((TOTAL_TESTS++))
@@ -182,7 +192,12 @@ run_all_tests() {
         ((FAILED_TESTS++))
         
         # Show failure summary (not full details to keep output minimal)
-        echo "$test_output" | grep -A 20 "^failures:" | head -25
+        if [ "$has_compile_error" = true ]; then
+            print_error_context "$test_output"
+            echo "$test_output" | tail -200
+        else
+            echo "$test_output" | grep -A 20 "^failures:" | head -25
+        fi
     fi
     
     ((TOTAL_TESTS++))
