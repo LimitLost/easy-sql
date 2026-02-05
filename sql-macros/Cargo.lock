@@ -12,98 +12,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "all-syntax-cases"
-version = "0.1.0"
-dependencies = [
- "all-syntax-cases-helpers",
- "proc-macro2",
- "quote",
- "syn",
-]
-
-[[package]]
-name = "all-syntax-cases-helpers"
-version = "0.1.0"
-dependencies = [
- "helpers",
- "proc-macro2",
- "quote",
- "syn",
-]
-
-[[package]]
-name = "always-context"
-version = "1.0.0"
-dependencies = [
- "all-syntax-cases",
- "helpers",
- "proc-macro2",
- "quote",
- "replace_with",
- "syn",
-]
-
-[[package]]
-name = "always-context-build"
-version = "0.1.0"
-dependencies = [
- "always-context",
- "anyhow",
- "helpers",
- "proc-macro2",
- "quote",
- "regex",
- "syn",
-]
-
-[[package]]
 name = "anyhow"
 version = "1.0.97"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dcfed56ad506cb2c684a14971b8861fdc3baaaae314b9e5f9bb532cbe3ba7a4f"
-
-[[package]]
-name = "anyhow-result"
-version = "0.1.0"
-dependencies = [
- "helpers",
- "proc-macro2",
- "quote",
- "syn",
-]
-
-[[package]]
-name = "attributes"
-version = "0.1.0"
-dependencies = [
- "always-context",
- "always-context-build",
- "anyhow",
- "attributes-macros",
- "helpers",
- "lazy_static",
- "proc-macro2",
- "quote",
- "regex",
- "syn",
-]
-
-[[package]]
-name = "attributes-macros"
-version = "0.1.0"
-dependencies = [
- "always-context",
- "always-context-build",
- "anyhow",
- "anyhow-result",
- "helpers",
- "lazy_static",
- "proc-macro-crate",
- "proc-macro2",
- "quote",
- "regex",
- "syn",
-]
 
 [[package]]
 name = "base64"
@@ -158,15 +70,6 @@ name = "common-path"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2382f75942f4b3be3690fe4f86365e9c853c1587d6ee58212cebf6e2a9ccd101"
-
-[[package]]
-name = "context-internal"
-version = "0.1.0"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn",
-]
 
 [[package]]
 name = "convert_case"
@@ -260,17 +163,125 @@ dependencies = [
 
 [[package]]
 name = "easy-macros"
-version = "1.0.0"
+version = "1.0.2"
 dependencies = [
- "all-syntax-cases",
- "always-context",
- "always-context-build",
- "anyhow",
- "anyhow-result",
- "attributes",
- "helpers",
+ "docify",
+ "easy-macros-all-syntax-cases",
+ "easy-macros-always-context",
+ "easy-macros-always-context-build",
+ "easy-macros-anyhow-result",
+ "easy-macros-attributes",
+ "easy-macros-helpers",
+]
+
+[[package]]
+name = "easy-macros-all-syntax-cases"
+version = "0.1.0"
+dependencies = [
+ "easy-macros-all-syntax-cases-helpers",
  "proc-macro2",
  "quote",
+ "syn",
+]
+
+[[package]]
+name = "easy-macros-all-syntax-cases-helpers"
+version = "0.1.0"
+dependencies = [
+ "easy-macros-helpers",
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
+name = "easy-macros-always-context"
+version = "1.1.0"
+dependencies = [
+ "easy-macros-all-syntax-cases",
+ "easy-macros-helpers",
+ "proc-macro2",
+ "quote",
+ "replace_with",
+ "syn",
+]
+
+[[package]]
+name = "easy-macros-always-context-build"
+version = "0.2.0"
+dependencies = [
+ "anyhow",
+ "easy-macros-always-context",
+ "easy-macros-helpers",
+ "proc-macro2",
+ "quote",
+ "regex",
+ "syn",
+]
+
+[[package]]
+name = "easy-macros-anyhow-result"
+version = "0.1.0"
+dependencies = [
+ "easy-macros-helpers",
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
+name = "easy-macros-attributes"
+version = "0.1.1"
+dependencies = [
+ "anyhow",
+ "docify",
+ "easy-macros-always-context",
+ "easy-macros-always-context-build",
+ "easy-macros-attributes-macros",
+ "easy-macros-helpers",
+ "lazy_static",
+ "proc-macro2",
+ "quote",
+ "regex",
+ "syn",
+]
+
+[[package]]
+name = "easy-macros-attributes-macros"
+version = "0.1.1"
+dependencies = [
+ "anyhow",
+ "easy-macros-always-context",
+ "easy-macros-always-context-build",
+ "easy-macros-anyhow-result",
+ "easy-macros-helpers",
+ "lazy_static",
+ "proc-macro-crate",
+ "proc-macro2",
+ "quote",
+ "regex",
+ "syn",
+]
+
+[[package]]
+name = "easy-macros-context-internal"
+version = "0.1.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
+name = "easy-macros-helpers"
+version = "0.1.0"
+dependencies = [
+ "docify",
+ "easy-macros-context-internal",
+ "proc-macro-crate",
+ "proc-macro2",
+ "quote",
+ "replace_with",
  "syn",
 ]
 
@@ -353,19 +364,6 @@ name = "hashbrown"
 version = "0.15.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bf151400ff0baff5465007dd2f3e717f3fe502074ca563069ce3a6629d07b289"
-
-[[package]]
-name = "helpers"
-version = "0.1.0"
-dependencies = [
- "context-internal",
- "docify",
- "proc-macro-crate",
- "proc-macro2",
- "quote",
- "replace_with",
- "syn",
-]
 
 [[package]]
 name = "icu_collections"
@@ -807,6 +805,7 @@ dependencies = [
  "anyhow",
  "convert_case",
  "easy-macros",
+ "lazy_static",
  "proc-macro2",
  "quote",
  "replace_with",

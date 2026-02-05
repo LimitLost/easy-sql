@@ -3,7 +3,10 @@ use easy_macros::always_context;
 
 use super::{NeverConnection, TestDriver};
 
-use crate::{Driver, DriverArguments, Insert, InternalDriver, Table, query};
+use crate::{
+    Driver, Insert, Table, query,
+    traits::{DriverArguments, InternalDriver},
+};
 #[allow(dead_code)]
 struct ExampleTableStruct {
     id: i64,

@@ -134,7 +134,7 @@ impl Column {
                 // User specified a different table - validate normally
                 checks.push(quote::quote_spanned! {col_name.span()=>
                     {
-                        fn has_table<T:#sql_crate::HasTable<#table_type>>(_test:&T){}
+                        fn has_table<T:#sql_crate::markers::HasTable<#table_type>>(_test:&T){}
                         has_table(&___t___);
                         let table_instance = #sql_crate::macro_support::never_any::<#table_type>();
                         let _ = table_instance.#col_name;

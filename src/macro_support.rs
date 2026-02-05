@@ -1,4 +1,4 @@
-//! Reexports and functions used by procedural macros
+//! Reexported items and support functions used by procedural macros
 
 pub use anyhow::{Context, Error, Result};
 use easy_macros::always_context;
@@ -11,10 +11,16 @@ pub use sqlx::{
     query_with,
 };
 
-use crate::{
-    Driver, DriverArguments, DriverQueryResult, DriverRow, EasyExecutor, Insert, InternalDriver,
-    Output, Table, ToConvert, Update,
+pub use crate::traits::{
+    DriverArguments, DriverConnection, DriverQueryResult, DriverRow, DriverTypeInfo,
+    InternalDriver, ToConvert,
 };
+
+pub use crate::markers::OutputData;
+
+use crate::traits::{Driver, EasyExecutor, Insert, Output, Table, Update};
+
+pub use sqlx::Row as SqlxRow;
 
 /// Used for compiler checks, quickly creates a value of any type
 ///
@@ -25,6 +31,7 @@ pub fn never_any<T>() -> T {
         "This function should never be called in runtime, it's used to quickly create value for type in compiler checks"
     );
 }
+
 #[inline(always)]
 ///This function extracts Driver from connection (that's the only reason why it exists instead of direct call)
 pub fn args_for_driver<'a, D: Driver>(

@@ -18,57 +18,6 @@ fn sql_crate() -> proc_macro2::TokenStream {
     }
 }
 
-/// Type-safe query! macro for executing SQL queries.
-///
-/// # Usage
-///
-/// ## SELECT Query
-/// ```rust
-/// // Basic SELECT
-/// let result = query!(&mut conn, SELECT OutputType FROM TableType WHERE id = {user_id}).await?;
-///
-/// // With ORDER BY and LIMIT
-/// let results = query!(&mut conn, SELECT OutputType FROM TableType WHERE status = "active" ORDER BY created_at DESC LIMIT 10).await?;
-/// ```
-///
-/// ## INSERT Query
-/// ```rust
-/// // INSERT without RETURNING
-/// query!(&mut conn, INSERT INTO TableType VALUES {data}).await?;
-///
-/// // INSERT with RETURNING
-/// let inserted = query!(&mut conn, INSERT INTO TableType VALUES {data} RETURNING OutputType).await?;
-/// ```
-///
-/// ## UPDATE Query
-/// ```rust
-/// // UPDATE without RETURNING
-/// query!(&mut conn, UPDATE TableType SET field = {new_value} WHERE id = {user_id}).await?;
-///
-/// // UPDATE with RETURNING
-/// let updated = query!(&mut conn, UPDATE TableType SET field = {new_value} WHERE id = {user_id} RETURNING OutputType).await?;
-/// ```
-///
-/// ## DELETE Query
-/// ```rust
-/// // DELETE without RETURNING
-/// query!(&mut conn, DELETE FROM TableType WHERE id = {user_id}).await?;
-///
-/// // DELETE with RETURNING
-/// let deleted = query!(&mut conn, DELETE FROM TableType WHERE id = {user_id} RETURNING OutputType).await?;
-/// ```
-///
-/// ## EXISTS Query
-/// ```rust
-/// // Check if records exist
-/// let exists: bool = query!(&mut conn, EXISTS TableType WHERE email = {user_email}).await?;
-/// ```
-///
-/// # Type Safety
-/// All field names and types are validated at compile-time. The macro generates proper
-/// parameter binding and SQL construction code.
-///
-/// TODO Note that `*conn` syntax might be needed when using `&mut EasyExecutor<D>` as connection
 #[proc_macro]
 #[always_context]
 #[anyhow_result]
@@ -87,13 +36,6 @@ pub fn query_debug(item: TokenStream) -> anyhow::Result<TokenStream> {
     panic!("{}", result);
 }
 
-/// Documentation WIP
-/// - Takes same input as query! macro
-/// - `.await?` is required
-/// - Returns a value implementing `fetch(conn)` function
-///    - taking `impl sqlx::Executor` as an argument,
-///    - returning `futures::Stream<Item = anyhow::Result<Output>>`
-/// - Selected Query needs to returning a value (use SELECT or RETURNING clause, EXISTS is not supported)
 #[proc_macro]
 #[always_context]
 #[anyhow_result]
@@ -129,7 +71,7 @@ pub fn table_join_debug(item: TokenStream) -> anyhow::Result<TokenStream> {
 }
 
 #[always_context]
-#[proc_macro_derive(DatabaseSetup)]
+#[proc_macro_derive(DatabaseSetup, attributes(sql))]
 #[anyhow_result]
 pub fn database_setup(item: TokenStream) -> anyhow::Result<TokenStream> {
     derive::database_setup(item)
@@ -203,37 +145,6 @@ pub fn table_debug(item: TokenStream) -> anyhow::Result<TokenStream> {
     panic!("{}", output);
 }
 
-/// Define a custom SQL function that can be used in query! macros.
-///
-/// # Syntax
-/// ```rust
-/// custom_sql_function!(FunctionName; "SQL_FUNCTION_NAME"; 1 | 2 | Any);
-/// ```
-///
-/// # Arguments
-/// - `FunctionName`: The Rust struct name for the function
-/// - `"SQL_FUNCTION_NAME"`: The SQL function name emitted in queries
-/// - `args`: Argument count specification:
-///   - A number (e.g., `2`) for exact argument count
-///   - Multiple numbers separated by `|` (e.g., `1 | 2`) for multiple allowed counts
-///   - `Any` for any number of arguments
-///
-/// # Examples
-/// ```rust
-/// // Exact argument count
-/// custom_sql_function!(JsonExtract; "JSON_EXTRACT"; 2);
-///
-/// // Multiple allowed counts
-/// custom_sql_function!(Slice; "SUBSTR"; 2 | 3);
-///
-/// // Any number of arguments
-/// custom_sql_function!(Coalesce_Any; "COALESCE"; Any);
-///
-/// // Usage in query: (Any case can be used)
-/// query!(&mut conn, SELECT * FROM Table WHERE JsonExtract(data, "$.field") = "value")
-/// query!(&mut conn, SELECT * FROM Table WHERE slice(name, 2, 3) = "ell")
-/// query!(&mut conn, SELECT * FROM Table WHERE coalesce_Any(name, "fallback") = "value")
-/// ```
 #[proc_macro]
 #[always_context]
 #[anyhow_result]

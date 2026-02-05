@@ -1,7 +1,10 @@
 use easy_macros::always_context;
 use sqlx::ColumnIndex;
 
-use crate::{Driver, DriverRow, InternalDriver, ToConvert};
+use crate::{
+    Driver,
+    traits::{DriverRow, InternalDriver, ToConvert},
+};
 
 use super::TestDriver;
 
@@ -47,31 +50,40 @@ where
 
         let _ = |data: DriverRow<TestDriver>| {
             anyhow::Result::<Self>::Ok(Self {
-                field1: <DriverRow<TestDriver> as crate::SqlxRow>::try_get(&data, "field1")
-                    .with_context(context!(
-                        "Getting field `field1` with type String for struct ExampleStruct"
-                    ))?,
-                field2: <DriverRow<TestDriver> as crate::SqlxRow>::try_get(&data, "field2")
-                    .with_context(context!(
-                        "Getting field `field2` with type i32 for struct ExampleStruct"
-                    ))?,
-                field3: <DriverRow<TestDriver> as crate::SqlxRow>::try_get(&data, "field3")
-                    .with_context(context!(
-                        "Getting field `field3` with type i64 for struct ExampleStruct"
-                    ))?,
+                field1: <DriverRow<TestDriver> as crate::macro_support::SqlxRow>::try_get(
+                    &data, "field1",
+                )
+                .with_context(context!(
+                    "Getting field `field1` with type String for struct ExampleStruct"
+                ))?,
+                field2: <DriverRow<TestDriver> as crate::macro_support::SqlxRow>::try_get(
+                    &data, "field2",
+                )
+                .with_context(context!(
+                    "Getting field `field2` with type i32 for struct ExampleStruct"
+                ))?,
+                field3: <DriverRow<TestDriver> as crate::macro_support::SqlxRow>::try_get(
+                    &data, "field3",
+                )
+                .with_context(context!(
+                    "Getting field `field3` with type i64 for struct ExampleStruct"
+                ))?,
             })
         };
 
         Ok(Self {
-            field1: <DriverRow<D> as crate::SqlxRow>::try_get(&data, "field1").with_context(
-                context!("Getting field `field1` with type String for struct ExampleStruct"),
-            )?,
-            field2: <DriverRow<D> as crate::SqlxRow>::try_get(&data, "field2").with_context(
-                context!("Getting field `field2` with type i32 for struct ExampleStruct"),
-            )?,
-            field3: <DriverRow<D> as crate::SqlxRow>::try_get(&data, "field3").with_context(
-                context!("Getting field `field3` with type i64 for struct ExampleStruct"),
-            )?,
+            field1: <DriverRow<D> as crate::macro_support::SqlxRow>::try_get(&data, "field1")
+                .with_context(context!(
+                    "Getting field `field1` with type String for struct ExampleStruct"
+                ))?,
+            field2: <DriverRow<D> as crate::macro_support::SqlxRow>::try_get(&data, "field2")
+                .with_context(context!(
+                    "Getting field `field2` with type i32 for struct ExampleStruct"
+                ))?,
+            field3: <DriverRow<D> as crate::macro_support::SqlxRow>::try_get(&data, "field3")
+                .with_context(context!(
+                    "Getting field `field3` with type i64 for struct ExampleStruct"
+                ))?,
         })
     }
 }

@@ -112,7 +112,6 @@ pub fn sql_output_base(
             item_name
         );
 
-        let sql_crate = &sql_crate;
         let macro_support = &macro_support;
 
         if has_attributes!(field, #[sql(bytes)]) {
@@ -124,7 +123,7 @@ pub fn sql_output_base(
             );
 
             fields_quotes.push(Box::new(move |driver|quote! {
-                #field_name: #macro_support::from_binary_vec( <#sql_crate::DriverRow<#driver> as #sql_crate::SqlxRow>::try_get(&data, #field_name_str).with_context(
+                #field_name: #macro_support::from_binary_vec( <#macro_support::DriverRow<#driver> as #macro_support::SqlxRow>::try_get(&data, #field_name_str).with_context(
                     #macro_support::context!(#context_str),
                 )?).with_context(
                     #macro_support::context!(#context_str2),
@@ -132,7 +131,7 @@ pub fn sql_output_base(
             }));
         } else {
             fields_quotes.push(Box::new(move |driver|quote! {
-                #field_name: <#sql_crate::DriverRow<#driver> as #sql_crate::SqlxRow>::try_get(&data, #field_name_str).with_context(
+                #field_name: <#macro_support::DriverRow<#driver> as #macro_support::SqlxRow>::try_get(&data, #field_name_str).with_context(
                     #macro_support::context!(#context_str),
                 )?,
             }));
@@ -152,7 +151,6 @@ pub fn sql_output_base(
             field.ty.to_token_stream(),
             item_name
         );
-        let sql_crate = &sql_crate;
         let macro_support = &macro_support;
 
         // Custom select fields are read using their aliased column names
@@ -167,7 +165,7 @@ pub fn sql_output_base(
             );
 
             fields_quotes.push(Box::new(move |driver|quote! {
-                #field_name: #macro_support::from_binary_vec( <#sql_crate::DriverRow<#driver> as #sql_crate::SqlxRow>::try_get(&data, #aliased_name).with_context(
+                #field_name: #macro_support::from_binary_vec( <#macro_support::DriverRow<#driver> as #macro_support::SqlxRow>::try_get(&data, #aliased_name).with_context(
                     #macro_support::context!(#context_str),
                 )?).with_context(
                     #macro_support::context!(#context_str2),
@@ -175,7 +173,7 @@ pub fn sql_output_base(
             }));
         } else {
             fields_quotes.push(Box::new(move |driver|quote! {
-                #field_name: <#sql_crate::DriverRow<#driver> as #sql_crate::SqlxRow>::try_get(&data, #aliased_name).with_context(
+                #field_name: <#macro_support::DriverRow<#driver> as #macro_support::SqlxRow>::try_get(&data, #aliased_name).with_context(
                     #macro_support::context!(#context_str),
                 )?,
             }));
@@ -246,12 +244,12 @@ pub fn sql_output_base(
     let trait_impl = if !has_custom_select_args {
         // No custom select with args - implement NormalSelect
         quote! {
-            impl #sql_crate::NormalSelect for #item_name {}
+            impl #sql_crate::markers::NormalSelect for #item_name {}
         }
     } else {
         // Custom select with args - implement WithArgsSelect
         quote! {
-            impl #sql_crate::WithArgsSelect for #item_name {}
+            impl #sql_crate::markers::WithArgsSelect for #item_name {}
         }
     };
 
@@ -419,13 +417,13 @@ pub fn sql_output_base(
     let driver_checks = drivers.iter().map(|driver| {
         let fields_quotes = fields_quotes.iter().map(|f| f(driver));
         quote! {
-            let _ = |data: #sql_crate::DriverRow<#driver>| {
+            let _ = |data: #macro_support::DriverRow<#driver>| {
                 #macro_support::Result::<Self>::Ok(Self {
                     #(
                         #fields_quotes
                     )*
                     #(
-                        #joined_checks_field_names: <#sql_crate::DriverRow<#driver> as #sql_crate::SqlxRow>::try_get(&data, #joined_field_aliases).with_context(
+                        #joined_checks_field_names: <#macro_support::DriverRow<#driver> as #macro_support::SqlxRow>::try_get(&data, #joined_field_aliases).with_context(
                             #macro_support::context!(#context_strs2),
                         )?,
                     )*
@@ -443,14 +441,14 @@ pub fn sql_output_base(
             if bytes {
                 let bound_ty = quote! { Vec<u8> };
                 quote! {
-                    for<'__easy_sql_x> #bound_ty: #macro_support::Decode<'__easy_sql_x, #sql_crate::InternalDriver<D>>,
-                    #bound_ty: #macro_support::Type<#sql_crate::InternalDriver<D>>,
+                    for<'__easy_sql_x> #bound_ty: #macro_support::Decode<'__easy_sql_x, #macro_support::InternalDriver<D>>,
+                    #bound_ty: #macro_support::Type<#macro_support::InternalDriver<D>>,
                 }
             } else {
                 let field_ty = &field.ty;
                 quote! {
-                    for<'__easy_sql_x> #field_ty: #macro_support::Decode<'__easy_sql_x, #sql_crate::InternalDriver<D>>,
-                    #field_ty: #macro_support::Type<#sql_crate::InternalDriver<D>>,
+                    for<'__easy_sql_x> #field_ty: #macro_support::Decode<'__easy_sql_x, #macro_support::InternalDriver<D>>,
+                    #field_ty: #macro_support::Type<#macro_support::InternalDriver<D>>,
                 }
             }
         });
@@ -459,11 +457,11 @@ pub fn sql_output_base(
 
     Ok(quote! {
         impl<D: #sql_crate::Driver> #sql_crate::Output<#table, D> for #item_name
-        where #sql_crate::DriverRow<D>: #sql_crate::ToConvert<D>,
-        for<'__easy_sql_x> &'__easy_sql_x str: #macro_support::ColumnIndex<#sql_crate::DriverRow<D>>,
+        where #macro_support::DriverRow<D>: #macro_support::ToConvert<D>,
+        for<'__easy_sql_x> &'__easy_sql_x str: #macro_support::ColumnIndex<#macro_support::DriverRow<D>>,
         #(#where_clauses_types)*
      {
-            type DataToConvert = #sql_crate::DriverRow<D>;
+            type DataToConvert = #macro_support::DriverRow<D>;
             type UsedForChecks = Self;
 
             fn select(current_query: &mut String) {
@@ -472,7 +470,7 @@ pub fn sql_output_base(
                 #select_body
             }
 
-            fn convert(data: #sql_crate::DriverRow<D>) -> #macro_support::Result<Self> {
+            fn convert(data: #macro_support::DriverRow<D>) -> #macro_support::Result<Self> {
                 use #macro_support::{Context,context};
 
                 #(#driver_checks)*
@@ -482,7 +480,7 @@ pub fn sql_output_base(
                         #fields_quotes
                     )*
                     #(
-                        #joined_checks_field_names: <#sql_crate::DriverRow<D> as #sql_crate::SqlxRow>::try_get(&data, #joined_field_aliases).with_context(
+                        #joined_checks_field_names: <#macro_support::DriverRow<D> as #macro_support::SqlxRow>::try_get(&data, #joined_field_aliases).with_context(
                             #macro_support::context!(#context_strs2),
                         )?,
                     )*
@@ -490,7 +488,7 @@ pub fn sql_output_base(
             }
         }
 
-        impl #sql_crate::OutputData<#table> for #item_name {
+        impl #macro_support::OutputData<#table> for #item_name {
             type SelectProvider = Self;
         }
 

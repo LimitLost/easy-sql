@@ -90,7 +90,7 @@ pub fn sql_insert_base(
 
     let insert_driver_tests=drivers.iter().map(|driver|{
         quote! {
-            let _=|mut args_list:#sql_crate::DriverArguments<'a, #driver>|{
+            let _=|mut args_list:#macro_support::DriverArguments<'a, #driver>|{
                 let _self=#macro_support::never_any::<Self>();
                 #(
                     args_list.add(#insert_values_support).map_err(#macro_support::Error::from_boxed)#insert_values_debug_ref?;
@@ -107,14 +107,14 @@ pub fn sql_insert_base(
             if bytes {
                 let bound_ty = quote! { Vec<u8> };
                 quote! {
-                    for<'__easy_sql_x> #bound_ty: #macro_support::Encode<'__easy_sql_x, #sql_crate::InternalDriver<D>>,
-                    #bound_ty: #macro_support::Type<#sql_crate::InternalDriver<D>>,
+                    for<'__easy_sql_x> #bound_ty: #macro_support::Encode<'__easy_sql_x, #macro_support::InternalDriver<D>>,
+                    #bound_ty: #macro_support::Type<#macro_support::InternalDriver<D>>,
                 }
             } else {
                 let field_ty = &field.ty;
                 quote! {
-                    for<'__easy_sql_x> #field_ty: #macro_support::Encode<'__easy_sql_x, #sql_crate::InternalDriver<D>>,
-                    #field_ty: #macro_support::Type<#sql_crate::InternalDriver<D>>,
+                    for<'__easy_sql_x> #field_ty: #macro_support::Encode<'__easy_sql_x, #macro_support::InternalDriver<D>>,
+                    #field_ty: #macro_support::Type<#macro_support::InternalDriver<D>>,
                 }
             }
         })
@@ -174,8 +174,8 @@ pub fn sql_insert_base(
 
             fn insert_values(
                 self,
-                mut args_list: #sql_crate::DriverArguments<'a, D>,
-            ) -> #macro_support::Result<(#sql_crate::DriverArguments<'a, D>, usize)> {
+                mut args_list: #macro_support::DriverArguments<'a, D>,
+            ) -> #macro_support::Result<(#macro_support::DriverArguments<'a, D>, usize)> {
                 use #macro_support::Context as _;
 
                 use #macro_support::Arguments;
@@ -203,8 +203,8 @@ pub fn sql_insert_base(
 
             fn insert_values(
                 self,
-                mut args_list: #sql_crate::DriverArguments<'a, D>,
-            ) -> #macro_support::Result<(#sql_crate::DriverArguments<'a, D>, usize)> {
+                mut args_list: #macro_support::DriverArguments<'a, D>,
+            ) -> #macro_support::Result<(#macro_support::DriverArguments<'a, D>, usize)> {
                 use #macro_support::Context as _;
 
                 use #macro_support::Arguments;

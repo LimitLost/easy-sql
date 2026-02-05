@@ -1,6 +1,10 @@
 use std::fmt::Debug;
 
-use crate::{Driver, DriverConnection, HasTable, InternalDriver, NotJoinedTable, Output};
+use crate::{
+    Driver, Output,
+    markers::{HasTable, NotJoinedTable},
+    traits::{DriverConnection, InternalDriver},
+};
 use easy_macros::always_context;
 use sql_macros::{Insert, Update};
 use sqlx::TypeInfo;
@@ -19,6 +23,8 @@ impl HasTable<EasySqlTables> for EasySqlTables {}
 impl NotJoinedTable for EasySqlTables {}
 
 #[macro_export]
+#[doc(hidden)]
+/// Used by Table derive macro
 macro_rules! EasySqlTables_create {
     ($driver:path, $conn:expr, $table_id:expr, $version:expr) => {
         use $crate::macro_support::Context;
@@ -36,6 +42,8 @@ macro_rules! EasySqlTables_create {
 }
 
 #[macro_export]
+#[doc(hidden)]
+/// Used by Table derive macro
 macro_rules! EasySqlTables_update_version {
     ($driver:path, $conn:expr, $table_id:expr, $new_version:expr) => {{
         use $crate::macro_support::Context;
@@ -51,6 +59,8 @@ macro_rules! EasySqlTables_update_version {
 }
 
 #[macro_export]
+#[doc(hidden)]
+/// Used by Table derive macro
 macro_rules! EasySqlTables_get_version {
     ($driver:path, $conn:expr, $table_id:expr) => {{
         #[derive($crate::Update, $crate::Output, Debug)]

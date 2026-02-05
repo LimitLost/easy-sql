@@ -5,7 +5,11 @@ use sqlx::Executor;
 /// Current Driver
 type CDriver = super::Postgres;
 
-use crate::{DriverArguments, InternalDriver, Output, ToConvert, ToConvertSingle};
+use crate::{
+    Output,
+    markers::ToConvertSingle,
+    traits::{DriverArguments, InternalDriver, ToConvert},
+};
 
 type Row = sqlx::postgres::PgRow;
 

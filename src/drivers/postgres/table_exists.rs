@@ -3,7 +3,7 @@ use easy_macros::{always_context, context};
 use sqlx::Row;
 
 use super::Postgres;
-use crate::{EasyExecutor, SetupSql};
+use crate::{EasyExecutor, traits::SetupSql};
 
 #[derive(Debug)]
 pub struct TableExists {

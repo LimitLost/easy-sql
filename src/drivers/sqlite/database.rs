@@ -13,6 +13,9 @@ pub use sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode};
 
 use super::Sqlite;
 
+/// SQLite connection pool wrapper with setup helpers.
+///
+/// Uses [`DatabaseSetup`](crate::DatabaseSetup) implementations to prepare schema on startup.
 #[derive(Debug)]
 pub struct Database {
     connection_pool: sqlx::Pool<Db>,
@@ -70,7 +73,8 @@ impl Database {
         })
     }
 
-    pub async fn setup_in_memory<T: DatabaseSetup<Sqlite>>() -> anyhow::Result<Self> {
+    // Broken - database will be lost after connection is closed
+    /* pub async fn setup_in_memory<T: DatabaseSetup<Sqlite>>() -> anyhow::Result<Self> {
         let connection_pool =
             sqlx::Pool::<Db>::connect_with(SqliteConnectOptions::default().in_memory(true)).await?;
 
@@ -84,7 +88,7 @@ impl Database {
             #[cfg(test)]
             test_db_file_path: None,
         })
-    }
+    } */
 
     pub async fn conn(&self) -> anyhow::Result<Connection<Sqlite>> {
         let conn = self.connection_pool.acquire().await?;

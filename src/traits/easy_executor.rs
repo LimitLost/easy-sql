@@ -1,8 +1,14 @@
 use easy_macros::always_context;
 
-use crate::{Driver, DriverConnection};
+use crate::Driver;
+
+use super::DriverConnection;
 
 #[always_context]
+/// Abstraction over `sqlx::Executor` used by the query macros.
+///
+/// Implemented for easy_sql and sqlx connections/pools; most users only need to pass a compatible
+/// connection to [`query!`](crate::query) or [`query_lazy!`](crate::query_lazy).
 pub trait EasyExecutor<D: Driver> {
     type InternalExecutor<'b>: sqlx::Executor<'b, Database = D::InternalDriver>
     where
@@ -26,6 +32,7 @@ pub trait EasyExecutor<D: Driver> {
 }
 
 #[always_context]
+/// Gives information about the SQL query to execute, and how to execute it with the provided executor. Used by setup structures.
 pub trait SetupSql<D: Driver> {
     type Output;
 

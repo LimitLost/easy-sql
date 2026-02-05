@@ -7,7 +7,7 @@ edition = "2024"
 proc-macro = true
 
 [dependencies]
-easy-macros = { version="1.0.2", features = ["full"] }
+easy-macros = { version = "1.1.1", features = ["full"] }
 convert_case = "0.8.0"
 sql-compilation-data = { path = "../sql-compilation-data" }
 
@@ -18,7 +18,7 @@ anyhow = { version = "1" }
 lazy_static = "1.5.0"
 
 [build-dependencies]
-easy-macros = { version="1.0.2", features = ["build"] }
+easy-macros = { version = "1.1.1", features = ["build"] }
 
 [features]
 default = []

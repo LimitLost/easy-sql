@@ -33,8 +33,8 @@ impl ReturningData {
         if let Some(output_args) = &self.output_args {
             checks.push(quote! {
                 let _ = || {
-                    fn __easy_sql_assert_with_args<T: #sql_crate::WithArgsSelect>() {}
-                    __easy_sql_assert_with_args::<<#output_type_ts as #sql_crate::OutputData<#table_type>>::SelectProvider>();
+                    fn __easy_sql_assert_with_args<T: #sql_crate::markers::WithArgsSelect>() {}
+                    __easy_sql_assert_with_args::<<#output_type_ts as #sql_crate::macro_support::OutputData<#table_type>>::SelectProvider>();
                 };
             });
 
@@ -70,8 +70,8 @@ impl ReturningData {
         } else {
             checks.push(quote! {
                 let _ = || {
-                    fn __easy_sql_assert_normal<T: #sql_crate::NormalSelect>() {}
-                    __easy_sql_assert_normal::<<#output_type_ts as #sql_crate::OutputData<#table_type>>::SelectProvider>();
+                    fn __easy_sql_assert_normal<T: #sql_crate::markers::NormalSelect>() {}
+                    __easy_sql_assert_normal::<<#output_type_ts as #sql_crate::macro_support::OutputData<#table_type>>::SelectProvider>();
                 };
             });
         }
@@ -225,7 +225,7 @@ pub fn generate_select(
         checks.push(quote! {
             {
                 fn to_convert_single_impl<
-                    Y: #sql_crate::ToConvertSingle<#driver>,
+                    Y: #sql_crate::markers::ToConvertSingle<#driver>,
                     T: #sql_crate::Output<#table_type, #driver, DataToConvert = Y>,
                 >(
                     _el: T,
@@ -276,7 +276,7 @@ pub fn generate_select(
 
         quote! {
             struct LazyQueryResult<'_easy_sql_a> {
-                builder: #macro_support::QueryBuilder<'_easy_sql_a, #sql_crate::InternalDriver<#lazy_mode_driver>>,
+                builder: #macro_support::QueryBuilder<'_easy_sql_a, #macro_support::InternalDriver<#lazy_mode_driver>>,
             }
 
             impl<'_easy_sql_q> LazyQueryResult<'_easy_sql_q> {
@@ -329,7 +329,7 @@ pub fn generate_select(
     Ok(quote! {
         {
             #async_block {
-                use {#sql_crate::ToConvert,#macro_support::{Context,Arguments}};
+                use {#macro_support::ToConvert,#macro_support::{Context,Arguments}};
 
                 // Safety checks closure
                 let _ = |___t___: #table_type| {
@@ -448,7 +448,7 @@ pub fn generate_insert(
             let returning_select = if returning_has_args {
                 quote! {
                     query.push_str(" RETURNING ");
-                    query.push_str(&<#returning_type as #sql_crate::OutputData<#table_type>>::SelectProvider::__easy_sql_select::<#driver>(
+                    query.push_str(&<#returning_type as #macro_support::OutputData<#table_type>>::SelectProvider::__easy_sql_select::<#driver>(
                         _easy_sql_d,
                         #(#returning_arg_tokens),*
                     ));
@@ -468,7 +468,7 @@ pub fn generate_insert(
                 quote! {
                     let _ = || {
                         fn to_convert_single_impl<
-                            Y: #sql_crate::ToConvertSingle<#driver>,
+                            Y: #sql_crate::markers::ToConvertSingle<#driver>,
                             T: #sql_crate::Output<#table_type, #driver, DataToConvert = Y>,
                         >(
                             _el: T,
@@ -477,7 +477,7 @@ pub fn generate_insert(
                         to_convert_single_impl(#macro_support::never_any::<#returning_type>());
                     };
                     struct LazyQueryResult<'_easy_sql_a> {
-                        builder: #macro_support::QueryBuilder<'_easy_sql_a, #sql_crate::InternalDriver<#driver>>,
+                        builder: #macro_support::QueryBuilder<'_easy_sql_a, #macro_support::InternalDriver<#driver>>,
                     }
 
                     impl<'_easy_sql_q> LazyQueryResult<'_easy_sql_q> {
@@ -579,7 +579,7 @@ pub fn generate_insert(
 
             #async_block {
                 use #macro_support::{Arguments,Context};
-                use #sql_crate::ToConvert;
+                use #macro_support::ToConvert;
 
                     let mut _easy_sql_args = #driver_arguments;
                     let mut query = String::from("INSERT INTO ");
@@ -797,7 +797,7 @@ pub fn generate_update(
             checks.push(quote! {
                 {
                     fn to_convert_single_impl<
-                        Y: #sql_crate::ToConvertSingle<#lazy_mode_driver>,
+                        Y: #sql_crate::markers::ToConvertSingle<#lazy_mode_driver>,
                         T: #sql_crate::Output<#table_type, #lazy_mode_driver, DataToConvert = Y>,
                     >(
                         _el: T,
@@ -809,7 +809,7 @@ pub fn generate_update(
             let returning_select = if returning_has_args {
                 quote! {
                     query.push_str(" RETURNING ");
-                    query.push_str(&<#returning_type as #sql_crate::OutputData<#table_type>>::SelectProvider::__easy_sql_select::<#lazy_mode_driver>(
+                    query.push_str(&<#returning_type as #macro_support::OutputData<#table_type>>::SelectProvider::__easy_sql_select::<#lazy_mode_driver>(
                         _easy_sql_d,
                         #(#returning_arg_tokens),*
                     ));
@@ -827,7 +827,7 @@ pub fn generate_update(
                     let mut builder = #macro_support::QueryBuilder::with_arguments(query, _easy_sql_args);
 
                     struct LazyQueryResult<'_easy_sql_a> {
-                        builder: #macro_support::QueryBuilder<'_easy_sql_a, #sql_crate::InternalDriver<#lazy_mode_driver>>,
+                        builder: #macro_support::QueryBuilder<'_easy_sql_a, #macro_support::InternalDriver<#lazy_mode_driver>>,
                     }
 
                     impl<'_easy_sql_q> LazyQueryResult<'_easy_sql_q> {
@@ -888,7 +888,7 @@ pub fn generate_update(
     let main_table_name = driver.table_name(sql_crate, &table_type);
     checks.push(quote! {
         let _ = || {
-            fn __easy_sql_assert_not_joined<T: #sql_crate::NotJoinedTable>() {}
+            fn __easy_sql_assert_not_joined<T: #sql_crate::markers::NotJoinedTable>() {}
             __easy_sql_assert_not_joined::<#table_type>();
         };
     });
@@ -908,7 +908,7 @@ pub fn generate_update(
 
             #async_block {
                 use #macro_support::{Context,Arguments};
-                use #sql_crate::ToConvert;
+                use #macro_support::ToConvert;
 
                 let mut _easy_sql_args = #driver_arguments;
                 let _easy_sql_d = #identifier_delimiter;
@@ -1058,7 +1058,7 @@ pub fn generate_delete(
             checks.push(quote! {
                 {
                     fn to_convert_single_impl<
-                        Y: #sql_crate::ToConvertSingle<#lazy_mode_driver>,
+                        Y: #sql_crate::markers::ToConvertSingle<#lazy_mode_driver>,
                         T: #sql_crate::Output<#table_type, #lazy_mode_driver, DataToConvert = Y>,
                     >(
                         _el: T,
@@ -1070,7 +1070,7 @@ pub fn generate_delete(
             let returning_select = if returning_has_args {
                 quote! {
                     query.push_str(" RETURNING ");
-                    query.push_str(&<#returning_type as #sql_crate::OutputData<#table_type>>::SelectProvider::__easy_sql_select::<#lazy_mode_driver>(
+                    query.push_str(&<#returning_type as #macro_support::OutputData<#table_type>>::SelectProvider::__easy_sql_select::<#lazy_mode_driver>(
                         _easy_sql_d,
                         #(#returning_arg_tokens),*
                     ));
@@ -1088,7 +1088,7 @@ pub fn generate_delete(
                     let mut builder = #macro_support::QueryBuilder::with_arguments(query, _easy_sql_args);
 
                     struct LazyQueryResult<'_easy_sql_a> {
-                        builder: #macro_support::QueryBuilder<'_easy_sql_a, #sql_crate::InternalDriver<#lazy_mode_driver>>,
+                        builder: #macro_support::QueryBuilder<'_easy_sql_a, #macro_support::InternalDriver<#lazy_mode_driver>>,
                     }
 
                     impl<'_easy_sql_q> LazyQueryResult<'_easy_sql_q> {
@@ -1149,7 +1149,7 @@ pub fn generate_delete(
     let table_name = driver.table_name(sql_crate, &table_type);
     checks.push(quote! {
         let _ = || {
-            fn __easy_sql_assert_not_joined<T: #sql_crate::NotJoinedTable>() {}
+            fn __easy_sql_assert_not_joined<T: #sql_crate::markers::NotJoinedTable>() {}
             __easy_sql_assert_not_joined::<#table_type>();
         };
     });
@@ -1170,7 +1170,7 @@ pub fn generate_delete(
 
             #async_block {
                 use #macro_support::{Context,Arguments};
-                use #sql_crate::ToConvert;
+                use #macro_support::ToConvert;
 
                 let mut _easy_sql_args = #driver_arguments;
                 let _easy_sql_d = #identifier_delimiter;

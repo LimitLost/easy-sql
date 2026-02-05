@@ -419,7 +419,7 @@ impl CompilationData {
                             name: #field_name,
                             data_type: {
                                 #macro_support::TypeInfo::name(
-                                    &<#data_type as #macro_support::Type<#sql_crate::InternalDriver<_EasySqlMigrationDriver>>>::type_info(),
+                                    &<#data_type as #macro_support::Type<#macro_support::InternalDriver<_EasySqlMigrationDriver>>>::type_info(),
                                 )
                                 .to_owned()
                             },

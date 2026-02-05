@@ -2,7 +2,10 @@ use easy_macros::always_context;
 use sqlx::{PgConnection, Pool};
 
 use super::Db;
-use crate::{DriverConnection, EasyExecutor, SetupSql};
+use crate::{
+    EasyExecutor,
+    traits::{DriverConnection, SetupSql},
+};
 
 type CDriver = super::Postgres;
 /// For some reason Db::Connection overlaps with crate::Connection

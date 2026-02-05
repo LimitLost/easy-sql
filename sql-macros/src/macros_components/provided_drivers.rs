@@ -43,7 +43,7 @@ impl ProvidedDrivers {
         match self {
             ProvidedDrivers::Single(driver) | ProvidedDrivers::SingleWithChecks { driver, .. } => {
                 quote_spanned! {driver.span()=>
-                    #sql_crate::DriverArguments::<#driver>::default()
+                    #sql_crate::macro_support::DriverArguments::<#driver>::default()
                 }
             }
             ProvidedDrivers::MultipleWithConn { drivers: _, conn } => {
@@ -102,7 +102,7 @@ impl ProvidedDrivers {
         match self {
             ProvidedDrivers::Single(driver) | ProvidedDrivers::SingleWithChecks { driver, .. } => {
                 quote! {
-                    query.push_str(&<#output_type as #sql_crate::OutputData<#table_type>>::SelectProvider::__easy_sql_select::<#driver>(
+                    query.push_str(&<#output_type as #sql_crate::macro_support::OutputData<#table_type>>::SelectProvider::__easy_sql_select::<#driver>(
                         _easy_sql_d,
                         #(#output_arg_tokens),*
                     ));
@@ -110,7 +110,7 @@ impl ProvidedDrivers {
             }
             ProvidedDrivers::MultipleWithConn { conn, .. } => {
                 quote! {
-                    query.push_str(&<#output_type as #sql_crate::OutputData<#table_type>>::SelectProvider::__easy_sql_select_driver_from_conn(
+                    query.push_str(&<#output_type as #sql_crate::macro_support::OutputData<#table_type>>::SelectProvider::__easy_sql_select_driver_from_conn(
                         &(#conn),
                         _easy_sql_d,
                         #(#output_arg_tokens),*
@@ -169,6 +169,7 @@ impl ProvidedDrivers {
             ProvidedDrivers::MultipleWithConn { drivers: _, conn } => {
                 quote_spanned! {update_data.span()=>
                     #sql_crate::macro_support::query_update_data::<#table_type, _, _>(
+                        #[allow(unused_braces)]
                         {#update_data},
                         _easy_sql_args,
                         &mut query,

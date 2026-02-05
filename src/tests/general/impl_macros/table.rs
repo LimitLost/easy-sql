@@ -6,7 +6,7 @@ struct DatabaseSetupTest {
 }
 
 use super::TestDriver;
-use crate::{self as sql_crate, Driver, EasySqlTables_create, InternalDriver};
+use crate::{self as sql_crate, Driver, EasySqlTables_create, traits::InternalDriver};
 
 #[allow(dead_code)]
 struct ExampleReferencedTable {

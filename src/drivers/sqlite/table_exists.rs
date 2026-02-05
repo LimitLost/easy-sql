@@ -3,7 +3,7 @@ use easy_macros::{always_context, context};
 use sqlx::Row;
 
 use super::Sqlite;
-use crate::{EasyExecutor, SetupSql};
+use crate::traits::{EasyExecutor, SetupSql};
 
 #[derive(Debug)]
 pub struct TableExists {

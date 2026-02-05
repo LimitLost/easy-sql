@@ -5,7 +5,9 @@ use easy_macros::always_context;
 use futures::StreamExt;
 
 use crate::{
-    Connection, Driver, DriverArguments, InternalDriver, Output, Table, macro_support::never_any,
+    Connection, Driver, Output, Table,
+    macro_support::never_any,
+    traits::{DriverArguments, InternalDriver},
 };
 
 use super::TestDriver;
@@ -46,7 +48,7 @@ async fn _test_select() -> anyhow::Result<Vec<ExampleOutput>> {
         //TODO Security checks
         let _ = || {
             fn to_convert_single_impl<
-                Y: crate::ToConvertSingle<TestDriver>,
+                Y: crate::markers::ToConvertSingle<TestDriver>,
                 T: crate::Output<ExampleTable, TestDriver, DataToConvert = Y>,
             >(
                 _el: T,
@@ -84,7 +86,10 @@ async fn _test_select() -> anyhow::Result<Vec<ExampleOutput>> {
                 conn: E,
             ) -> impl futures::Stream<Item = anyhow::Result<ExampleOutput>> + '_easy_sql_e
             where
-                E: sqlx::Executor<'_easy_sql_e, Database = crate::InternalDriver<TestDriver>>,
+                E: sqlx::Executor<
+                        '_easy_sql_e,
+                        Database = crate::traits::InternalDriver<TestDriver>,
+                    >,
                 '_easy_sql_q: '_easy_sql_e,
             {
                 self.builder.build().fetch(conn).map(|r| {

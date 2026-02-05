@@ -1,10 +1,10 @@
-mod table_exists;
-pub use table_exists::*;
-mod create_table;
-pub use create_table::*;
 mod alter_table;
+mod create_table;
 mod database;
+mod table_exists;
+use create_table::CreateTable;
 pub use database::*;
+use table_exists::TableExists;
 
 mod connection;
 mod to_convert_impl;
@@ -16,9 +16,13 @@ use anyhow::Context;
 use easy_macros::always_context;
 
 use crate::{
-    AllowsNoPrimaryKey, Driver, EasyExecutor, SupportsAutoIncrementCompositePrimaryKey, TableField,
+    Driver, EasyExecutor, TableField,
+    markers::{AllowsNoPrimaryKey, SupportsAutoIncrementCompositePrimaryKey},
 };
 
+/// Marker type for the PostgreSQL driver.
+///
+/// Use as the driver parameter in macros when explicit selection is needed.
 #[derive(Debug)]
 pub struct Postgres;
 
@@ -73,7 +77,7 @@ impl AllowsNoPrimaryKey for Postgres {}
 #[always_context]
 impl SupportsAutoIncrementCompositePrimaryKey for Postgres {}
 
-pub fn table_field_definition(field: TableField) -> String {
+fn table_field_definition(field: TableField) -> String {
     let TableField {
         name,
         data_type,

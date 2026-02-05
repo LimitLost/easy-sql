@@ -2,7 +2,10 @@ use easy_macros::always_context;
 use sqlx::{Pool, SqliteConnection};
 
 use super::Db;
-use crate::{DriverConnection, EasyExecutor, SetupSql};
+use crate::{
+    EasyExecutor,
+    traits::{DriverConnection, SetupSql},
+};
 
 type CDriver = super::Sqlite;
 /// For some reason Db::Connection overlaps with crate::Connection

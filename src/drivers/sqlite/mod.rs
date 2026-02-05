@@ -1,10 +1,12 @@
 use std::collections::HashMap;
 
 use anyhow::Context;
+use create_table::CreateTable;
 use easy_macros::always_context;
 
 mod database;
 pub use database::*;
+use table_exists::TableExists;
 
 mod connection;
 mod to_convert_impl;
@@ -12,12 +14,13 @@ mod to_default_impl;
 
 mod alter_table;
 mod create_table;
-pub use create_table::*;
 mod table_exists;
-pub use table_exists::*;
 
-use crate::{AllowsNoPrimaryKey, Driver, EasyExecutor, TableField};
+use crate::{Driver, EasyExecutor, TableField, markers::AllowsNoPrimaryKey};
 
+/// Marker type for the SQLite driver.
+///
+/// Use as the driver parameter in macros when explicit selection is needed.
 #[derive(Debug)]
 pub struct Sqlite;
 
@@ -71,7 +74,7 @@ impl Driver for Sqlite {
 impl AllowsNoPrimaryKey for Sqlite {}
 
 #[always_context]
-pub fn table_field_definition(field: TableField) -> String {
+fn table_field_definition(field: TableField) -> String {
     let TableField {
         name,
         data_type,

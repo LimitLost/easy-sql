@@ -5,7 +5,7 @@ use easy_macros::{always_context, context};
 
 use super::{Sqlite, table_field_definition};
 use crate::EasyExecutor;
-use crate::SetupSql;
+use crate::traits::SetupSql;
 
 use crate::TableField;
 

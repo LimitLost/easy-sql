@@ -5,7 +5,10 @@ use easy_macros::always_context;
 use sqlx::Database;
 use std::fmt::Debug;
 
-use crate::{Driver, DriverConnection, InternalDriver, SetupSql, easy_executor::EasyExecutor};
+use crate::{
+    Driver, EasyExecutor,
+    traits::{DriverConnection, InternalDriver, SetupSql},
+};
 #[derive(Debug)]
 pub struct Transaction<'a, D: Driver> {
     internal: sqlx::Transaction<'a, D::InternalDriver>,

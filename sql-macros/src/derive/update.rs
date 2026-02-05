@@ -59,13 +59,13 @@ pub fn sql_update_base(
         if bytes {
             let bound_ty = quote! { Vec<u8> };
             where_clauses_types.push(quote! {
-                for<'__easy_sql_x> #bound_ty: #macro_support::Encode<'__easy_sql_x, #sql_crate::InternalDriver<D>>,
-                #bound_ty: #macro_support::Type<#sql_crate::InternalDriver<D>>,
+                for<'__easy_sql_x> #bound_ty: #macro_support::Encode<'__easy_sql_x, #macro_support::InternalDriver<D>>,
+                #bound_ty: #macro_support::Type<#macro_support::InternalDriver<D>>,
             });
         } else {
             where_clauses_types.push(quote! {
-                for<'__easy_sql_x> #field_ty: #macro_support::Encode<'__easy_sql_x, #sql_crate::InternalDriver<D>>,
-                #field_ty: #macro_support::Type<#sql_crate::InternalDriver<D>>,
+                for<'__easy_sql_x> #field_ty: #macro_support::Encode<'__easy_sql_x, #macro_support::InternalDriver<D>>,
+                #field_ty: #macro_support::Type<#macro_support::InternalDriver<D>>,
             });
         }
 
@@ -103,14 +103,14 @@ pub fn sql_update_base(
                 if bytes {
                     let bound_ty = quote! { Vec<u8> };
                     where_clauses_types.push(quote! {
-                        for<'__easy_sql_x> #bound_ty: #macro_support::Encode<'__easy_sql_x, #sql_crate::InternalDriver<D>>,
-                        #bound_ty: #macro_support::Type<#sql_crate::InternalDriver<D>>,
+                        for<'__easy_sql_x> #bound_ty: #macro_support::Encode<'__easy_sql_x, #macro_support::InternalDriver<D>>,
+                        #bound_ty: #macro_support::Type<#macro_support::InternalDriver<D>>,
                     });
                 } else {
                     let option_base_ty = quote! { Option<#base_ty> };
                     where_clauses_types.push(quote! {
-                        for<'__easy_sql_x> #option_base_ty: #macro_support::Encode<'__easy_sql_x, #sql_crate::InternalDriver<D>>,
-                        #option_base_ty: #macro_support::Type<#sql_crate::InternalDriver<D>>,
+                        for<'__easy_sql_x> #option_base_ty: #macro_support::Encode<'__easy_sql_x, #macro_support::InternalDriver<D>>,
+                        #option_base_ty: #macro_support::Type<#macro_support::InternalDriver<D>>,
                     });
                 }
             }
@@ -295,7 +295,7 @@ pub fn sql_update_base(
 
     let driver_tests = drivers.iter().map(|driver| {
         quote! {
-            let _=|mut args_list:#sql_crate::DriverArguments<'a, #driver>|{
+            let _=|mut args_list:#macro_support::DriverArguments<'a, #driver>|{
                 let _self=#macro_support::never_any::<Self>();
                 #(
                     args_list.add(#driver_test_values).map_err(#macro_support::Error::from_boxed)?;
@@ -311,10 +311,10 @@ pub fn sql_update_base(
 
             fn updates(
                 self,
-                mut args_list: #sql_crate::DriverArguments<'a, D>,
+                mut args_list: #macro_support::DriverArguments<'a, D>,
                 current_query: &mut String,
                 parameter_n: &mut usize,
-            ) -> #macro_support::Result<#sql_crate::DriverArguments<'a, D>>{
+            ) -> #macro_support::Result<#macro_support::DriverArguments<'a, D>>{
                 use #macro_support::{Arguments as _, Context as _};
 
                 let _ = || {
@@ -344,10 +344,10 @@ pub fn sql_update_base(
 
             fn updates(
                 self,
-                mut args_list: #sql_crate::DriverArguments<'a, D>,
+                mut args_list: #macro_support::DriverArguments<'a, D>,
                 current_query: &mut String,
                 parameter_n: &mut usize,
-            ) -> #macro_support::Result<#sql_crate::DriverArguments<'a, D>>{
+            ) -> #macro_support::Result<#macro_support::DriverArguments<'a, D>>{
                 use #macro_support::{Arguments, Context as _};
                 // Validity check needs to be done only once
 

@@ -9,6 +9,9 @@ pub use sqlx::postgres::{PgConnectOptions, PgPoolOptions};
 
 use super::Postgres;
 
+/// PostgreSQL connection pool wrapper with setup helpers.
+///
+/// Uses [`DatabaseSetup`](crate::DatabaseSetup) implementations to prepare schema on startup.
 #[derive(Debug)]
 pub struct Database {
     connection_pool: sqlx::Pool<Db>,

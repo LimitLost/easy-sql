@@ -1,9 +1,13 @@
 use anyhow::Context;
 use easy_macros::always_context;
 
-use crate::{Driver, DriverArguments};
+use crate::traits::{Driver, DriverArguments};
 
 #[always_context]
+/// Insert payload mapping for a table.
+///
+/// Prefer implementing this trait via the [`Insert`](crate::Insert) derive macro; manual
+/// implementations may need updates across releases.
 pub trait Insert<'a, Table, D: Driver> {
     fn insert_columns() -> Vec<String>;
 

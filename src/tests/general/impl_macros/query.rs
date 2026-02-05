@@ -3,7 +3,9 @@
 use anyhow::Context;
 use easy_macros::always_context;
 
-use crate::{Connection, Driver, DriverArguments, Insert, Output, Table, macro_support::never_any};
+use crate::{
+    Connection, Driver, Insert, Output, Table, macro_support::never_any, traits::DriverArguments,
+};
 
 use crate::macro_support;
 
@@ -41,7 +43,7 @@ async fn _test_select() -> anyhow::Result<ExampleOutput> {
         // Security checks are added in the macro
         // Imports
         use anyhow::Context;
-        use {crate::ToConvert, sqlx::Arguments};
+        use {crate::traits::ToConvert, sqlx::Arguments};
 
         let mut args = macro_support::args_for_driver(&&mut fake_conn);
         let mut query = "SELECT ".to_string();
@@ -68,8 +70,8 @@ async fn _test_select() -> anyhow::Result<ExampleOutput> {
         let built_query = builder.build();
 
         async fn execute<'a, T, O: Output<T, D>, D: Driver>(
-            exec: &mut impl crate::EasyExecutor<D>,
-            query: sqlx::query::Query<'a, crate::InternalDriver<D>, DriverArguments<'a, D>>,
+            exec: &mut impl crate::traits::EasyExecutor<D>,
+            query: sqlx::query::Query<'a, crate::traits::InternalDriver<D>, DriverArguments<'a, D>>,
         ) -> anyhow::Result<O> {
             let raw_data = O::DataToConvert::get(exec.executor(), query).await?;
 
@@ -114,7 +116,7 @@ async fn _test_insert() -> anyhow::Result<()> {
             async fn __easy_sql_perform<'a, T: Insert<'a, ExampleTable, TestDriver>>(
                 exec: &mut impl crate::EasyExecutor<TestDriver>,
                 to_insert: T,
-            ) -> anyhow::Result<crate::DriverQueryResult<TestDriver>> {
+            ) -> anyhow::Result<crate::traits::DriverQueryResult<TestDriver>> {
                 let mut args = DriverArguments::<TestDriver>::default();
                 let mut query = "INSERT INTO ".to_string();
                 let mut current_arg_n = 0;
@@ -221,10 +223,10 @@ async fn _test_update() -> anyhow::Result<()> {
             .map_err(anyhow::Error::from_boxed)?;
 
         async fn execute<'a>(
-            exec: impl sqlx::Executor<'a, Database = crate::InternalDriver<TestDriver>>,
+            exec: impl sqlx::Executor<'a, Database = crate::traits::InternalDriver<TestDriver>>,
             query: String,
             args: DriverArguments<'a, TestDriver>,
-        ) -> Result<crate::DriverQueryResult<TestDriver>, sqlx::Error> {
+        ) -> Result<crate::traits::DriverQueryResult<TestDriver>, sqlx::Error> {
             let mut builder = sqlx::QueryBuilder::with_arguments(query, args);
 
             let built_query = builder.build();
@@ -274,7 +276,7 @@ async fn _test_delete() -> anyhow::Result<()> {
                 exec: &mut impl crate::EasyExecutor<TestDriver>,
                 query: String,
                 args: DriverArguments<'a, TestDriver>,
-            ) -> Result<crate::DriverQueryResult<TestDriver>, sqlx::Error> {
+            ) -> Result<crate::traits::DriverQueryResult<TestDriver>, sqlx::Error> {
                 let mut builder = sqlx::QueryBuilder::with_arguments(query, args);
 
                 let built_query = builder.build();

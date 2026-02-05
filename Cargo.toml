@@ -8,14 +8,15 @@ license = "Apache-2.0"
 
 sqlx = {version = "0.8"}
 
-pg_escape = {version = "0.1.1", optional = true}
+docify = "0.4.1"
 
+pg_escape = {version = "0.1.1", optional = true}
 uuid = {version = "*", features = ["serde"], optional = true}
 # Add serde impl to bigdecimal
 bigdecimal = {version = "*", features = ["serde-json"], optional = true}
 # Add serde impl to decimal
 rust_decimal = {version = "1.37.1", features = ["serde-str"], optional = true}
-easy-macros = {version="1.0.2", features = ["always-context"]}
+easy-macros = {version = "1.1.1", features = ["always-context"]}
 chrono = {version = "*", features = ["serde"], optional = true}
 
 
@@ -43,8 +44,10 @@ sqlx = {version = "0.8", features = [
   "runtime-tokio",
 ]}
 
+easy-macros = {version = "1.1.1", features = ["add-code"]}
+
 [build-dependencies]
-easy-macros = {version="1.0.2", features = ["build"]}
+easy-macros = {version = "1.1.1", features = ["build"]}
 regex = "*"
 sql-build = {path = "./sql-build", features = ["migrations"]}
 

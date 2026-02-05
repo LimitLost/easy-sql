@@ -341,7 +341,7 @@ Tip: Use `#[sql(table_name = ...)]` or rename one of the structs",
                 field_types.push(quote! {
                     {
                         #macro_support::TypeInfo::name(
-                            &<Vec<u8> as #macro_support::Type<#sql_crate::InternalDriver<#driver>>>::type_info(),
+                            &<Vec<u8> as #macro_support::Type<#macro_support::InternalDriver<#driver>>>::type_info(),
                         )
                         .to_owned()
                     }
@@ -351,7 +351,7 @@ Tip: Use `#[sql(table_name = ...)]` or rename one of the structs",
                 field_types.push(quote! {
                     {
                         #macro_support::TypeInfo::name(
-                            &<#field_type as #macro_support::Type<#sql_crate::InternalDriver<#driver>>>::type_info(),
+                            &<#field_type as #macro_support::Type<#macro_support::InternalDriver<#driver>>>::type_info(),
                         )
                         .to_owned()
                     }
@@ -422,7 +422,7 @@ Tip: Use `#[sql(table_name = ...)]` or rename one of the structs",
         let primary_key_check = if primary_keys.is_empty() {
             quote! {
                 let _ = || {
-                    fn __easy_sql_assert<T: #sql_crate::AllowsNoPrimaryKey>() {}
+                    fn __easy_sql_assert<T: #sql_crate::markers::AllowsNoPrimaryKey>() {}
                     __easy_sql_assert::<#driver>();
                 };
             }
@@ -435,7 +435,7 @@ Tip: Use `#[sql(table_name = ...)]` or rename one of the structs",
         {
             quote! {
                 let _ = || {
-                    fn __easy_sql_assert<T: #sql_crate::SupportsAutoIncrementCompositePrimaryKey>() {}
+                    fn __easy_sql_assert<T: #sql_crate::markers::SupportsAutoIncrementCompositePrimaryKey>() {}
                     __easy_sql_assert::<#driver>();
                 };
             }
@@ -448,7 +448,7 @@ Tip: Use `#[sql(table_name = ...)]` or rename one of the structs",
         {
             quote! {
                 let _ = || {
-                    fn __easy_sql_assert<T: #sql_crate::SupportsMultipleAutoIncrementColumns>() {}
+                    fn __easy_sql_assert<T: #sql_crate::markers::SupportsMultipleAutoIncrementColumns>() {}
                     __easy_sql_assert::<#driver>();
                 };
             }
@@ -544,9 +544,9 @@ Tip: Use `#[sql(table_name = ...)]` or rename one of the structs",
     }
 
     result_builder.add(quote! {
-        impl #sql_crate::HasTable<#item_name> for #item_name{}
+        impl #sql_crate::markers::HasTable<#item_name> for #item_name{}
 
-        impl #sql_crate::NotJoinedTable for #item_name {}
+        impl #sql_crate::markers::NotJoinedTable for #item_name {}
 
         impl<EasySqlD:#sql_crate::Driver> #sql_crate::Table<EasySqlD> for #item_name {
 

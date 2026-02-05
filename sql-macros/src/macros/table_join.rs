@@ -77,10 +77,19 @@ impl Parse for Join {
 impl Parse for Input {
     fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
         let mut drivers = None;
-        if input.peek(syn::token::Bracket) {
-            let content;
-            syn::bracketed!(content in input);
-            drivers = Some(content.parse_terminated(syn::Path::parse, syn::Token![,])?);
+        if input.peek(syn::Token![<]) {
+            input.parse::<syn::Token![<]>()?;
+            let mut parsed_drivers = Punctuated::new();
+            while !input.peek(syn::Token![>]) {
+                parsed_drivers.push_value(input.parse::<syn::Path>()?);
+                if input.peek(syn::Token![,]) {
+                    parsed_drivers.push_punct(input.parse::<syn::Token![,]>()?);
+                } else {
+                    break;
+                }
+            }
+            input.parse::<syn::Token![>]>()?;
+            drivers = Some(parsed_drivers);
         }
 
         let struct_name = input.parse::<syn::Ident>()?;
@@ -187,7 +196,7 @@ pub fn table_join(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::T
         .iter()
         .map(|table| {
             quote! {
-                impl #sql_crate::HasTableJoined<#table> for #item_name{
+                impl #sql_crate::markers::HasTableJoined<#table> for #item_name{
                     type MaybeOption<Y> = Y;
 
                     fn into_maybe_option<Y>(t: Y) -> Self::MaybeOption<Y>{
@@ -198,7 +207,7 @@ pub fn table_join(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::T
         })
         .chain(optional_joined_tables.iter().map(|table| {
             quote! {
-                impl #sql_crate::HasTableJoined<#table> for #item_name{
+                impl #sql_crate::markers::HasTableJoined<#table> for #item_name{
                     type MaybeOption<Y> = Option<Y>;
 
                     fn into_maybe_option<Y>(t: Y) -> Self::MaybeOption<Y>{
@@ -336,9 +345,9 @@ pub fn table_join(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::T
             }
         }
 
-        impl #sql_crate::HasTable<#main_table_struct> for #item_name{}
+        impl #sql_crate::markers::HasTable<#main_table_struct> for #item_name{}
 
-        #(impl #sql_crate::HasTable<#has_table_impls> for #item_name{})*
+        #(impl #sql_crate::markers::HasTable<#has_table_impls> for #item_name{})*
 
 
     });

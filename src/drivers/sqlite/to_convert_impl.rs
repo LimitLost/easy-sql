@@ -5,7 +5,10 @@ use sqlx::Executor;
 /// Current Driver
 type CDriver = super::Sqlite;
 
-use crate::{DriverArguments, InternalDriver, Output, ToConvert, ToConvertSingle};
+use crate::{
+    markers::ToConvertSingle,
+    traits::{DriverArguments, InternalDriver, Output, ToConvert},
+};
 
 type Row = sqlx::sqlite::SqliteRow;
 

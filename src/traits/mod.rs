@@ -10,15 +10,11 @@ pub use update::*;
 
 mod table;
 pub use table::*;
-mod has_table_traits;
-pub use has_table_traits::*;
 mod driver;
 pub use driver::*;
-
-mod select_type;
-pub use select_type::*;
 
 mod to_default;
 pub use to_default::*;
 
-//TODO when joining tables create trait "HasTable"
+mod easy_executor;
+pub use easy_executor::*;

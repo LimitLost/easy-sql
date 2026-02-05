@@ -7,7 +7,10 @@ use easy_macros::always_context;
 
 use sqlx::{Database, Executor};
 
-use crate::{Driver, DriverConnection, InternalDriver, SetupSql, easy_executor::EasyExecutor};
+use crate::{
+    Driver, EasyExecutor,
+    traits::{DriverConnection, InternalDriver, SetupSql},
+};
 
 #[derive(Debug)]
 pub struct Connection<D: Driver> {

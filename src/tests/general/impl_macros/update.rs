@@ -1,6 +1,6 @@
 use easy_macros::always_context;
 
-use crate::{Driver, InternalDriver, Update};
+use crate::{Driver, Update, traits::InternalDriver};
 
 use super::TestDriver;
 #[allow(dead_code)]
@@ -31,13 +31,13 @@ where
 {
     fn updates(
         self,
-        mut args_list: crate::DriverArguments<'a, D>,
+        mut args_list: crate::traits::DriverArguments<'a, D>,
         current_query: &mut String,
         parameter_n: &mut usize,
-    ) -> anyhow::Result<crate::DriverArguments<'a, D>> {
+    ) -> anyhow::Result<crate::traits::DriverArguments<'a, D>> {
         use sqlx::Arguments;
 
-        let _ = |mut args_list: crate::DriverArguments<'a, TestDriver>| {
+        let _ = |mut args_list: crate::traits::DriverArguments<'a, TestDriver>| {
             let _self = crate::macro_support::never_any::<Self>();
 
             args_list
@@ -89,10 +89,10 @@ struct ExampleStruct2 {
 impl<'a> Update<'a, ExampleTableStruct, TestDriver> for ExampleStruct2 {
     fn updates(
         self,
-        mut args_list: crate::DriverArguments<'a, TestDriver>,
+        mut args_list: crate::traits::DriverArguments<'a, TestDriver>,
         current_query: &mut String,
         parameter_n: &mut usize,
-    ) -> anyhow::Result<crate::DriverArguments<'a, TestDriver>> {
+    ) -> anyhow::Result<crate::traits::DriverArguments<'a, TestDriver>> {
         use sqlx::Arguments;
         let mut first = true;
 

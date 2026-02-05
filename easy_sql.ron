@@ -1,5 +1,45 @@
 CompilationData(
     tables: {
+        "43af18d0-f056-4b18-9958-3fadb41e4334": TableData(
+            saved_versions: {
+                2: TableDataVersion(
+                    table_name: "doc_comments",
+                    fields: [
+                        TableField(
+                            name: "id",
+                            ty_to_bytes: false,
+                            field_type: "i32",
+                            default: None,
+                            is_unique: false,
+                        ),
+                        TableField(
+                            name: "post_id",
+                            ty_to_bytes: false,
+                            field_type: "i32",
+                            default: None,
+                            is_unique: false,
+                        ),
+                        TableField(
+                            name: "body",
+                            ty_to_bytes: false,
+                            field_type: "String",
+                            default: None,
+                            is_unique: false,
+                        ),
+                    ],
+                    primary_keys: [
+                        "id",
+                    ],
+                    auto_increment: true,
+                    foreign_keys: {
+                        "PostTable,cascade": [
+                            "post_id",
+                        ],
+                    },
+                ),
+            },
+            latest_version: 2,
+        ),
         "9e0ab3c7-2e5d-4f13-b6d8-7c8ea17a3cf2": TableData(
             saved_versions: {
                 1: TableDataVersion(
