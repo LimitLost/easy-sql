@@ -248,6 +248,23 @@ impl ProvidedDrivers {
         }
     }
 
+    pub fn type_info(&self, sql_crate: &TokenStream, field_type: &syn::Type) -> TokenStream {
+        match self {
+            ProvidedDrivers::Single(driver) | ProvidedDrivers::SingleWithChecks { driver, .. } => {
+                quote_spanned! {field_type.span()=>
+                    <#field_type as #sql_crate::macro_support::Type<
+                        #sql_crate::macro_support::InternalDriver<#driver>
+                    >>::type_info()
+                }
+            }
+            ProvidedDrivers::MultipleWithConn { drivers: _, conn } => {
+                quote_spanned! {field_type.span()=>
+                    #sql_crate::macro_support::driver_type_info::<#field_type, _>(& (#conn))
+                }
+            }
+        }
+    }
+
     pub fn table_name<T: ToTokens + Spanned>(
         &self,
         sql_crate: &TokenStream,

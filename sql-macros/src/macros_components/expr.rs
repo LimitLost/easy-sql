@@ -1,7 +1,7 @@
-use super::builtin_functions;
+use super::{CollectedData, builtin_functions};
 use crate::macros_components::keyword::DoubleArrow;
 
-use super::{column::Column, next_clause::next_clause_token,ProvidedDrivers};
+use super::{column::Column, next_clause::next_clause_token};
 
 use super::keyword;
 use ::{
@@ -9,6 +9,7 @@ use ::{
     syn::{self, parse::Parse, spanned::Spanned},
 };
 use easy_macros::always_context;
+use convert_case::{Case, Casing};
 use quote::{ToTokens, format_ident, quote, quote_spanned};
 use syn::ext::IdentExt;
 
@@ -183,82 +184,37 @@ impl Expr {
     ///`main_table_type` - None means we're inside of table join
     pub fn into_query_string(
         &self,
-        binds: &mut Vec<proc_macro2::TokenStream>,
-        checks: &mut Vec<proc_macro2::TokenStream>,
-        sql_crate: &proc_macro2::TokenStream,
-        driver: &ProvidedDrivers,
-        current_param_n: &mut usize,
-        current_format_params: &mut Vec<proc_macro2::TokenStream>,
-        before_param_n: &mut proc_macro2::TokenStream,
-        before_format: &mut Vec<proc_macro2::TokenStream>,
+        data: &mut CollectedData,
         inside_count_fn: bool,
         for_custom_select: bool,
-        output_ty: Option<&proc_macro2::TokenStream>,
-        main_table_type: Option<&proc_macro2::TokenStream>,
     ) -> String {
         match self {
             Expr::Value(val) => val.into_query_string(
-                binds,
-                checks,
-                sql_crate,
-                driver,
-                current_param_n,
-                current_format_params,
-                before_param_n,
-                before_format,
+                data,
                 inside_count_fn,
                 for_custom_select,
-                output_ty,
-                main_table_type,
             ),
             Expr::IsNull(val) => {
                 let val_sql = val.into_query_string(
-                    binds,
-                    checks,
-                    sql_crate,
-                    driver,
-                    current_param_n,
-                    current_format_params,
-                    before_param_n,
-                    before_format,
+                    data,
                     false,
                     for_custom_select,
-                    output_ty,
-                    main_table_type,
                 );
                 format!("{} IS NULL", val_sql)
             }
             Expr::IsNotNull(val) => {
                 let val_sql = val.into_query_string(
-                    binds,
-                    checks,
-                    sql_crate,
-                    driver,
-                    current_param_n,
-                    current_format_params,
-                    before_param_n,
-                    before_format,
+                    data,
                     false,
                     for_custom_select,
-                    output_ty,
-                    main_table_type,
                 );
                 format!("{} IS NOT NULL", val_sql)
             }
             Expr::Parenthesized(inner) => {
                 let inner_sql = inner.into_query_string(
-                    binds,
-                    checks,
-                    sql_crate,
-                    driver,
-                    current_param_n,
-                    current_format_params,
-                    before_param_n,
-                    before_format,
+                    data,
                     inside_count_fn,
                     for_custom_select,
-                    output_ty,
-                    main_table_type,
                 );
                 format!("({})", inner_sql)
             }
@@ -267,18 +223,9 @@ impl Expr {
                     "{}{}",
                     not_chain.into_query_string(),
                     first.into_query_string(
-                        binds,
-                        checks,
-                        sql_crate,
-                        driver,
-                        current_param_n,
-                        current_format_params,
-                        before_param_n,
-                        before_format,
+                        data,
                         false,
                         for_custom_select,
-                        output_ty,
-                        main_table_type,
                     )
                 );
                 for (not_chain, op, expr) in rest {
@@ -307,18 +254,9 @@ impl Expr {
                     result.push_str(op_str);
                     result.push_str(&not_chain.into_query_string());
                     result.push_str(&expr.into_query_string(
-                        binds,
-                        checks,
-                        sql_crate,
-                        driver,
-                        current_param_n,
-                        current_format_params,
-                        before_param_n,
-                        before_format,
+                        data,
                         false,
                         for_custom_select,
-                        output_ty,
-                        main_table_type,
                     ));
                 }
 
@@ -326,36 +264,18 @@ impl Expr {
             }
             Expr::In(val, values) => {
                 let val_sql = val.into_query_string(
-                    binds,
-                    checks,
-                    sql_crate,
-                    driver,
-                    current_param_n,
-                    current_format_params,
-                    before_param_n,
-                    before_format,
+                    data,
                     false,
                     for_custom_select,
-                    output_ty,
-                    main_table_type,
                 );
                 match values {
                     ValueIn::Multiple(vals) => {
                         let mut in_items = Vec::new();
                         for v in vals.iter() {
                             in_items.push(v.into_query_string(
-                                binds,
-                                checks,
-                                sql_crate,
-                                driver,
-                                current_param_n,
-                                current_format_params,
-                                before_param_n,
-                                before_format,
+                                data,
                                 false,
                                 for_custom_select,
-                                output_ty,
-                                main_table_type,
                             ));
                         }
                         format!("{} IN ({})", val_sql, in_items.join(", "))
@@ -364,18 +284,9 @@ impl Expr {
                         // Single column reference - convert to Value and process
                         let col_value = Value::Column(col.clone());
                         let col_sql = col_value.into_query_string(
-                            binds,
-                            checks,
-                            sql_crate,
-                            driver,
-                            current_param_n,
-                            current_format_params,
-                            before_param_n,
-                            before_format,
+                            data,
                             false,
                             for_custom_select,
-                            output_ty,
-                            main_table_type,
                         );
                         format!("{} IN ({})", val_sql, col_sql)
                     }
@@ -386,30 +297,31 @@ impl Expr {
                             v.to_token_stream().to_string()
                         );
 
-                        let param_start = *current_param_n;
+                        let param_start = *data.current_param_n;
 
                         // Create a runtime binding and placeholder generation for the collection
-                        binds.push(quote::quote_spanned! {v.span()=>
+                        data.binds.push(quote::quote_spanned! {v.span()=>
                             #[allow(unused_parens)]
                             for __easy_sql_in_item in (#v) {
                                 _easy_sql_args.add(__easy_sql_in_item).map_err(anyhow::Error::from_boxed).context(#debug_str)?;
                             }
                         });
 
-                        let format_param_n = current_format_params.len();
+                        let format_param_n = data.format_params.len();
 
                         let before_param_n_name =
                             format_ident!("__easy_sql_before_param_n_{}", format_param_n);
+                        let before_param_n = &mut data.before_param_n;
 
-                        before_format.push(quote! {
+                        data.before_format.push(quote! {
                             let #before_param_n_name:usize;
                         });
 
                         let parameter_placeholder_call =
-                            driver.parameter_placeholder_fn(sql_crate, v.span());
+                            data.driver.parameter_placeholder_fn(data.sql_crate, v.span());
 
                         // Create format parameter that generates placeholders at runtime
-                        current_format_params.push(quote::quote_spanned! {v.span()=>
+                        data.format_params.push(quote::quote_spanned! {v.span()=>
                             
                             {
                                 #[allow(clippy::needless_borrow)]
@@ -426,7 +338,8 @@ impl Expr {
                             }
                         });
 
-                        *before_param_n = quote! {#before_param_n_name + #before_param_n};
+
+                        **before_param_n = quote! {#before_param_n_name + #before_param_n};
 
                         format!("{} IN ({{}})", val_sql)
                     }
@@ -434,46 +347,19 @@ impl Expr {
             }
             Expr::Between(val, min, max) => {
                 let val_sql = val.into_query_string(
-                    binds,
-                    checks,
-                    sql_crate,
-                    driver,
-                    current_param_n,
-                    current_format_params,
-                    before_param_n,
-                    before_format,
+                    data,
                     false,
                     for_custom_select,
-                    output_ty,
-                    main_table_type,
                 );
                 let min_sql = min.into_query_string(
-                    binds,
-                    checks,
-                    sql_crate,
-                    driver,
-                    current_param_n,
-                    current_format_params,
-                    before_param_n,
-                    before_format,
+                    data,
                     false,
                     for_custom_select,
-                    output_ty,
-                    main_table_type,
                 );
                 let max_sql = max.into_query_string(
-                    binds,
-                    checks,
-                    sql_crate,
-                    driver,
-                    current_param_n,
-                    current_format_params,
-                    before_param_n,
-                    before_format,
+                    data,
                     false,
                     for_custom_select,
-                    output_ty,
-                    main_table_type,
                 );
                 format!("({} BETWEEN {} AND {})", val_sql, min_sql, max_sql)
             }
@@ -517,7 +403,11 @@ pub enum Value {
     Column(Column),
     Lit(syn::Lit),
     OutsideVariable(syn::Expr),
-    FunctionCall { name: syn::Ident, args: Vec<Expr> },
+    Cast {
+        expr: Box<Expr>,
+        ty: syn::Type,
+    },
+    FunctionCall { name: syn::Ident, args: Option<Vec<Expr>> },
     Star(syn::Token![*]), // Special case for COUNT(*) and similar
 }
 
@@ -544,21 +434,13 @@ impl Value {
     ///`main_table_type` - None means we're inside of table join
     fn into_query_string(
         &self,
-        binds: &mut Vec<proc_macro2::TokenStream>,
-        checks: &mut Vec<proc_macro2::TokenStream>,
-        sql_crate: &proc_macro2::TokenStream,
-        driver: &ProvidedDrivers,
-        current_param_n: &mut usize,
-        current_format_params: &mut Vec<proc_macro2::TokenStream>,
-        before_param_n: &mut proc_macro2::TokenStream,
-        before_format: &mut Vec<proc_macro2::TokenStream>,
+        data: &mut CollectedData,
         inside_count: bool,
         for_custom_select: bool,
-        output_ty: Option<&proc_macro2::TokenStream>,
-        main_table_type: Option<&proc_macro2::TokenStream>,
     ) -> String {
+        let sql_crate= data.sql_crate;
         match self {
-            Value::Column(col) => col.into_query_string(checks, sql_crate, driver, current_format_params, for_custom_select, output_ty, main_table_type),
+            Value::Column(col) => col.into_query_string(data, for_custom_select),
             Value::Lit(lit) => {
                 // In custom select mode, embed literals directly in the SQL string
                 if for_custom_select {
@@ -590,16 +472,16 @@ impl Value {
                     "Failed to bind `{}` to query parameter",
                     lit.to_token_stream().to_string()
                 );
-                binds.push(quote::quote_spanned! {lit.span()=>
+                data.binds.push(quote::quote_spanned! {lit.span()=>
                         _easy_sql_args.add(&#lit).map_err(anyhow::Error::from_boxed).context(#debug_str)?;
                     });
-                current_format_params.push(driver.parameter_placeholder(
+                data.format_params.push(data.driver.parameter_placeholder(
                     sql_crate,
                     lit.span(),
-                    before_param_n,
-                    &*current_param_n,
+                    &data.before_param_n,
+                    &*data.current_param_n,
                 ));
-                *current_param_n += 1;
+                *data.current_param_n += 1;
                 "{}".to_string()
             }
             Value::OutsideVariable(expr_val) => {
@@ -612,7 +494,7 @@ impl Value {
                             if let Some(stripped) = ident_str.strip_prefix("arg") {
                                 if let Ok(_idx) = stripped.parse::<usize>() {
                                     // This is an {argN} placeholder - push the identifier as a variable reference
-                                    current_format_params.push(quote::quote! {
+                                    data.format_params.push(quote::quote! {
                                         #ident
                                     });
                                     return "{}".to_string();
@@ -620,7 +502,7 @@ impl Value {
                             }
                         }
                     }
-                    checks.push(quote::quote_spanned! {expr_val.span()=>
+                    data.checks.push(quote::quote_spanned! {expr_val.span()=>
                         {
                             compile_error!("Outside variables in custom select must be in the form {argN}, where N is the argument index. Then enter them in the query! like this: query!(SELECT CurrentType(input0, input1, ...) FROM ...)");
                         }
@@ -628,9 +510,9 @@ impl Value {
                     return "{}".to_string();
                 }
 
-                if main_table_type.is_none() {
+                if data.main_table_type.is_none() {
                     // Inside table join - outside variables are not allowed
-                    checks.push(quote::quote_spanned! {expr_val.span()=>
+                    data.checks.push(quote::quote_spanned! {expr_val.span()=>
                         {
                             compile_error!("Outside variables are not allowed inside of JOIN clauses. (yet)");
                         }
@@ -643,61 +525,98 @@ impl Value {
                     "Failed to bind `{}` to query parameter",
                     expr_val.to_token_stream().to_string()
                 );
-                binds.push(quote::quote_spanned! {expr_val.span()=>
+                data.binds.push(quote::quote_spanned! {expr_val.span()=>
                         _easy_sql_args.add(&#expr_val).map_err(anyhow::Error::from_boxed).context(#debug_str)?;
                     });
-                current_format_params.push(driver.parameter_placeholder(
+                data.format_params.push(data.driver.parameter_placeholder(
                     sql_crate,
                     expr_val.span(),
-                    before_param_n,
-                    &*current_param_n,
+                    &data.before_param_n,
+                    &*data.current_param_n,
                 ));
 
-                *current_param_n += 1;
+                *data.current_param_n += 1;
                 "{}".to_string()
+            }
+            Value::Cast { expr, ty } => {
+                for driver_ty in data.driver.iter_for_checks() {
+                        data.checks.push(quote_spanned! {ty.span()=>
+                                {
+                                    fn __easy_sql_assert_supports_fn<T: #sql_crate::markers::SupportsCast<1>>() {}
+                                    __easy_sql_assert_supports_fn::<#driver_ty>();
+                                }
+                            });
+                    }
+
+                let arg_sql = expr.into_query_string(
+                    data,
+                    inside_count,
+                    for_custom_select,
+                );
+                let type_info = data.driver.type_info(sql_crate, ty);
+                data.types_driver_support_needed.push(ty.to_token_stream());
+                data.format_params.push(quote_spanned! {ty.span()=>
+                    #type_info
+                });
+                format!("CAST({} AS {{}})", arg_sql)
             }
             Value::FunctionCall { name, args } => {
                 let func_name_str = name.to_string();
                 let builtin_fn_data = builtin_functions::get_builtin_fn(&func_name_str);
+                let arg_count = args.as_ref().map(|args| args.len() as isize).unwrap_or(-1);
                 let (func_name, is_count) = if builtin_fn_data.is_some() {
                     let func_name = func_name_str.to_uppercase();
-                    (func_name.clone(), func_name == "COUNT")
+                    let trait_name = format!("Supports{}", func_name.to_case(Case::Pascal));
+                    let trait_ident = format_ident!("{}", trait_name);
+                    let trait_path = quote! {#sql_crate::markers::#trait_ident};
+
+                    for driver_ty in data.driver.iter_for_checks() {
+                        data.checks.push(quote_spanned! {name.span()=>
+                                {
+                                    fn __easy_sql_assert_supports_fn<T: #trait_path<#arg_count>>() {}
+                                    __easy_sql_assert_supports_fn::<#driver_ty>();
+                                }
+                            });
+                    }
+
+                    (
+                        func_name.clone(),
+                        func_name == "COUNT",
+                    )
                 } else {
                     let macro_name = func_name_str.to_lowercase();
                     let macro_ident = proc_macro2::Ident::new_raw(&macro_name, name.span());
-                    let dummy_args = (0..args.len())
+                    let dummy_args = (0..arg_count)
                         .map(|_| quote_spanned! {name.span()=> ()})
                         .collect::<Vec<_>>();
-                    current_format_params.push(quote_spanned! {name.span()=>
+                    let macro_call = quote_spanned! {name.span()=>
                         #macro_ident!(#(#dummy_args),*)
-                    });
+                    };
+                    data.format_params.push(macro_call);
                     ("{}".to_string(), false)
                 };
+                
                 let mut arg_strings = Vec::new();
+                
 
-                for arg in args {
+                if let Some(args)=args{
+                    for arg in args {
                     let arg_sql = arg.into_query_string(
-                        binds,
-                        checks,
-                        sql_crate,
-                        driver,
-                        current_param_n,
-                        current_format_params,
-                        before_param_n,
-                        before_format,
+                        data,
                         is_count,
                         for_custom_select,
-                        output_ty,
-                        main_table_type,
                     );
                     arg_strings.push(arg_sql);
                 }
-
                 format!("{}({})", func_name, arg_strings.join(", "))
+                }else{
+                    return func_name;
+                }
+
             }
             Value::Star(s) => {
                 if !inside_count {
-                    checks.push(quote_spanned! {s.span()=>
+                    data.checks.push(quote_spanned! {s.span()=>
                         {
                             compile_error!("Star (*) is only valid inside function calls like COUNT(*).");
                         }
@@ -726,9 +645,14 @@ impl Value {
                 }
             }
             Value::FunctionCall { args, .. } => {
-                for e in args {
-                    e.collect_indices_impl(indices);
+                if let Some(args) = args {
+                    for e in args {
+                        e.collect_indices_impl(indices);
+                    }
                 }
+            }
+            Value::Cast { expr, .. } => {
+                expr.collect_indices_impl(indices);
             }
             _ => {}
         }
@@ -744,7 +668,22 @@ pub enum ValueIn {
 #[always_context]
 impl Parse for Value {
     fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
-        // First, check if this is a function call (which may include Rust keywords)
+        // First, check for zero-arg builtin functions without parentheses (aka SQL Value)
+        if input.peek(syn::Ident::peek_any) && !input.peek2(syn::token::Paren) {
+            let lookahead = input.fork();
+            let ident = lookahead.call(syn::Ident::parse_any)?;
+            if let Some(builtin_fn_data) = builtin_functions::get_builtin_fn(&ident.to_string())
+                && builtin_fn_data.maybe_value
+            {
+                let ident = input.call(syn::Ident::parse_any)?;
+                return Ok(Value::FunctionCall {
+                    name: ident,
+                    args: None,
+                });
+            }
+        }
+
+        // Next, check if this is a function call (which may include Rust keywords)
         if let Some(func_name) = Value::function_call_start(&input)? {
             // Parse the arguments
             let inside_paren;
@@ -754,6 +693,22 @@ impl Parse for Value {
 
             let func_name_str = func_name.to_string();
             let builtin_fn_data = builtin_functions::get_builtin_fn(&func_name_str);
+
+            if func_name_str.eq_ignore_ascii_case("cast") {
+                let expr = sub_where_expr(&inside_paren)?;
+                if inside_paren.is_empty() {
+                    return Err(inside_paren.error("CAST expects syntax: CAST(expr AS Type)"));
+                }
+                inside_paren.parse::<keyword::as_kw>()?;
+                let ty: syn::Type = inside_paren.parse()?;
+                if !inside_paren.is_empty() {
+                    return Err(inside_paren.error("CAST expects syntax: CAST(expr AS Type)"));
+                }
+                return Ok(Value::Cast {
+                    expr: Box::new(expr),
+                    ty,
+                });
+            }
 
             if !inside_paren.is_empty() {
                 let lookahead_star = inside_paren.lookahead1();
@@ -801,42 +756,9 @@ impl Parse for Value {
                 }
             }
 
-            // Validate built-in functions
-            if let Some(builtin_fn_data) = builtin_fn_data {
-                let arg_count = args.len();
-
-                // Check minimum arguments
-                if arg_count < builtin_fn_data.min_args {
-                    return Err(syn::Error::new(
-                        func_name.span(),
-                        format!(
-                            "Function {} requires at least {} argument(s), but {} provided",
-                            func_name_str.to_uppercase(),
-                            builtin_fn_data.min_args,
-                            arg_count
-                        ),
-                    ));
-                }
-
-                // Check maximum arguments (if specified)
-                if let Some(max) = builtin_fn_data.max_args {
-                    if arg_count > max {
-                        return Err(syn::Error::new(
-                            func_name.span(),
-                            format!(
-                                "Function {} accepts at most {} argument(s), but {} provided",
-                                func_name_str.to_uppercase(),
-                                max,
-                                arg_count
-                            ),
-                        ));
-                    }
-                }
-            }
-
             Ok(Value::FunctionCall {
                 name: func_name,
-                args,
+                args:Some(args),
             })
         } else {
             let lookahead = input.lookahead1();

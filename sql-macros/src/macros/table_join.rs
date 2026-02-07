@@ -8,7 +8,7 @@ use syn::Path;
 use syn::punctuated::Punctuated;
 use syn::{self, parse::Parse};
 
-use crate::macros_components::{Expr, ProvidedDrivers};
+use crate::macros_components::{CollectedData, Expr, ProvidedDrivers};
 use crate::sql_crate;
 
 use crate::macros_components::keyword;
@@ -234,14 +234,32 @@ pub fn table_join(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::T
     });
 
     let mut current_param_n = 0;
-    let mut current_format_params = Vec::new();
+    let mut format_params = Vec::new();
     let mut before_param_n = quote! {};
     let mut before_format = Vec::new();
+    // Not used but required by CollectedData
+    let mut types_driver_support_needed = Vec::new();
+    let mut format_str = String::new();
 
     let driver = ProvidedDrivers::SingleWithChecks {
         driver: quote! { D },
         checks: supported_drivers,
     };
+
+    let mut data = CollectedData::new(
+        &mut format_str,
+        &mut format_params,
+        &mut binds,
+        &mut checks,
+        &sql_crate,
+        &driver,
+        &mut current_param_n,
+        &mut before_param_n,
+        &mut before_format,
+        None,
+        None,
+        &mut types_driver_support_needed,
+    );
 
     let table_joins = input
         .joins
@@ -249,64 +267,29 @@ pub fn table_join(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::T
         .map(|join| {
             let format_str = match join {
                 Join::Inner { table, on } => {
-                    current_format_params.push(driver.table_name(&sql_crate, table));
-                    let on = on.clone().into_query_string(
-                        &mut binds,
-                        &mut checks,
-                        &sql_crate,
-                        &driver,
-                        &mut current_param_n,
-                        &mut current_format_params,
-                        &mut before_param_n,
-                        &mut before_format,
-                        false,
-                        false,
-                        None,
-                        None,
-                    );
+                    data.format_params
+                        .push(driver.table_name(&sql_crate, table));
+                    let on = on.clone().into_query_string(&mut data, false, false);
 
                     format!(" INNER JOIN {{}} ON {}", on)
                 }
                 Join::Left { table, on } => {
-                    current_format_params.push(driver.table_name(&sql_crate, table));
-                    let on = on.clone().into_query_string(
-                        &mut binds,
-                        &mut checks,
-                        &sql_crate,
-                        &driver,
-                        &mut current_param_n,
-                        &mut current_format_params,
-                        &mut before_param_n,
-                        &mut before_format,
-                        false,
-                        false,
-                        None,
-                        None,
-                    );
+                    data.format_params
+                        .push(driver.table_name(&sql_crate, table));
+                    let on = on.clone().into_query_string(&mut data, false, false);
 
                     format!(" LEFT JOIN {{}} ON {}", on)
                 }
                 Join::Right { table, on } => {
-                    current_format_params.push(driver.table_name(&sql_crate, table));
-                    let on = on.clone().into_query_string(
-                        &mut binds,
-                        &mut checks,
-                        &sql_crate,
-                        &driver,
-                        &mut current_param_n,
-                        &mut current_format_params,
-                        &mut before_param_n,
-                        &mut before_format,
-                        false,
-                        false,
-                        None,
-                        None,
-                    );
+                    data.format_params
+                        .push(driver.table_name(&sql_crate, table));
+                    let on = on.clone().into_query_string(&mut data, false, false);
 
                     format!(" RIGHT JOIN {{}} ON {}", on)
                 }
                 Join::Cross { table } => {
-                    current_format_params.push(driver.table_name(&sql_crate, table));
+                    data.format_params
+                        .push(driver.table_name(&sql_crate, table));
                     format!(" CROSS JOIN {{}}")
                 }
             };
@@ -339,7 +322,7 @@ pub fn table_join(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::T
                 // Define the identifier delimiter for the current driver
                 let _easy_sql_d = <D as #sql_crate::Driver>::identifier_delimiter();
 
-                let result = format!(#table_joins_str, #(#current_format_params),*);
+                let result = format!(#table_joins_str, #(#format_params),*);
 
                 current_query.push_str(&result);
             }

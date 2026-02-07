@@ -17,6 +17,7 @@ mod create_table;
 mod table_exists;
 
 use crate::{Driver, EasyExecutor, TableField, markers::AllowsNoPrimaryKey};
+use sql_macros::{impl_supports_fn, impl_supports_fn_any};
 
 /// Marker type for the SQLite driver.
 ///
@@ -73,6 +74,51 @@ impl Driver for Sqlite {
 #[always_context]
 impl AllowsNoPrimaryKey for Sqlite {}
 
+impl_supports_fn!(Sqlite, SupportsCount, 0, 1);
+impl_supports_fn!(Sqlite, SupportsSum, 1);
+impl_supports_fn!(Sqlite, SupportsAvg, 1);
+impl_supports_fn!(Sqlite, SupportsMin, 1);
+impl_supports_fn!(Sqlite, SupportsMax, 1);
+
+impl_supports_fn_any!(Sqlite, SupportsConcat);
+impl_supports_fn!(Sqlite, SupportsUpper, 1);
+impl_supports_fn!(Sqlite, SupportsLower, 1);
+impl_supports_fn!(Sqlite, SupportsLength, 1);
+impl_supports_fn!(Sqlite, SupportsTrim, 1);
+impl_supports_fn!(Sqlite, SupportsSubstring, 2, 3);
+impl_supports_fn!(Sqlite, SupportsSubstr, 2, 3);
+
+impl_supports_fn_any!(Sqlite, SupportsCoalesce);
+impl_supports_fn!(Sqlite, SupportsNullif, 2);
+impl_supports_fn!(Sqlite, SupportsIfnull, 2);
+
+impl_supports_fn!(Sqlite, SupportsDate, 1);
+impl_supports_fn!(Sqlite, SupportsTime, 1);
+impl_supports_fn!(Sqlite, SupportsDatetime, 1);
+impl_supports_fn!(Sqlite, SupportsCurrentTimestamp, -1);
+impl_supports_fn!(Sqlite, SupportsCurrentDate, -1);
+impl_supports_fn!(Sqlite, SupportsCurrentTime, -1);
+
+impl_supports_fn!(Sqlite, SupportsAbs, 1);
+impl_supports_fn!(Sqlite, SupportsRound, 1, 2);
+#[cfg(feature = "sqlite_math")]
+impl_supports_fn!(Sqlite, SupportsMod, 2);
+
+#[cfg(feature = "sqlite_math")]
+impl_supports_fn!(Sqlite, SupportsCeil, 1);
+#[cfg(feature = "sqlite_math")]
+impl_supports_fn!(Sqlite, SupportsCeiling, 1);
+#[cfg(feature = "sqlite_math")]
+impl_supports_fn!(Sqlite, SupportsFloor, 1);
+#[cfg(feature = "sqlite_math")]
+impl_supports_fn!(Sqlite, SupportsPower, 2);
+#[cfg(feature = "sqlite_math")]
+impl_supports_fn!(Sqlite, SupportsPow, 2);
+#[cfg(feature = "sqlite_math")]
+impl_supports_fn!(Sqlite, SupportsSqrt, 1);
+
+impl_supports_fn!(Sqlite, SupportsCast, 1, 2);
+impl_supports_fn!(Sqlite, SupportsDistinct, 1);
 #[always_context]
 fn table_field_definition(field: TableField) -> String {
     let TableField {

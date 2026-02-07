@@ -24,3 +24,6 @@ mod provided_drivers;
 pub use provided_drivers::*;
 
 mod builtin_functions;
+
+mod collected_data;
+pub use collected_data::*;

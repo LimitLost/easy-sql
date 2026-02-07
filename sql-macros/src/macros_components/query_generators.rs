@@ -3,9 +3,9 @@ use proc_macro2::{Span, TokenStream};
 use quote::{ToTokens, format_ident, quote};
 
 use super::{
-    DeleteQuery, ExistsQuery, InsertQuery, ProvidedDrivers, ReturningData, SelectQuery,
-    UpdateQuery, group_by_clause, having_clause, limit_clause, order_by_clause, set_clause,
-    where_clause,
+    CollectedData, DeleteQuery, ExistsQuery, InsertQuery, ProvidedDrivers, ReturningData,
+    SelectQuery, UpdateQuery, group_by_clause, having_clause, limit_clause, order_by_clause,
+    set_clause, where_clause,
 };
 
 struct ReturningArgData {
@@ -14,24 +14,17 @@ struct ReturningArgData {
 }
 
 impl ReturningData {
-    fn build_arg_data(
-        &self,
-        sql_crate: &TokenStream,
-        driver: &ProvidedDrivers,
-        table_type: &syn::Type,
-        binds: &mut Vec<TokenStream>,
-        checks: &mut Vec<TokenStream>,
-        param_counter: &mut usize,
-        before_param_n: &mut TokenStream,
-        before_format: &mut Vec<TokenStream>,
-    ) -> ReturningArgData {
+    fn build_arg_data(&self, data: &mut CollectedData) -> ReturningArgData {
         let mut arg_defs = Vec::new();
         let mut arg_tokens = Vec::new();
 
         let output_type_ts = self.output_type.to_token_stream();
 
+        let sql_crate = data.sql_crate;
+        let table_type = data.main_table_type;
+
         if let Some(output_args) = &self.output_args {
-            checks.push(quote! {
+            data.checks.push(quote! {
                 let _ = || {
                     fn __easy_sql_assert_with_args<T: #sql_crate::markers::WithArgsSelect>() {}
                     __easy_sql_assert_with_args::<<#output_type_ts as #sql_crate::macro_support::OutputData<#table_type>>::SelectProvider>();
@@ -40,20 +33,8 @@ impl ReturningData {
 
             for (idx, arg) in output_args.iter().enumerate() {
                 let mut arg_format_params = Vec::new();
-                let arg_sql_template = arg.into_query_string(
-                    binds,
-                    checks,
-                    sql_crate,
-                    driver,
-                    param_counter,
-                    &mut arg_format_params,
-                    before_param_n,
-                    before_format,
-                    false,
-                    false,
-                    Some(&output_type_ts),
-                    Some(&table_type.to_token_stream()),
-                );
+                let mut data = data.with_format_params(&mut arg_format_params);
+                let arg_sql_template = arg.into_query_string(&mut data, false, false);
                 let arg_ident = format_ident!("__easy_sql_returning_arg_{}", idx);
                 let arg_def = if arg_format_params.is_empty() {
                     quote! {
@@ -68,7 +49,7 @@ impl ReturningData {
                 arg_tokens.push(quote! { #arg_ident.as_str() });
             }
         } else {
-            checks.push(quote! {
+            data.checks.push(quote! {
                 let _ = || {
                     fn __easy_sql_assert_normal<T: #sql_crate::markers::NormalSelect>() {}
                     __easy_sql_assert_normal::<<#output_type_ts as #sql_crate::macro_support::OutputData<#table_type>>::SelectProvider>();
@@ -115,104 +96,52 @@ pub fn generate_select(
 
     let mut before_param_n = quote! {};
     let mut before_format = Vec::new();
+    let output_type_ts = output.output_type.to_token_stream();
+    let mut types_driver_support_needed = Vec::new();
 
-    let output_arg_data = output.build_arg_data(
-        sql_crate,
-        &driver,
-        &table_type,
+    let mut data = CollectedData::new(
+        &mut format_str,
+        &mut format_params,
         &mut binds,
         &mut checks,
+        sql_crate,
+        &driver,
         &mut param_counter,
         &mut before_param_n,
         &mut before_format,
+        Some(&output_type_ts),
+        Some(&table_type_tokens),
+        &mut types_driver_support_needed,
     );
+
+    let output_arg_data = output.build_arg_data(&mut data);
     let output_arg_defs = output_arg_data.arg_defs;
     let output_arg_tokens = output_arg_data.arg_tokens;
-
-    let output_type = output.output_type;
     let output_args = output.output_args;
-    let output_type_ts = output_type.to_token_stream();
+    let output_type = output.output_type;
 
     // Generate runtime code for WHERE clause
     if let Some(where_expr) = select.where_clause {
-        where_clause(
-            where_expr,
-            &mut format_str,
-            &mut format_params,
-            &mut binds,
-            &mut checks,
-            sql_crate,
-            &driver,
-            &mut param_counter,
-            &mut before_param_n,
-            &mut before_format,
-            Some(&output_type_ts),
-            &table_type_tokens,
-        )
+        where_clause(where_expr, &mut data)
     }
 
     // Build GROUP BY clause code if present
     if let Some(group_by_list) = select.group_by {
-        group_by_clause(
-            group_by_list,
-            &mut format_str,
-            &mut format_params,
-            sql_crate,
-            &mut checks,
-            &driver,
-            Some(&output_type_ts),
-            &table_type_tokens,
-        )
+        group_by_clause(group_by_list, &mut data)
     }
 
     // Generate runtime code for HAVING clause
     if let Some(having_expr) = select.having {
-        having_clause(
-            having_expr,
-            &mut format_str,
-            &mut format_params,
-            &mut binds,
-            &mut checks,
-            sql_crate,
-            &driver,
-            &mut param_counter,
-            &mut before_param_n,
-            &mut before_format,
-            Some(&output_type_ts),
-            &table_type_tokens,
-        )
+        having_clause(having_expr, &mut data)
     }
     // Build ORDER BY clause code if present
     if let Some(order_by_list) = select.order_by {
-        order_by_clause(
-            order_by_list,
-            &mut format_str,
-            &mut format_params,
-            sql_crate,
-            &mut checks,
-            &mut binds,
-            &driver,
-            &mut param_counter,
-            &mut before_param_n,
-            &mut before_format,
-            Some(&output_type_ts),
-            &table_type_tokens,
-        )
+        order_by_clause(order_by_list, &mut data)
     };
 
     // Build LIMIT clause code if present
     if let Some(limit) = select.limit {
-        limit_clause(
-            limit,
-            &mut format_str,
-            &mut format_params,
-            &mut checks,
-            &mut binds,
-            sql_crate,
-            &driver,
-            &mut param_counter,
-            &before_param_n,
-        )
+        limit_clause(limit, &mut data)
     }
 
     let lazy_mode_driver = if connection.is_none() {
@@ -376,6 +305,7 @@ pub fn generate_insert(
     macro_input: &str,
 ) -> anyhow::Result<TokenStream> {
     let table_type = insert.table_type;
+    let table_type_tokens = table_type.to_token_stream();
     let values = insert.values;
 
     let macro_support = quote! {#sql_crate::macro_support};
@@ -409,16 +339,25 @@ pub fn generate_insert(
         let mut returning_param_counter = 0usize;
         let mut returning_before_param_n = quote! {current_arg_n + };
 
-        let returning_arg_data = returning.build_arg_data(
-            sql_crate,
-            &driver,
-            &table_type,
+        let mut returning_format_str = String::new();
+        let mut returning_format_params = Vec::new();
+        let mut types_driver_support_needed = Vec::new();
+        let output_type_ts = returning_type.to_token_stream();
+        let mut data = CollectedData::new(
+            &mut returning_format_str,
+            &mut returning_format_params,
             &mut returning_arg_binds,
             &mut returning_checks,
+            sql_crate,
+            &driver,
             &mut returning_param_counter,
             &mut returning_before_param_n,
             &mut returning_before_format,
+            Some(&output_type_ts),
+            Some(&table_type_tokens),
+            &mut types_driver_support_needed,
         );
+        let returning_arg_data = returning.build_arg_data(&mut data);
         let returning_arg_defs = returning_arg_data.arg_defs;
         let returning_arg_tokens = returning_arg_data.arg_tokens;
 
@@ -654,42 +593,34 @@ pub fn generate_update(
 
     let mut before_param_n = quote! {};
     let mut before_format = Vec::new();
+    let mut types_driver_support_needed = Vec::new();
 
-    // Process SET clause first
-    let set_code = set_clause(
-        set_clause_data,
+    let mut data = CollectedData::new(
         &mut format_str,
         &mut format_params,
+        &mut all_binds,
+        &mut checks,
         sql_crate,
         &driver,
         &mut param_counter,
-        &mut all_binds,
-        &mut checks,
         &mut before_param_n,
         &mut before_format,
-        None, // No output type in UPDATE
-        &table_type_tokens,
+        None,
+        Some(&table_type_tokens),
+        &mut types_driver_support_needed,
     );
+
+    // Process SET clause first
+    let set_code = set_clause(set_clause_data, &mut data);
 
     // Process WHERE clause with compile-time SQL generation
     let where_code = if let Some(where_expr) = update.where_clause {
-        if !before_param_n.is_empty() {
+        if !data.before_param_n.is_empty() {
             let mut clause_format_str = String::new();
             let mut clause_format_params = Vec::new();
-            where_clause(
-                where_expr,
-                &mut clause_format_str,
-                &mut clause_format_params,
-                &mut all_binds,
-                &mut checks,
-                sql_crate,
-                &driver,
-                &mut param_counter,
-                &mut before_param_n,
-                &mut before_format,
-                None, // Returning handling happens after the value is SET in the Sql engines
-                &table_type_tokens,
-            );
+            let mut data =
+                data.with_format_str_and_params(&mut clause_format_str, &mut clause_format_params);
+            where_clause(where_expr, &mut data);
 
             quote! {
                 query.push_str(&format!(#clause_format_str,
@@ -697,20 +628,7 @@ pub fn generate_update(
                 ));
             }
         } else {
-            where_clause(
-                where_expr,
-                &mut format_str,
-                &mut format_params,
-                &mut all_binds,
-                &mut checks,
-                sql_crate,
-                &driver,
-                &mut param_counter,
-                &mut before_param_n,
-                &mut before_format,
-                None, // Returning handling happens after the value is SET in the Sql engines
-                &table_type_tokens,
-            );
+            where_clause(where_expr, &mut data);
             quote! {}
         }
     } else {
@@ -733,16 +651,7 @@ pub fn generate_update(
     {
         let returning_type: syn::Type = returning.output_type.clone();
         let returning_has_args = returning.output_args.is_some();
-        let returning_arg_data = returning.build_arg_data(
-            sql_crate,
-            &driver,
-            &table_type,
-            &mut all_binds,
-            &mut checks,
-            &mut param_counter,
-            &mut before_param_n,
-            &mut before_format,
-        );
+        let returning_arg_data = returning.build_arg_data(&mut data);
         let returning_arg_defs = returning_arg_data.arg_defs;
         let returning_arg_tokens = returning_arg_data.arg_tokens;
 
@@ -959,23 +868,26 @@ pub fn generate_delete(
 
     let mut before_param_n = quote! {};
     let mut before_format = Vec::new();
+    let mut types_driver_support_needed = Vec::new();
+
+    let mut data = CollectedData::new(
+        &mut format_str,
+        &mut format_params,
+        &mut binds,
+        &mut checks,
+        sql_crate,
+        &driver,
+        &mut param_counter,
+        &mut before_param_n,
+        &mut before_format,
+        None, // Returning handling happens after the value is removed in the Sql engines
+        Some(&table_type_tokens),
+        &mut types_driver_support_needed,
+    );
 
     // Generate runtime code for WHERE clause
     if let Some(where_expr) = delete.where_clause {
-        where_clause(
-            where_expr,
-            &mut format_str,
-            &mut format_params,
-            &mut binds,
-            &mut checks,
-            sql_crate,
-            &driver,
-            &mut param_counter,
-            &mut before_param_n,
-            &mut before_format,
-            None, // Returning handling happens after the value is removed in the Sql engines
-            &table_type_tokens,
-        )
+        where_clause(where_expr, &mut data)
     }
 
     let lazy_mode_driver = if connection.is_none() {
@@ -994,16 +906,7 @@ pub fn generate_delete(
     {
         let returning_type: syn::Type = returning.output_type.clone();
         let returning_has_args = returning.output_args.is_some();
-        let returning_arg_data = returning.build_arg_data(
-            sql_crate,
-            &driver,
-            &table_type,
-            &mut binds,
-            &mut checks,
-            &mut param_counter,
-            &mut before_param_n,
-            &mut before_format,
-        );
+        let returning_arg_data = returning.build_arg_data(&mut data);
         let returning_arg_defs = returning_arg_data.arg_defs;
         let returning_arg_tokens = returning_arg_data.arg_tokens;
 
@@ -1217,88 +1120,46 @@ pub fn generate_exists(
 
     let mut before_param_n = quote! {};
     let mut before_format = Vec::new();
+    let mut types_driver_support_needed = Vec::new();
+
+    let mut data = CollectedData::new(
+        &mut format_str,
+        &mut format_params,
+        &mut binds,
+        &mut checks,
+        sql_crate,
+        &driver,
+        &mut param_counter,
+        &mut before_param_n,
+        &mut before_format,
+        None, // No output type in EXISTS
+        Some(&table_type_tokens),
+        &mut types_driver_support_needed,
+    );
 
     // Generate runtime code for WHERE clause
     if let Some(where_expr) = exists.where_clause {
-        where_clause(
-            where_expr,
-            &mut format_str,
-            &mut format_params,
-            &mut binds,
-            &mut checks,
-            sql_crate,
-            &driver,
-            &mut param_counter,
-            &mut before_param_n,
-            &mut before_format,
-            None, // No output type in EXISTS
-            &table_type_tokens,
-        )
+        where_clause(where_expr, &mut data)
     }
 
     // Build GROUP BY clause code if present
     if let Some(group_by_list) = exists.group_by {
-        group_by_clause(
-            group_by_list,
-            &mut format_str,
-            &mut format_params,
-            sql_crate,
-            &mut checks,
-            &driver,
-            None, // No output type in EXISTS
-            &table_type_tokens,
-        )
+        group_by_clause(group_by_list, &mut data)
     }
 
     // Generate runtime code for HAVING clause
     if let Some(having_expr) = exists.having {
-        having_clause(
-            having_expr,
-            &mut format_str,
-            &mut format_params,
-            &mut binds,
-            &mut checks,
-            sql_crate,
-            &driver,
-            &mut param_counter,
-            &mut before_param_n,
-            &mut before_format,
-            None, // No output type in EXISTS
-            &table_type_tokens,
-        )
+        having_clause(having_expr, &mut data)
     }
 
     // Build ORDER BY clause code if present
     if let Some(order_by_list) = exists.order_by {
-        order_by_clause(
-            order_by_list,
-            &mut format_str,
-            &mut format_params,
-            sql_crate,
-            &mut checks,
-            &mut binds,
-            &driver,
-            &mut param_counter,
-            &mut before_param_n,
-            &mut before_format,
-            None, // EXISTS queries don't have output types
-            &table_type_tokens,
-        )
+        order_by_clause(order_by_list, &mut data)
     }
 
     // Build LIMIT clause code if present
     if let Some(limit) = exists.limit {
-        limit_clause(
-            limit,
-            &mut format_str,
-            &mut format_params,
-            &mut checks,
-            &mut binds,
-            sql_crate,
-            &driver,
-            &mut param_counter,
-            &before_param_n,
-        )
+        limit_clause(limit, &mut data)
     }
 
     format_str.push(')');

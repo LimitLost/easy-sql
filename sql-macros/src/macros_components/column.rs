@@ -1,4 +1,4 @@
-use super::ProvidedDrivers;
+use super::CollectedData;
 use ::{
     quote::ToTokens,
     syn::{self, Token, parse::Parse, punctuated::Punctuated, spanned::Spanned},
@@ -12,16 +12,8 @@ pub enum Column {
 
 #[always_context]
 impl Column {
-    pub fn into_query_string(
-        &self,
-        checks: &mut Vec<proc_macro2::TokenStream>,
-        sql_crate: &proc_macro2::TokenStream,
-        driver: &ProvidedDrivers,
-        current_format_params: &mut Vec<proc_macro2::TokenStream>,
-        for_custom_select: bool,
-        output_ty: Option<&proc_macro2::TokenStream>,
-        main_table_type: Option<&proc_macro2::TokenStream>,
-    ) -> String {
+    pub fn into_query_string(&self, data: &mut CollectedData, for_custom_select: bool) -> String {
+        let sql_crate = data.sql_crate;
         match self {
             Column::SpecificTableColumn(table_type, col_name) => {
                 // When output_ty matches table_type,
@@ -102,14 +94,14 @@ impl Column {
                     contains_type_recursively(&output_type, &table_type)
                 }
 
-                if let Some(output_type) = output_ty
+                if let Some(output_type) = data.output_ty
                     && output_matches_type(output_type, &table_type.to_token_stream())
                 {
                     // User specified OutputType.column - validate against Output type fields (custom select can't reference other columns from select statement)
 
                     if for_custom_select {
                         // In custom select mode, referencing select columns (created in OutputType) is unsupported
-                        checks.push(quote::quote_spanned! {table_type.span()=>
+                        data.checks.push(quote::quote_spanned! {table_type.span()=>
                                 {
                                     compile_error!("Referencing select columns in custom select statements is not supported. Please use table column references instead.");
                                 }
@@ -117,9 +109,12 @@ impl Column {
                         return format!("{{delimeter}}{}{{delimeter}}", col_name);
                     }
 
+                    let output_ty = &data.output_ty;
+                    let main_table_type = &data.main_table_type;
+
                     // and generate unqualified column reference (just the column name)
-                    let drivers_iter = driver.iter_for_checks();
-                    checks.push(quote::quote_spanned! {col_name.span()=>
+                    let drivers_iter = data.driver.iter_for_checks();
+                    data.checks.push(quote::quote_spanned! {col_name.span()=>
                                 #({
                                     let output_instance : <#output_ty as #sql_crate::Output<#main_table_type, #drivers_iter>>::UsedForChecks = #sql_crate::macro_support::never_any::<#table_type>();
                                     let _ = output_instance.#col_name;
@@ -132,7 +127,7 @@ impl Column {
 
                 // Standard behavior: validate against Table type
                 // User specified a different table - validate normally
-                checks.push(quote::quote_spanned! {col_name.span()=>
+                data.checks.push(quote::quote_spanned! {col_name.span()=>
                     {
                         fn has_table<T:#sql_crate::markers::HasTable<#table_type>>(_test:&T){}
                         has_table(&___t___);
@@ -147,7 +142,8 @@ impl Column {
                     "_easy_sql_d"
                 };
 
-                current_format_params.push(driver.table_name(sql_crate, &table_type));
+                data.format_params
+                    .push(data.driver.table_name(sql_crate, &table_type));
 
                 format!(
                     "{{{delimeter}}}{{}}{{{delimeter}}}.{{{delimeter}}}{}{{{delimeter}}}",
@@ -155,11 +151,11 @@ impl Column {
                 )
             }
             Column::Column(ident) => {
-                let main_table_type = if let Some(mt) = main_table_type {
+                let main_table_type = if let Some(mt) = data.main_table_type {
                     mt
                 } else {
                     // Inside table join - no main table type available
-                    checks.push(quote::quote_spanned! {ident.span()=>
+                    data.checks.push(quote::quote_spanned! {ident.span()=>
                             {
                                 compile_error!("Column references without a table prefix are not allowed inside of JOIN clauses. Please specify the table name explicitly, e.g., TableName.column_name");
                             }
@@ -174,9 +170,9 @@ impl Column {
                 #[cfg(feature = "use_output_columns")]
                 if !for_custom_select {
                     // Feature enabled: validate against Output type if provided, custom select can't reference other columns from select statement
-                    if let Some(output_type) = output_ty {
-                        let drivers_iter = driver.iter_for_checks();
-                        checks.push(quote::quote_spanned! {ident.span()=>
+                    if let Some(output_type) = data.output_ty {
+                        let drivers_iter = data.driver.iter_for_checks();
+                        data.checks.push(quote::quote_spanned! {ident.span()=>
                                 #({
                                     let output_instance = #sql_crate::macro_support::never_any::<<#output_type as #sql_crate::Output<#main_table_type, #drivers_iter>>::UsedForChecks>();
                                     let _ = output_instance.#ident;
@@ -192,7 +188,7 @@ impl Column {
                 // - Feature is disabled (always validates against Table)
                 // - Feature is enabled but no output_ty provided (fallback to Table validation)
                 // - Custom select mode (can't reference other columns from select statement)
-                checks.push(quote::quote_spanned! {ident.span()=>
+                data.checks.push(quote::quote_spanned! {ident.span()=>
                         {
                             let table_instance = #sql_crate::macro_support::never_any::<#main_table_type>();
                             let _ = table_instance.#ident;

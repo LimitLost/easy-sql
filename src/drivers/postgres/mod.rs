@@ -19,6 +19,7 @@ use crate::{
     Driver, EasyExecutor, TableField,
     markers::{AllowsNoPrimaryKey, SupportsAutoIncrementCompositePrimaryKey},
 };
+use sql_macros::{impl_supports_fn, impl_supports_fn_any};
 
 /// Marker type for the PostgreSQL driver.
 ///
@@ -76,6 +77,43 @@ impl AllowsNoPrimaryKey for Postgres {}
 
 #[always_context]
 impl SupportsAutoIncrementCompositePrimaryKey for Postgres {}
+
+impl_supports_fn!(Postgres, SupportsCount, 0, 1);
+impl_supports_fn!(Postgres, SupportsSum, 1);
+impl_supports_fn!(Postgres, SupportsAvg, 1);
+impl_supports_fn!(Postgres, SupportsMin, 1);
+impl_supports_fn!(Postgres, SupportsMax, 1);
+
+impl_supports_fn_any!(Postgres, SupportsConcat);
+impl_supports_fn!(Postgres, SupportsUpper, 1);
+impl_supports_fn!(Postgres, SupportsLower, 1);
+impl_supports_fn!(Postgres, SupportsLength, 1);
+impl_supports_fn!(Postgres, SupportsTrim, 1);
+impl_supports_fn!(Postgres, SupportsSubstring, 2, 3);
+impl_supports_fn!(Postgres, SupportsSubstr, 2, 3);
+
+impl_supports_fn_any!(Postgres, SupportsCoalesce);
+impl_supports_fn!(Postgres, SupportsNullif, 2);
+
+impl_supports_fn!(Postgres, SupportsNow, 0);
+impl_supports_fn!(Postgres, SupportsDate, 1);
+impl_supports_fn!(Postgres, SupportsTime, 1);
+impl_supports_fn!(Postgres, SupportsCurrentTimestamp, -1);
+impl_supports_fn!(Postgres, SupportsCurrentDate, -1);
+impl_supports_fn!(Postgres, SupportsCurrentTime, -1);
+
+impl_supports_fn!(Postgres, SupportsAbs, 1);
+impl_supports_fn!(Postgres, SupportsRound, 1, 2);
+impl_supports_fn!(Postgres, SupportsMod, 2);
+impl_supports_fn!(Postgres, SupportsCeil, 1);
+impl_supports_fn!(Postgres, SupportsCeiling, 1);
+impl_supports_fn!(Postgres, SupportsFloor, 1);
+impl_supports_fn!(Postgres, SupportsPower, 2);
+impl_supports_fn!(Postgres, SupportsPow, 2);
+impl_supports_fn!(Postgres, SupportsSqrt, 1);
+
+impl_supports_fn!(Postgres, SupportsCast, 1, 2);
+impl_supports_fn!(Postgres, SupportsDistinct, 1);
 
 fn table_field_definition(field: TableField) -> String {
     let TableField {

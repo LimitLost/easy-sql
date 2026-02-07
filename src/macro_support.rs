@@ -51,6 +51,17 @@ pub fn driver_parameter_placeholder<D: Driver>(
     Box::new(|index: usize| D::parameter_placeholder(index))
 }
 
+/// This function extracts Driver from connection to fetch type information for a Rust type.
+#[inline(always)]
+pub fn driver_type_info<T, D: Driver>(
+    _exec: &impl crate::EasyExecutor<D>,
+) -> <InternalDriver<D> as sqlx::Database>::TypeInfo
+where
+    T: Type<InternalDriver<D>>,
+{
+    <T as Type<InternalDriver<D>>>::type_info()
+}
+
 ///This function extracts Driver from connection (that's the only reason why it exists instead of direct call)
 #[inline(always)]
 pub fn query_add_selected<T, O: Output<T, D>, D: Driver>(
@@ -210,4 +221,19 @@ pub fn to_binary<T: serde::Serialize>(value: T) -> anyhow::Result<Vec<u8>> {
     let result = bincode::serde::encode_to_vec(value, bincode::config::standard())?;
 
     Ok(result)
+}
+
+/// Const hash for SQL function names to use in compile-time capability checks.
+///
+/// Uses a simple FNV-1a 64-bit hash for stable, reproducible IDs.
+pub const fn function_name_hash(name: &str) -> u64 {
+    let bytes = name.as_bytes();
+    let mut hash: u64 = 0xcbf29ce484222325;
+    let mut i = 0;
+    while i < bytes.len() {
+        hash ^= bytes[i] as u64;
+        hash = hash.wrapping_mul(0x100000001b3);
+        i += 1;
+    }
+    hash
 }

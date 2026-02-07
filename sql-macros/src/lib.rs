@@ -151,3 +151,24 @@ pub fn table_debug(item: TokenStream) -> anyhow::Result<TokenStream> {
 pub fn custom_sql_function(input: TokenStream) -> anyhow::Result<TokenStream> {
     Ok(macros::custom_sql_function_impl(input))
 }
+
+#[proc_macro]
+#[always_context]
+#[anyhow_result]
+pub fn impl_supports_fn_any(input: TokenStream) -> anyhow::Result<TokenStream> {
+    macros::impl_supports_fn_any(input)
+}
+
+#[proc_macro]
+#[always_context]
+#[anyhow_result]
+pub fn impl_supports_fn(input: TokenStream) -> anyhow::Result<TokenStream> {
+    macros::impl_supports_fn(input)
+}
+
+#[proc_macro]
+#[always_context]
+#[anyhow_result]
+pub fn define_supports_fn_trait(input: TokenStream) -> anyhow::Result<TokenStream> {
+    macros::define_supports_fn_trait(input)
+}

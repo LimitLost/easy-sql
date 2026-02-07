@@ -2,8 +2,6 @@
 // Note: The query! macro design expects SELECT to specify an Output type,
 // not individual columns/functions. Functions are tested in WHERE, ORDER BY, etc.
 
-use crate::sqlite_math_required;
-
 use super::*;
 use easy_macros::always_context;
 use sql_macros::query;
@@ -34,6 +32,20 @@ pub struct FunctionTestData {
     pub category: String,
 }
 
+#[derive(Output, Debug, Clone, PartialEq)]
+#[sql(table = FunctionTestTable)]
+struct FunctionAggregateResults {
+    #[sql(select = COUNT(*))]
+    count_all: i64,
+    #[sql(select = SUM(value))]
+    sum_value: i64,
+    #[sql(select = cast(AVG(value) AS f64))]
+    avg_value: f64,
+    #[sql(select = MIN(value))]
+    min_value: i32,
+    #[sql(select = MAX(value))]
+    max_value: i32,
+}
 // ==============================================
 // Test Utilities
 // ==============================================
@@ -212,6 +224,62 @@ async fn test_function_round_in_where() -> anyhow::Result<()> {
     Ok(())
 }
 
+/// Test ROUND with precision argument (SQLite)
+#[always_context(skip(!))]
+#[tokio::test]
+#[cfg(feature = "sqlite")]
+async fn test_function_round_with_precision_in_where() -> anyhow::Result<()> {
+    let db = Database::setup_for_testing::<FunctionTestTable>().await?;
+    let mut conn = db.transaction().await?;
+
+    setup_test_data(&mut conn).await?;
+
+    let precision = 1;
+    let rounded = 1.5;
+    let results: Vec<FunctionTestData> = query!(&mut conn,
+        SELECT Vec<FunctionTestData> FROM FunctionTestTable
+        WHERE round(cast(price as f64), {precision}) = {rounded}
+    )
+    .await?;
+
+    assert!(
+        results.iter().any(|row| row.name == "Apple"),
+        "Should find Apple where round(price, 1) == 1.5"
+    );
+
+    conn.rollback().await?;
+    Ok(())
+}
+
+/// Test ROUND with precision argument (Postgres)
+#[always_context(skip(!))]
+#[tokio::test]
+#[cfg(all(feature = "postgres", feature = "rust_decimal"))]
+async fn test_function_round_with_precision_in_where() -> anyhow::Result<()> {
+    use rust_decimal::Decimal;
+
+    let db = Database::setup_for_testing::<FunctionTestTable>().await?;
+    let mut conn = db.transaction().await?;
+
+    setup_test_data(&mut conn).await?;
+
+    let precision = 1;
+    let rounded = 1.5;
+    let results: Vec<FunctionTestData> = query!(&mut conn,
+        SELECT Vec<FunctionTestData> FROM FunctionTestTable
+        WHERE round(cast(price as Decimal), {precision}) = {rounded}
+    )
+    .await?;
+
+    assert!(
+        results.iter().any(|row| row.name == "Apple"),
+        "Should find Apple where round(price, 1) == 1.5"
+    );
+
+    conn.rollback().await?;
+    Ok(())
+}
+
 // ==============================================
 // 2. NESTED FUNCTIONS IN WHERE
 // ==============================================
@@ -241,9 +309,8 @@ async fn test_nested_functions_in_where() -> anyhow::Result<()> {
 /// Test nested math functions in WHERE  
 #[always_context(skip(!))]
 #[tokio::test]
+#[cfg(any(feature = "sqlite_math", not(feature = "sqlite")))]
 async fn test_nested_math_functions_in_where() -> anyhow::Result<()> {
-    sqlite_math_required!();
-
     let db = Database::setup_for_testing::<FunctionTestTable>().await?;
     let mut conn = db.transaction().await?;
 
@@ -326,6 +393,29 @@ async fn test_function_abs_in_order_by() -> anyhow::Result<()> {
     Ok(())
 }
 
+/// Test aggregate functions in SELECT
+#[always_context(skip(!))]
+#[tokio::test]
+async fn test_aggregate_functions_in_select() -> anyhow::Result<()> {
+    let db = Database::setup_for_testing::<FunctionTestTable>().await?;
+    let mut conn = db.transaction().await?;
+
+    setup_test_data(&mut conn).await?;
+
+    let result: FunctionAggregateResults = query!(&mut conn,
+        SELECT FunctionAggregateResults FROM FunctionTestTable
+    )
+    .await?;
+
+    assert!(result.count_all >= 6);
+    assert!(result.sum_value > 0);
+    assert!(result.avg_value > 0.0);
+    assert!(result.min_value <= result.max_value);
+
+    conn.rollback().await?;
+    Ok(())
+}
+
 // ==============================================
 // 4. COMPLEX EXPRESSIONS WITH FUNCTIONS
 // ==============================================
@@ -387,6 +477,76 @@ async fn test_multiple_functions_in_where() -> anyhow::Result<()> {
     Ok(())
 }
 
+/// Test SUBSTRING function in WHERE clause
+#[always_context(skip(!))]
+#[tokio::test]
+async fn test_function_substring_in_where() -> anyhow::Result<()> {
+    let db = Database::setup_for_testing::<FunctionTestTable>().await?;
+    let mut conn = db.transaction().await?;
+
+    setup_test_data(&mut conn).await?;
+
+    let start = 1;
+    let length = 3;
+    let expected = "Ban".to_string();
+    let result: FunctionTestData = query!(&mut conn,
+        SELECT FunctionTestData FROM FunctionTestTable
+        WHERE substring(name, {start}, {length}) = {expected}
+    )
+    .await?;
+
+    assert_eq!(result.name, "Banana");
+
+    conn.rollback().await?;
+    Ok(())
+}
+
+/// Test SUBSTR function in WHERE clause
+#[always_context(skip(!))]
+#[tokio::test]
+async fn test_function_substr_in_where() -> anyhow::Result<()> {
+    let db = Database::setup_for_testing::<FunctionTestTable>().await?;
+    let mut conn = db.transaction().await?;
+
+    setup_test_data(&mut conn).await?;
+
+    let start = 1;
+    let length = 5;
+    let expected = "Apple".to_string();
+    let result: FunctionTestData = query!(&mut conn,
+        SELECT FunctionTestData FROM FunctionTestTable
+        WHERE substr(name, {start}, {length}) = {expected}
+    )
+    .await?;
+
+    assert_eq!(result.name, "Apple");
+
+    conn.rollback().await?;
+    Ok(())
+}
+
+/// Test NULLIF function in WHERE clause
+#[always_context(skip(!))]
+#[tokio::test]
+async fn test_function_nullif_in_where() -> anyhow::Result<()> {
+    let db = Database::setup_for_testing::<FunctionTestTable>().await?;
+    let mut conn = db.transaction().await?;
+
+    setup_test_data(&mut conn).await?;
+
+    let target = 20;
+    let result: FunctionTestData = query!(&mut conn,
+        SELECT FunctionTestData FROM FunctionTestTable
+        WHERE nullif(value, {target}) IS NULL
+    )
+    .await?;
+
+    assert_eq!(result.value, 20);
+
+    conn.rollback().await?;
+    Ok(())
+}
+
 /// Test function with OR in WHERE
 #[always_context(skip(!))]
 #[tokio::test]
@@ -420,9 +580,8 @@ async fn test_function_with_or_in_where() -> anyhow::Result<()> {
 /// Test POWER function in WHERE
 #[always_context(skip(!))]
 #[tokio::test]
+#[cfg(any(feature = "sqlite_math", not(feature = "sqlite")))]
 async fn test_function_power_in_where() -> anyhow::Result<()> {
-    sqlite_math_required!();
-
     let db = Database::setup_for_testing::<FunctionTestTable>().await?;
     let mut conn = db.transaction().await?;
 
@@ -448,12 +607,39 @@ async fn test_function_power_in_where() -> anyhow::Result<()> {
     Ok(())
 }
 
+/// Test POW function in WHERE
+#[always_context(skip(!))]
+#[tokio::test]
+#[cfg(any(feature = "sqlite_math", not(feature = "sqlite")))]
+async fn test_function_pow_in_where() -> anyhow::Result<()> {
+    let db = Database::setup_for_testing::<FunctionTestTable>().await?;
+    let mut conn = db.transaction().await?;
+
+    let data = vec![
+        test_data("Two", 2, 1.0, "Math"),
+        test_data("Three", 3, 1.0, "Math"),
+    ];
+    query!(&mut conn, INSERT INTO FunctionTestTable VALUES {data}).await?;
+
+    let exponent = 2;
+    let threshold = 4.0;
+    let results: Vec<FunctionTestData> = query!(&mut conn,
+        SELECT Vec<FunctionTestData> FROM FunctionTestTable
+        WHERE pow(value, {exponent}) >= {threshold}
+    )
+    .await?;
+
+    assert_eq!(results.len(), 2, "Should find 2 items (2 and 3)");
+
+    conn.rollback().await?;
+    Ok(())
+}
+
 /// Test SQRT function in WHERE
 #[always_context(skip(!))]
 #[tokio::test]
+#[cfg(any(feature = "sqlite_math", not(feature = "sqlite")))]
 async fn test_function_sqrt_in_where() -> anyhow::Result<()> {
-    sqlite_math_required!();
-
     let db = Database::setup_for_testing::<FunctionTestTable>().await?;
     let mut conn = db.transaction().await?;
 
@@ -485,9 +671,8 @@ async fn test_function_sqrt_in_where() -> anyhow::Result<()> {
 /// Test CEIL function in WHERE
 #[always_context(skip(!))]
 #[tokio::test]
+#[cfg(any(feature = "sqlite_math", not(feature = "sqlite")))]
 async fn test_function_ceil_in_where() -> anyhow::Result<()> {
-    sqlite_math_required!();
-
     let db = Database::setup_for_testing::<FunctionTestTable>().await?;
     let mut conn = db.transaction().await?;
 
@@ -511,12 +696,37 @@ async fn test_function_ceil_in_where() -> anyhow::Result<()> {
     Ok(())
 }
 
+/// Test CEILING function in WHERE
+#[always_context(skip(!))]
+#[tokio::test]
+#[cfg(any(feature = "sqlite_math", not(feature = "sqlite")))]
+async fn test_function_ceiling_in_where() -> anyhow::Result<()> {
+    let db = Database::setup_for_testing::<FunctionTestTable>().await?;
+    let mut conn = db.transaction().await?;
+
+    setup_test_data(&mut conn).await?;
+
+    let threshold = 3.0;
+    let results: Vec<FunctionTestData> = query!(&mut conn,
+        SELECT Vec<FunctionTestData> FROM FunctionTestTable
+        WHERE ceiling(price) >= {threshold}
+    )
+    .await?;
+
+    assert!(
+        results.iter().any(|row| row.name == "Dates"),
+        "Should find Dates where ceiling(price) >= 3"
+    );
+
+    conn.rollback().await?;
+    Ok(())
+}
+
 /// Test FLOOR function in WHERE
 #[always_context(skip(!))]
 #[tokio::test]
+#[cfg(any(feature = "sqlite_math", not(feature = "sqlite")))]
 async fn test_function_floor_in_where() -> anyhow::Result<()> {
-    sqlite_math_required!();
-
     let db = Database::setup_for_testing::<FunctionTestTable>().await?;
     let mut conn = db.transaction().await?;
 
@@ -601,15 +811,65 @@ async fn test_function_coalesce() -> anyhow::Result<()> {
     Ok(())
 }
 
+/// Test IFNULL function with nullable fields (SQLite only)
+#[always_context(skip(!))]
+#[tokio::test]
+#[cfg(feature = "sqlite")]
+async fn test_function_ifnull() -> anyhow::Result<()> {
+    #[derive(Table, Debug, Clone)]
+    #[sql(no_version)]
+    #[sql(unique_id = "1e52a082-c9f9-4b8e-98a5-43a5b5c1f1a8")]
+    struct IfNullTable {
+        #[sql(primary_key)]
+        #[sql(auto_increment)]
+        id: i32,
+        nullable_value: Option<i32>,
+        default_value: i32,
+    }
+
+    #[derive(Insert, Output, Debug, Clone)]
+    #[sql(table = IfNullTable)]
+    #[sql(default = id)]
+    struct IfNullData {
+        nullable_value: Option<i32>,
+        default_value: i32,
+    }
+
+    let db = Database::setup_for_testing::<IfNullTable>().await?;
+    let mut conn = db.transaction().await?;
+
+    let data = vec![
+        IfNullData {
+            nullable_value: None,
+            default_value: 7,
+        },
+        IfNullData {
+            nullable_value: Some(5),
+            default_value: 7,
+        },
+    ];
+    query!(&mut conn, INSERT INTO IfNullTable VALUES {data}).await?;
+
+    let result: IfNullData = query!(&mut conn,
+        SELECT IfNullData FROM IfNullTable
+        WHERE ifnull(nullable_value, default_value) = 7
+    )
+    .await?;
+
+    assert_eq!(result.nullable_value, None);
+
+    conn.rollback().await?;
+    Ok(())
+}
+
 // ==============================================
 // 8. MOD FUNCTION
 // ==============================================
 
 #[always_context(skip(!))]
 #[tokio::test]
+#[cfg(any(feature = "sqlite_math", not(feature = "sqlite")))]
 async fn test_function_mod_in_where() -> anyhow::Result<()> {
-    sqlite_math_required!();
-
     let db = Database::setup_for_testing::<FunctionTestTable>().await?;
     let mut conn = db.transaction().await?;
 
@@ -626,6 +886,28 @@ async fn test_function_mod_in_where() -> anyhow::Result<()> {
 
     // Should find: Apple(10), Banana(20), Carrot(15), Dates(5), Spaces(100)
     assert!(results.len() >= 5, "Should find multiples of 5");
+
+    conn.rollback().await?;
+    Ok(())
+}
+
+/// Test CAST function in WHERE clause
+#[always_context(skip(!))]
+#[tokio::test]
+async fn test_function_cast_in_where() -> anyhow::Result<()> {
+    let db = Database::setup_for_testing::<FunctionTestTable>().await?;
+    let mut conn = db.transaction().await?;
+
+    setup_test_data(&mut conn).await?;
+
+    let value_str = "10".to_string();
+    let result: FunctionTestData = query!(&mut conn,
+        SELECT FunctionTestData FROM FunctionTestTable
+        WHERE cast(value as String) = {value_str}
+    )
+    .await?;
+
+    assert_eq!(result.name, "Apple");
 
     conn.rollback().await?;
     Ok(())
@@ -695,41 +977,78 @@ async fn test_function_concat_in_where() -> anyhow::Result<()> {
 }
 
 // ==============================================
-// 11. VALIDATION TESTS (Compile-time)
+// 11. DATE/TIME FUNCTIONS
 // ==============================================
 
-/// Test that valid single-argument functions compile
-#[test]
-fn test_single_arg_functions_compile() {
-    // These should all compile without errors:
-    // upper(name), lower(name), length(name), trim(name), abs(value)
-    // If this test compiles, single-arg function validation works
+/// Test CURRENT_* and DATE/TIME functions (Postgres)
+#[always_context(skip(!))]
+#[tokio::test]
+#[cfg(not(feature = "sqlite"))]
+async fn test_function_current_date_time_postgres() -> anyhow::Result<()> {
+    let db = Database::setup_for_testing::<FunctionTestTable>().await?;
+    let mut conn = db.transaction().await?;
+
+    setup_test_data(&mut conn).await?;
+
+    let results: Vec<FunctionTestData> = query!(&mut conn,
+        SELECT Vec<FunctionTestData> FROM FunctionTestTable
+        WHERE current_timestamp >= current_timestamp
+            AND current_date = current_date
+            AND current_time = current_time
+    )
+    .await?;
+
+    assert!(!results.is_empty());
+
+    conn.rollback().await?;
+    Ok(())
 }
 
-/// Test that valid two-argument functions compile
-#[test]
-fn test_two_arg_functions_compile() {
-    // These should compile:
-    // round(price, precision), power(value, exponent), mod(value, divisor)
-    // If this test compiles, two-arg function validation works
+/// Test NOW function (Postgres)
+#[always_context(skip(!))]
+#[tokio::test]
+#[cfg(not(feature = "sqlite"))]
+async fn test_function_now_in_where() -> anyhow::Result<()> {
+    let db = Database::setup_for_testing::<FunctionTestTable>().await?;
+    let mut conn = db.transaction().await?;
+
+    setup_test_data(&mut conn).await?;
+
+    let results: Vec<FunctionTestData> = query!(&mut conn,
+        SELECT Vec<FunctionTestData> FROM FunctionTestTable
+        WHERE now() <= now()
+    )
+    .await?;
+
+    assert!(!results.is_empty());
+
+    conn.rollback().await?;
+    Ok(())
 }
 
-/// Test that variable-argument functions compile
-#[test]
-fn test_variadic_functions_compile() {
-    // These should compile with varying argument counts:
-    // concat(a, b), concat(a, b, c), concat(a, b, c, d)
-    // coalesce(a, b), coalesce(a, b, c)
-    // If this test compiles, variadic function validation works
-}
+/// Test CURRENT_* and DATE/TIME/DATETIME functions (SQLite)
+#[always_context(skip(!))]
+#[tokio::test]
+#[cfg(feature = "sqlite")]
+async fn test_function_current_date_time_sqlite() -> anyhow::Result<()> {
+    let db = Database::setup_for_testing::<FunctionTestTable>().await?;
+    let mut conn = db.transaction().await?;
 
-// The following would cause compile errors (documented for reference):
-//
-// query!(&mut conn, SELECT FunctionTestData FROM FunctionTestTable WHERE sum() = 0)
-// // Error: Function SUM requires at least 1 argument(s)
-//
-// query!(&mut conn, SELECT FunctionTestData FROM FunctionTestTable WHERE upper(name, name) = "A")
-// // Error: Function UPPER accepts at most 1 argument(s)
-//
-// query!(&mut conn, SELECT FunctionTestData FROM FunctionTestTable WHERE round(price) = 1)
-// // Error: Function ROUND requires at least 1 argument(s) and accepts at most 2 argument(s)
+    setup_test_data(&mut conn).await?;
+
+    let results: Vec<FunctionTestData> = query!(&mut conn,
+        SELECT Vec<FunctionTestData> FROM FunctionTestTable
+        WHERE current_timestamp >= current_timestamp
+            AND current_date = current_date
+            AND current_time = current_time
+            AND date(current_timestamp) = date(current_timestamp)
+            AND time(current_timestamp) = time(current_timestamp)
+            AND datetime(current_timestamp) = datetime(current_timestamp)
+    )
+    .await?;
+
+    assert!(!results.is_empty());
+
+    conn.rollback().await?;
+    Ok(())
+}

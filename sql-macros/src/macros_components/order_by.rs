@@ -1,12 +1,9 @@
 use super::{
-    ProvidedDrivers,
+    CollectedData,
     expr::Expr,
     keyword::{self},
 };
-use ::{
-    proc_macro2::TokenStream,
-    syn::{self, parse::Parse},
-};
+use ::syn::{self, parse::Parse};
 use easy_macros::always_context;
 
 #[derive(Debug, Clone)]
@@ -39,33 +36,8 @@ pub struct OrderBy {
 
 #[always_context]
 impl OrderBy {
-    pub fn into_query_string(
-        self,
-        checks: &mut Vec<TokenStream>,
-        binds: &mut Vec<TokenStream>,
-        sql_crate: &TokenStream,
-        driver: &ProvidedDrivers,
-        current_param_n: &mut usize,
-        current_format_params: &mut Vec<TokenStream>,
-        before_param_n: &mut TokenStream,
-        before_format: &mut Vec<TokenStream>,
-        output_ty: Option<&TokenStream>,
-        main_table_type: &TokenStream,
-    ) -> String {
-        let expr_query = self.expr.into_query_string(
-            binds,
-            checks,
-            sql_crate,
-            driver,
-            current_param_n,
-            current_format_params,
-            before_param_n,
-            before_format,
-            false,
-            false,
-            output_ty,
-            Some(main_table_type),
-        );
+    pub fn into_query_string(self, data: &mut CollectedData) -> String {
+        let expr_query = self.expr.into_query_string(data, false, false);
         let order_query_str = match self.order {
             Order::Asc => "ASC",
             Order::Desc => "DESC",

@@ -1,6 +1,5 @@
-use super::ProvidedDrivers;
+use super::CollectedData;
 use ::{
-    proc_macro2::TokenStream,
     quote::{quote, quote_spanned},
     syn::{self, parse::Parse, spanned::Spanned},
 };
@@ -33,25 +32,16 @@ impl Parse for Limit {
 
 #[always_context]
 impl Limit {
-    pub fn into_query_string(
-        self,
-        checks: &mut Vec<TokenStream>,
-        format_args: &mut Vec<TokenStream>,
-        binds: &mut Vec<TokenStream>,
-        sql_crate: &TokenStream,
-        driver: &ProvidedDrivers,
-        param_counter: &mut usize,
-        before_param_n: &TokenStream,
-    ) -> String {
+    pub fn into_query_string(self, data: &mut CollectedData) -> String {
         match self {
             Limit::Literal(s) => {
-                format_args.push(quote! {#s});
+                data.format_params.push(quote! {#s});
 
                 "{}".to_string()
             }
             Limit::Expr(expr) => {
                 // Check if the expression can be converted to i64
-                checks.push(quote_spanned! {expr.span()=>
+                data.checks.push(quote_spanned! {expr.span()=>
                     let _test:i64 = #expr as i64;
                 });
 
@@ -60,18 +50,18 @@ impl Limit {
                     "Failed to bind `{}` to LIMIT parameter",
                     quote! {#expr}.to_string()
                 );
-                binds.push(quote_spanned! {expr.span()=>
+                data.binds.push(quote_spanned! {expr.span()=>
                     _easy_sql_args.add(&#expr).map_err(anyhow::Error::from_boxed).context(#debug_str)?;
                 });
 
                 // Add parameter placeholder
-                format_args.push(driver.parameter_placeholder(
-                    sql_crate,
+                data.format_params.push(data.driver.parameter_placeholder(
+                    data.sql_crate,
                     expr.span(),
-                    before_param_n,
-                    &*param_counter,
+                    &data.before_param_n,
+                    &*data.current_param_n,
                 ));
-                *param_counter += 1;
+                *data.current_param_n += 1;
 
                 "{}".to_string()
             }

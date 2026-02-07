@@ -15,7 +15,7 @@ use sql_compilation_data::CompilationData;
 
 use crate::{
     CUSTOM_SELECT_ALIAS_PREFIX,
-    macros_components::{ProvidedDrivers, expr::Expr, joined_field::JoinedField},
+    macros_components::{CollectedData, ProvidedDrivers, expr::Expr, joined_field::JoinedField},
     sql_crate,
 };
 
@@ -257,6 +257,8 @@ pub fn sql_output_base(
     let custom_select_impl = if has_custom_select {
         let max_idx = indices.iter().max().copied().unwrap_or_default();
 
+        let mut types_driver_support_needed = Vec::new();
+
         // Verify no gaps in argument sequence
         if has_custom_select_args {
             for i in 0..=max_idx {
@@ -337,6 +339,12 @@ pub fn sql_output_base(
                 // Generate the SQL template at compile time
                 let mut checks = Vec::new();
                 let mut format_params = Vec::new();
+                // Not used in output but required in Collected Data
+                let mut format_str = String::new();
+                let mut binds = Vec::new();
+                let mut before_param_n = quote! {};
+                let mut before_format = Vec::new();
+                let mut current_param_n = 0usize;
 
                 let drivers_for_checks = drivers
                     .iter()
@@ -346,22 +354,26 @@ pub fn sql_output_base(
                 // Call into_query_string at proc-macro expansion time with for_custom_select = true
                 // Pass the Output type so columns can be validated against it
                 let output_type_ts = quote! { #item_name };
-                let sql_template = expr.into_query_string(
-                    &mut Vec::new(),
+                let driver_for_select = ProvidedDrivers::SingleWithChecks {
+                    driver: quote! { D },
+                    checks: drivers_for_checks,
+                };
+                let mut data = CollectedData::new(
+                    &mut format_str,
+                    &mut format_params,
+                    &mut binds,
                     &mut checks,
                     &sql_crate,
-                    &ProvidedDrivers::SingleWithChecks {
-                        driver: quote! { D },
-                        checks: drivers_for_checks,
-                    },
-                    &mut 0,
-                    &mut format_params,
-                    &mut quote! {},
-                    &mut Vec::new(),
-                    false,
-                    true, // for_custom_select
+                    &driver_for_select,
+                    &mut current_param_n,
+                    &mut before_param_n,
+                    &mut before_format,
                     Some(&output_type_ts),
                     Some(&table),
+                    &mut types_driver_support_needed,
+                );
+                let sql_template = expr.into_query_string(
+                    &mut data, false, true, // for_custom_select
                 );
 
                 let parts_format_str = format!("{{}} AS {{delimeter}}{}{{delimeter}}", alias);
@@ -389,11 +401,21 @@ pub fn sql_output_base(
             }
         };
 
+        let where_clause_types = types_driver_support_needed
+            .into_iter()
+            .map(|ty| {
+                quote! {
+                    #ty: #macro_support::Type<#macro_support::InternalDriver<D>>,
+                }
+            })
+            .collect::<Vec<_>>();
+
         quote! {
             impl #item_name {
                 pub fn __easy_sql_select<D: #sql_crate::Driver>(delimeter: &str, #(#arg_params),*) -> String
                 where
                     Self: #sql_crate::Output<#table, D>,
+                    #(#where_clause_types)*
                 {
                     #select_generation_code
                 }
@@ -405,6 +427,7 @@ pub fn sql_output_base(
                 ) -> String
                 where
                     Self: #sql_crate::Output<#table, D>,
+                    #(#where_clause_types)*
                 {
                     Self::__easy_sql_select::<D>(delimeter, #(#arg_params_in_call),*)
                 }

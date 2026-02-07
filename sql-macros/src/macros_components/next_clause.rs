@@ -17,6 +17,7 @@ pub fn next_clause_token(lookahead: &Lookahead1) -> bool {
         || lookahead.peek(keyword::cross)
         || lookahead.peek(keyword::returning)
         || lookahead.peek(syn::Token![,])
+    || lookahead.peek(keyword::as_kw)
         || lookahead.peek(keyword::asc)
         || lookahead.peek(keyword::desc)
 }

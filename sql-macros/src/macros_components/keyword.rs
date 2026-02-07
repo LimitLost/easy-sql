@@ -277,6 +277,7 @@ sql_keyword!(null);
 
 sql_keyword!(asc);
 sql_keyword!(desc);
+sql_keyword!(as, as_kw);
 
 sql_keyword!(inner);
 sql_keyword!(left);
