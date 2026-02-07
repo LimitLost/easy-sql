@@ -5,6 +5,30 @@ use super::*;
 use anyhow::Context;
 use easy_macros::always_context;
 use sql_macros::query;
+#[cfg(feature = "postgres")]
+use sqlx::types::JsonValue;
+
+// ==============================================
+// JSON TEST TABLES (PostgreSQL-only)
+// ==============================================
+
+#[cfg(feature = "postgres")]
+#[derive(Table, Debug, Clone)]
+#[sql(no_version)]
+struct JsonOperatorTable {
+    #[sql(primary_key)]
+    #[sql(auto_increment)]
+    id: i32,
+    payload: JsonValue,
+}
+
+#[cfg(feature = "postgres")]
+#[derive(Insert, Output, Debug, Clone, PartialEq)]
+#[sql(table = JsonOperatorTable)]
+#[sql(default = id)]
+struct JsonOperatorData {
+    payload: JsonValue,
+}
 
 // ==============================================
 // 1. COMPARISON OPERATORS
@@ -1568,9 +1592,26 @@ async fn test_expr_combined_bitwise() -> anyhow::Result<()> {
 #[always_context(skip(!))]
 #[tokio::test]
 async fn test_expr_json_arrow_operator() -> anyhow::Result<()> {
-    // Note: This test requires a table with JSONB column
-    // Skipping implementation as ExprTestTable doesn't have JSON columns
-    // This demonstrates the test pattern for JSON operators
+    use serde_json::json;
+
+    let db = Database::setup_for_testing::<JsonOperatorTable>().await?;
+    let mut conn = db.transaction().await?;
+
+    let data = JsonOperatorData {
+        payload: json!({"name": "Alice", "age": 30}),
+    };
+    query!(&mut conn, INSERT INTO JsonOperatorTable VALUES {data}).await?;
+
+    let expected = json!("Alice");
+    let result: JsonOperatorData = query!(&mut conn,
+        SELECT JsonOperatorData FROM JsonOperatorTable
+        WHERE payload -> "name" = {expected}
+    )
+    .await?;
+
+    assert_eq!(result.payload.get("name").and_then(|v| v.as_str()), Some("Alice"));
+
+    conn.rollback().await?;
     Ok(())
 }
 
@@ -1579,9 +1620,26 @@ async fn test_expr_json_arrow_operator() -> anyhow::Result<()> {
 #[always_context(skip(!))]
 #[tokio::test]
 async fn test_expr_json_double_arrow_operator() -> anyhow::Result<()> {
-    // Note: This test requires a table with JSONB column
-    // Skipping implementation as ExprTestTable doesn't have JSON columns
-    // This demonstrates the test pattern for JSON operators
+    use serde_json::json;
+
+    let db = Database::setup_for_testing::<JsonOperatorTable>().await?;
+    let mut conn = db.transaction().await?;
+
+    let data = JsonOperatorData {
+        payload: json!({"name": "Ada", "active": true}),
+    };
+    query!(&mut conn, INSERT INTO JsonOperatorTable VALUES {data}).await?;
+
+    let expected = "Ada".to_string();
+    let result: JsonOperatorData = query!(&mut conn,
+        SELECT JsonOperatorData FROM JsonOperatorTable
+        WHERE payload ->> "name" = {expected}
+    )
+    .await?;
+
+    assert_eq!(result.payload.get("name").and_then(|v| v.as_str()), Some("Ada"));
+
+    conn.rollback().await?;
     Ok(())
 }
 

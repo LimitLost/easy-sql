@@ -17,7 +17,15 @@ use easy_macros::always_context;
 
 use crate::{
     Driver, EasyExecutor, TableField,
-    markers::{AllowsNoPrimaryKey, SupportsAutoIncrementCompositePrimaryKey},
+    markers::{
+        AllowsNoPrimaryKey, SupportsAdd, SupportsAnd, SupportsAutoIncrementCompositePrimaryKey,
+        SupportsBetween, SupportsBitAnd, SupportsBitOr, SupportsBitShiftLeft,
+        SupportsBitShiftRight, SupportsConcatOperator, SupportsDiv, SupportsEqual,
+        SupportsGreaterThan, SupportsGreaterThanOrEqual, SupportsIn, SupportsIsNotNull,
+        SupportsIsNull, SupportsJsonExtract, SupportsJsonExtractText, SupportsLessThan,
+        SupportsLessThanOrEqual, SupportsLike, SupportsModOperator, SupportsMul, SupportsNotEqual,
+        SupportsOr, SupportsSub,
+    },
 };
 use sql_macros::{impl_supports_fn, impl_supports_fn_any};
 
@@ -114,6 +122,32 @@ impl_supports_fn!(Postgres, SupportsSqrt, 1);
 
 impl_supports_fn!(Postgres, SupportsCast, 1, 2);
 impl_supports_fn!(Postgres, SupportsDistinct, 1);
+
+impl SupportsAnd for Postgres {}
+impl SupportsOr for Postgres {}
+impl SupportsAdd for Postgres {}
+impl SupportsSub for Postgres {}
+impl SupportsMul for Postgres {}
+impl SupportsDiv for Postgres {}
+impl SupportsModOperator for Postgres {}
+impl SupportsConcatOperator for Postgres {}
+impl SupportsJsonExtract for Postgres {}
+impl SupportsJsonExtractText for Postgres {}
+impl SupportsBitAnd for Postgres {}
+impl SupportsBitOr for Postgres {}
+impl SupportsBitShiftLeft for Postgres {}
+impl SupportsBitShiftRight for Postgres {}
+impl SupportsEqual for Postgres {}
+impl SupportsNotEqual for Postgres {}
+impl SupportsGreaterThan for Postgres {}
+impl SupportsGreaterThanOrEqual for Postgres {}
+impl SupportsLessThan for Postgres {}
+impl SupportsLessThanOrEqual for Postgres {}
+impl SupportsLike for Postgres {}
+impl SupportsIsNull for Postgres {}
+impl SupportsIsNotNull for Postgres {}
+impl SupportsIn for Postgres {}
+impl SupportsBetween for Postgres {}
 
 fn table_field_definition(field: TableField) -> String {
     let TableField {

@@ -172,3 +172,10 @@ pub fn impl_supports_fn(input: TokenStream) -> anyhow::Result<TokenStream> {
 pub fn define_supports_fn_trait(input: TokenStream) -> anyhow::Result<TokenStream> {
     macros::define_supports_fn_trait(input)
 }
+
+#[proc_macro]
+#[always_context]
+#[anyhow_result]
+pub fn define_supports_operator_trait(input: TokenStream) -> anyhow::Result<TokenStream> {
+    macros::define_supports_operator_trait(input)
+}

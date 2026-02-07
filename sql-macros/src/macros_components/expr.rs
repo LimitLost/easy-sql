@@ -1,5 +1,7 @@
+use std::fmt::Display;
+
 use super::{CollectedData, builtin_functions};
-use crate::macros_components::keyword::DoubleArrow;
+use crate::macros_components::keyword::{DoubleArrow};
 
 use super::{column::Column, next_clause::next_clause_token};
 
@@ -10,7 +12,7 @@ use ::{
 };
 use easy_macros::always_context;
 use convert_case::{Case, Casing};
-use quote::{ToTokens, format_ident, quote, quote_spanned};
+use quote::{IdentFragment, ToTokens, format_ident, quote, quote_spanned};
 use syn::ext::IdentExt;
 
 syn::custom_punctuation!(NotEqualsMicrosoft,<>);
@@ -35,6 +37,8 @@ pub enum Operator {
     Concat,
     ///-> or ->>
     JsonExtract,
+    ///->>
+    JsonExtractText,
     /// &
     BitAnd,
     /// |
@@ -72,6 +76,17 @@ impl Parse for Operator {
         } else if lookahead.peek(syn::Token![+]) {
             input.parse::<syn::Token![+]>()?;
             Ok(Operator::Add)
+        } else if input.peek(syn::Token![-]) && input.peek2(syn::Token![>>]) {
+            input.parse::<syn::Token![-]>()?;
+            input.parse::<syn::Token![>>]>()?;
+            Ok(Operator::JsonExtractText)
+        }else if lookahead.peek(syn::Token![->]) {
+            input.parse::<syn::Token![->]>()?;
+            Ok(Operator::JsonExtract)
+        }  else if input.peek(syn::Token![-]) && input.peek2(syn::Token![>]) {
+            input.parse::<syn::Token![-]>()?;
+            input.parse::<syn::Token![>]>()?;
+            Ok(Operator::JsonExtract)
         } else if lookahead.peek(syn::Token![-]) {
             input.parse::<syn::Token![-]>()?;
             Ok(Operator::Sub)
@@ -87,12 +102,6 @@ impl Parse for Operator {
         } else if lookahead.peek(syn::Token![||]) {
             input.parse::<syn::Token![||]>()?;
             Ok(Operator::Concat)
-        } else if lookahead.peek(DoubleArrow) {
-            input.parse::<DoubleArrow>()?;
-            Ok(Operator::JsonExtract)
-        } else if lookahead.peek(syn::Token![->]) {
-            input.parse::<syn::Token![->]>()?;
-            Ok(Operator::JsonExtract)
         } else if lookahead.peek(syn::Token![&]) {
             input.parse::<syn::Token![&]>()?;
             Ok(Operator::BitAnd)
@@ -168,6 +177,22 @@ impl NotChain {
     }
 }
 
+fn add_operator_support_check<T>(
+    data: &mut CollectedData,
+    operator_in_trait_name: T,
+) where T:IdentFragment,for<'a> &'a T: Display+IdentFragment{
+    let sql_crate = data.sql_crate;
+    let trait_ident= format_ident!("Supports{}", operator_in_trait_name);
+    for driver_ty in data.driver.iter_for_checks() {
+        data.checks.push(quote_spanned! {proc_macro2::Span::call_site()=>
+            {
+                fn __easy_sql_assert_supports_operator<T: #sql_crate::markers::#trait_ident>() {}
+                __easy_sql_assert_supports_operator::<#driver_ty>();
+            }
+        });
+    }
+}
+
 #[derive(Debug, Clone)]
 pub enum Expr {
     Value(Value),
@@ -195,6 +220,10 @@ impl Expr {
                 for_custom_select,
             ),
             Expr::IsNull(val) => {
+                add_operator_support_check(
+                    data,
+                    "IsNull",
+                );
                 let val_sql = val.into_query_string(
                     data,
                     false,
@@ -203,6 +232,10 @@ impl Expr {
                 format!("{} IS NULL", val_sql)
             }
             Expr::IsNotNull(val) => {
+                add_operator_support_check(
+                    data,
+                    "IsNotNull",
+                );
                 let val_sql = val.into_query_string(
                     data,
                     false,
@@ -229,6 +262,14 @@ impl Expr {
                     )
                 );
                 for (not_chain, op, expr) in rest {
+                    let op_trait_name = match op {
+                        Operator::Mod|Operator::Concat => format!("{:?}Operator",op),
+                        op=>format!("{:?}",op)
+                    };
+                    add_operator_support_check(
+                        data,
+                        op_trait_name,
+                    );
                     let op_str = match op {
                         Operator::And => " AND ",
                         Operator::Or => " OR ",
@@ -239,6 +280,7 @@ impl Expr {
                         Operator::Mod => " % ",
                         Operator::Concat => " || ",
                         Operator::JsonExtract => " -> ",
+                        Operator::JsonExtractText => " ->> ",
                         Operator::BitAnd => " & ",
                         Operator::BitOr => " | ",
                         Operator::BitShiftLeft => " << ",
@@ -263,6 +305,10 @@ impl Expr {
                 result
             }
             Expr::In(val, values) => {
+                add_operator_support_check(
+                    data,
+                    "In",
+                );
                 let val_sql = val.into_query_string(
                     data,
                     false,
@@ -346,6 +392,10 @@ impl Expr {
                 }
             }
             Expr::Between(val, min, max) => {
+                add_operator_support_check(
+                    data,
+                    "Between",
+                );
                 let val_sql = val.into_query_string(
                     data,
                     false,
@@ -876,14 +926,16 @@ fn continue_parse_value_maybe_expr(
 
     if lookahead.peek(keyword::and)
         || lookahead.peek(keyword::or)
-        || lookahead.peek(syn::Token![+])
-        || lookahead.peek(syn::Token![-])
+    || lookahead.peek(syn::Token![+])
+    || lookahead.peek(DoubleArrow)
+    || lookahead.peek(syn::Token![->])
+    || (input.peek(syn::Token![-]) && input.peek2(syn::Token![>>]))
+    || (input.peek(syn::Token![-]) && input.peek2(syn::Token![>]))
+    || lookahead.peek(syn::Token![-])
         || lookahead.peek(syn::Token![*])
         || lookahead.peek(syn::Token![/])
         || lookahead.peek(syn::Token![%])
         || lookahead.peek(syn::Token![||])
-        || lookahead.peek(DoubleArrow)
-        || lookahead.peek(syn::Token![->])
         || lookahead.peek(syn::Token![&])
         || lookahead.peek(syn::Token![|])
         || lookahead.peek(syn::Token![<<])

@@ -10,3 +10,5 @@ mod impl_supports_fn;
 pub use impl_supports_fn::*;
 mod define_supports_fn_trait;
 pub use define_supports_fn_trait::*;
+mod define_supports_operator_trait;
+pub use define_supports_operator_trait::*;

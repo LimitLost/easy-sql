@@ -16,7 +16,16 @@ mod alter_table;
 mod create_table;
 mod table_exists;
 
-use crate::{Driver, EasyExecutor, TableField, markers::AllowsNoPrimaryKey};
+use crate::{
+    Driver, EasyExecutor, TableField,
+    markers::{
+        AllowsNoPrimaryKey, SupportsAdd, SupportsAnd, SupportsBetween, SupportsBitAnd,
+        SupportsBitOr, SupportsBitShiftLeft, SupportsBitShiftRight, SupportsConcatOperator,
+        SupportsDiv, SupportsEqual, SupportsGreaterThan, SupportsGreaterThanOrEqual, SupportsIn,
+        SupportsIsNotNull, SupportsIsNull, SupportsLessThan, SupportsLessThanOrEqual, SupportsLike,
+        SupportsModOperator, SupportsMul, SupportsNotEqual, SupportsOr, SupportsSub,
+    },
+};
 use sql_macros::{impl_supports_fn, impl_supports_fn_any};
 
 /// Marker type for the SQLite driver.
@@ -119,6 +128,31 @@ impl_supports_fn!(Sqlite, SupportsSqrt, 1);
 
 impl_supports_fn!(Sqlite, SupportsCast, 1, 2);
 impl_supports_fn!(Sqlite, SupportsDistinct, 1);
+
+impl SupportsAnd for Sqlite {}
+impl SupportsOr for Sqlite {}
+impl SupportsAdd for Sqlite {}
+impl SupportsSub for Sqlite {}
+impl SupportsMul for Sqlite {}
+impl SupportsDiv for Sqlite {}
+impl SupportsModOperator for Sqlite {}
+impl SupportsConcatOperator for Sqlite {}
+impl SupportsBitAnd for Sqlite {}
+impl SupportsBitOr for Sqlite {}
+impl SupportsBitShiftLeft for Sqlite {}
+impl SupportsBitShiftRight for Sqlite {}
+impl SupportsEqual for Sqlite {}
+impl SupportsNotEqual for Sqlite {}
+impl SupportsGreaterThan for Sqlite {}
+impl SupportsGreaterThanOrEqual for Sqlite {}
+impl SupportsLessThan for Sqlite {}
+impl SupportsLessThanOrEqual for Sqlite {}
+impl SupportsLike for Sqlite {}
+impl SupportsIsNull for Sqlite {}
+impl SupportsIsNotNull for Sqlite {}
+impl SupportsIn for Sqlite {}
+impl SupportsBetween for Sqlite {}
+
 #[always_context]
 fn table_field_definition(field: TableField) -> String {
     let TableField {
