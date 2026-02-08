@@ -57,15 +57,14 @@ async fn mini_demo() -> anyhow::Result<()> {
         };
         query!(&mut conn, INSERT INTO UserTable VALUES {data}).await?;
 
-        let email = "sam@example.com";
         let new_email = "sammy@example.com";
         query!(&mut conn,
-            UPDATE UserTable SET active = false, email = {new_email} WHERE UserTable.email = {email}
+            UPDATE UserTable SET active = false, email = {new_email} WHERE UserTable.email = "sam@example.com"
         )
         .await?;
 
         let row: UserRow = query!(&mut conn,
-            SELECT UserRow FROM UserTable WHERE email = {email}
+            SELECT UserRow FROM UserTable WHERE email = {new_email}
         )
         .await?;
 

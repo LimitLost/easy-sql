@@ -11,5 +11,5 @@ mod table_join_macro;
 mod table_macro;
 mod update_macro;
 
-#[cfg(not(feature = "migrations"))]
+#[cfg(all(not(feature = "migrations"), feature = "sqlite"))]
 mod mini_demo;
