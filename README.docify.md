@@ -98,7 +98,7 @@ Migrations are optional and driven by table versions in [`Table`](https://docs.r
 1. **Create the table struct** and set `#[sql(version = 1)]`.
 2. **Save/build** so the build helper can generate `#[sql(unique_id = "...")]` and register the version structure in `easy_sql.ron`.
 3. **Update the table** (add/rename fields), then bump the version up.
-4. **Save/build again** — the migration from version 1 is automatically generated and will be applied when Database::setup or DatabaseSetup::setup are called.
+4. **Save/build again** — the migration from version 1 is automatically generated and will be applied when (driver related) `Database::setup` or (table related) `DatabaseSetup::setup` are called.
 
 Version tracking is stored in [`EasySqlTables`](https://docs.rs/easy-sql/latest/easy_sql/struct.EasySqlTables.html), and you can opt out with `#[sql(no_version)]` (needed only when `migrations` feature is enabled).
 
@@ -115,19 +115,19 @@ Version tracking is stored in [`EasySqlTables`](https://docs.rs/easy-sql/latest/
 
 Each feature below is toggled on `easy-sql` (not on SQLx). Defaults are noted.
 
-| Feature                       | Default | Description                                                                                                                                        |
-| ----------------------------- | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `sqlite`                      | ❌      | Enable the SQLite driver.                                                                                                                          |
-| `postgres`                    | ❌      | Enable the Postgres driver.                                                                                                                        |
-| `sqlite_math`                 | ❌      | Enable extra SQLite math functions. Sqlite needs to be compiled with LIBSQLITE3_FLAGS="-DSQLITE_ENABLE_MATH_FUNCTIONS" for those functions to work |
-| `migrations`                  | ❌      | Enable migration generation and tracking.                                                                                                          |
-| `check_duplicate_table_names` | ✅      | Detect duplicate table names at build time.                                                                                                        |
-| `use_output_columns`          | ❌      | Bare columns refer to output the type, instead of the table type.                                                                                  |
-| `bigdecimal`                  | ❌      | Add `BigDecimal` `ToDefault` support (SQLx `bigdecimal`).                                                                                          |
-| `rust_decimal`                | ❌      | Add `Decimal` `ToDefault` support (SQLx `rust_decimal`).                                                                                           |
-| `uuid`                        | ❌      | Add `Uuid` `ToDefault` support via SQLx.                                                                                                           |
-| `chrono`                      | ❌      | Add `chrono` `ToDefault` support via SQLx.                                                                                                         |
-| `ipnet`                       | ❌      | Add `ipnet` `ToDefault` support via SQLx.                                                                                                          |
+| Feature                       | Default | Description                                                                                                                                          |
+| ----------------------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `sqlite`                      | ❌      | Enable the SQLite driver.                                                                                                                            |
+| `postgres`                    | ❌      | Enable the Postgres driver.                                                                                                                          |
+| `sqlite_math`                 | ❌      | Enable extra SQLite math functions. Sqlite needs to be compiled with `LIBSQLITE3_FLAGS="-DSQLITE_ENABLE_MATH_FUNCTIONS"` for those functions to work |
+| `migrations`                  | ❌      | Enable migration generation and tracking.                                                                                                            |
+| `check_duplicate_table_names` | ✅      | Detect duplicate table names at build time.                                                                                                          |
+| `use_output_columns`          | ❌      | Bare columns refer to output the type, instead of the table type.                                                                                    |
+| `bigdecimal`                  | ❌      | Add `BigDecimal` `ToDefault` support (SQLx `bigdecimal`).                                                                                            |
+| `rust_decimal`                | ❌      | Add `Decimal` `ToDefault` support (SQLx `rust_decimal`).                                                                                             |
+| `uuid`                        | ❌      | Add `Uuid` `ToDefault` support via SQLx.                                                                                                             |
+| `chrono`                      | ❌      | Add `chrono` `ToDefault` support via SQLx.                                                                                                           |
+| `ipnet`                       | ❌      | Add `ipnet` `ToDefault` support via SQLx.                                                                                                            |
 
 ## License
 
