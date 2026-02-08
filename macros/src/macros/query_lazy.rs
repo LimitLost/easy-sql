@@ -47,7 +47,7 @@ pub fn query_lazy(input_raw: proc_macro::TokenStream) -> anyhow::Result<proc_mac
     let driver = if let Some(driver_path) = input.driver {
         ProvidedDrivers::Single(quote! {#driver_path})
     } else {
-        let compilation_data = CompilationData::load(Vec::<String>::new(), false).with_context(|| {
+        let compilation_data = CompilationData::load_in_macro().with_context(|| {
             "Failed to load compilation data for query_lazy! macro. Make sure easy_sql_build::build is called in the build script"
         })?;
 

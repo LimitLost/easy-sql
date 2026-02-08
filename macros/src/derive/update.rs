@@ -388,7 +388,7 @@ pub fn update(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::Token
     #[no_context]
     let table = table.with_context(context!("Table attribute is required"))?;
 
-    let compilation_data = CompilationData::load(Vec::<String>::new(), false)?;
+    let compilation_data = CompilationData::load_in_macro()?;
     let supported_drivers = super::supported_drivers(&item, &compilation_data, true)?;
 
     sql_update_base(item_name, fields, &table, &supported_drivers).map(|tokens| tokens.into())

@@ -253,7 +253,7 @@ pub fn insert(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::Token
         defaults.extend(parsed.fields.into_iter());
     }
 
-    let compilation_data = CompilationData::load(Vec::<String>::new(), false)?;
+    let compilation_data = CompilationData::load_in_macro()?;
 
     let supported_drivers = super::supported_drivers(&item, &compilation_data, true)?;
 

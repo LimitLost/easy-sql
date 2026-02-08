@@ -155,6 +155,7 @@ impl CompilationData {
 
         Ok(current_dir.join("easy_sql.ron"))
     }
+
     #[cfg(feature = "build")]
     pub fn load(
         default_drivers: Vec<String>,
@@ -163,37 +164,44 @@ impl CompilationData {
         let data_path = Self::data_location()?;
 
         let data: CompilationData = {
-            #[cfg(feature = "build")]
+            if !data_path.exists() {
+                CompilationData {
+                    tables: HashMap::new(),
+                    #[cfg(feature = "check_duplicate_table_names")]
+                    used_table_names: HashMap::new(),
+                    default_drivers,
+                }
+            } else {
+                let data = std::fs::read_to_string(&data_path)
+                    .context("Failed to read easy_sql.ron file")?;
+
+                let mut data: CompilationData =
+                    ron::de::from_str(&data).context("Failed to parse easy_sql.ron file")?;
+
+                if default_drivers_update && data.default_drivers != default_drivers {
+                    data.default_drivers = default_drivers;
+                    data.save()?;
+                }
+
+                data
+            }
+        };
+
+        Ok(data)
+    }
+
+    pub fn load_in_macro() -> anyhow::Result<CompilationData> {
+        let data_path = Self::data_location()?;
+
+        let data: CompilationData = {
             {
                 if !data_path.exists() {
-                    CompilationData {
+                    return Ok(CompilationData {
                         tables: HashMap::new(),
                         #[cfg(feature = "check_duplicate_table_names")]
                         used_table_names: HashMap::new(),
-                        default_drivers,
-                    }
-                } else {
-                    let data = std::fs::read_to_string(&data_path)
-                        .context("Failed to read easy_sql.ron file")?;
-
-                    let mut data: CompilationData =
-                        ron::de::from_str(&data).context("Failed to parse easy_sql.ron file")?;
-
-                    if default_drivers_update && data.default_drivers != default_drivers {
-                        data.default_drivers = default_drivers;
-                        data.save()?;
-                    }
-
-                    data
-                }
-            }
-            #[cfg(not(feature = "build"))]
-            {
-                if !data_path.exists() {
-                    anyhow::bail!(
-                        "`easy_sql::build` in build script is required (for automatic migrations and checks); easy_sql.ron file not found in the project directory: {:?}",
-                        data_path
-                    );
+                        default_drivers: Vec::new(),
+                    });
                 }
 
                 let data = std::fs::read_to_string(&data_path)

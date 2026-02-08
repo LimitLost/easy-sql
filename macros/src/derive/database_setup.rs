@@ -22,7 +22,7 @@ pub fn database_setup(item: proc_macro::TokenStream) -> anyhow::Result<proc_macr
         syn::Fields::Unit => anyhow::bail!("Unit struct is not supported"),
     };
 
-    let compilation_data = CompilationData::load(Vec::<String>::new(), false)?;
+    let compilation_data = CompilationData::load_in_macro()?;
 
     let supported_drivers = super::supported_drivers(&item, &compilation_data, false)?;
 

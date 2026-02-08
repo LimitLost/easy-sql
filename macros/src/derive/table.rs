@@ -114,7 +114,7 @@ pub fn table(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::TokenS
     #[cfg(feature = "migrations")]
     let skip_migrations = no_version;
 
-    let compilation_data = CompilationData::load(Vec::<String>::new(), false)?;
+    let compilation_data = CompilationData::load_in_macro()?;
 
     #[cfg(feature = "check_duplicate_table_names")]
     if let Some(entries) = compilation_data.used_table_names.get(&table_name) {

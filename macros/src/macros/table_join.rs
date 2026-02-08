@@ -220,7 +220,7 @@ pub fn table_join(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::T
 
     let mut result = TokensBuilder::default();
 
-    let compilation_data = CompilationData::load(Vec::<String>::new(), false)?;
+    let compilation_data = CompilationData::load_in_macro()?;
 
     let supported_drivers = supported_drivers(input.drivers.clone(), &compilation_data)?
         .into_iter()
