@@ -144,7 +144,7 @@ Tip: Use `#[sql(table_name = ...)]` or rename one of the structs",
         }
     }
 
-    let supported_drivers = super::supported_drivers(&item, &compilation_data)?;
+    let supported_drivers = super::supported_drivers(&item, &compilation_data, false)?;
 
     #[cfg(feature = "migrations")]
     let mut table_version = None;
@@ -480,7 +480,7 @@ Tip: Use `#[sql(table_name = ...)]` or rename one of the structs",
                     #table_name,
                     vec![
                         #(
-                        #sql_crate::TableField{
+                        #sql_crate::driver::TableField{
                             name: #field_names_str,
                             data_type: #field_types,
                             is_unique: #is_unique,

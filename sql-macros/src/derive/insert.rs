@@ -256,7 +256,7 @@ pub fn insert(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::Token
 
     let compilation_data = CompilationData::load(Vec::<String>::new(), false)?;
 
-    let supported_drivers = super::supported_drivers(&item, &compilation_data)?;
+    let supported_drivers = super::supported_drivers(&item, &compilation_data, true)?;
 
     sql_insert_base(
         &item_name,

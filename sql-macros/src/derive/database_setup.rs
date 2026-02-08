@@ -24,7 +24,7 @@ pub fn database_setup(item: proc_macro::TokenStream) -> anyhow::Result<proc_macr
 
     let compilation_data = CompilationData::load(Vec::<String>::new(), false)?;
 
-    let supported_drivers = super::supported_drivers(&item, &compilation_data)?;
+    let supported_drivers = super::supported_drivers(&item, &compilation_data, false)?;
 
     let mut result = TokensBuilder::default();
 

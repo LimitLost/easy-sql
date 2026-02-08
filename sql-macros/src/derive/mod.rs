@@ -41,6 +41,7 @@ fn ty_to_variant(
 fn supported_drivers(
     item: &ItemStruct,
     compilation_data: &CompilationData,
+    optional: bool,
 ) -> anyhow::Result<Vec<Path>> {
     if let Some(attr_data) = get_attributes!(item, #[sql(drivers = __unknown__)])
         .into_iter()
@@ -75,9 +76,11 @@ fn supported_drivers(
         }
 
         Ok(drivers)
-    } else {
+    } else if !optional {
         anyhow::bail!(
             "No default drivers provided in the build script, please provide supported drivers using #[sql(drivers = ExampleDriver1,ExampleDriver2])] attribute"
         );
+    } else {
+        Ok(vec![])
     }
 }
