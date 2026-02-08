@@ -14,7 +14,7 @@ struct ReturningArgData {
 }
 
 impl ReturningData {
-    fn build_arg_data(&self, data: &mut CollectedData) -> ReturningArgData {
+    fn build_arg_data(&mut self, data: &mut CollectedData) -> ReturningArgData {
         let mut arg_defs = Vec::new();
         let mut arg_tokens = Vec::new();
 
@@ -23,7 +23,7 @@ impl ReturningData {
         let sql_crate = data.sql_crate;
         let table_type = data.main_table_type;
 
-        if let Some(output_args) = &self.output_args {
+        if let Some(output_args) = &mut self.output_args {
             data.checks.push(quote! {
                 let _ = || {
                     fn __easy_sql_assert_with_args<T: #sql_crate::markers::WithArgsSelect>() {}
@@ -31,7 +31,7 @@ impl ReturningData {
                 };
             });
 
-            for (idx, arg) in output_args.iter().enumerate() {
+            for (idx, arg) in output_args.drain(..).enumerate() {
                 let mut arg_format_params = Vec::new();
                 let mut data = data.with_format_params(&mut arg_format_params);
                 let arg_sql_template = arg.into_query_string(&mut data, false, false);
@@ -72,7 +72,7 @@ pub fn generate_select(
     sql_crate: &TokenStream,
     macro_input: &str,
 ) -> anyhow::Result<TokenStream> {
-    let output = select.output;
+    let mut output = select.output;
     let table_type = select.table_type;
     let table_type_tokens = table_type.to_token_stream();
     let distinct = select.distinct;
@@ -330,7 +330,7 @@ pub fn generate_insert(
         returning_arg_binds,
         returning_before_format,
         returning_checks,
-    ) = if let Some(returning) = insert.returning {
+    ) = if let Some(mut returning) = insert.returning {
         let returning_type: syn::Type = returning.output_type.clone();
         let returning_has_args = returning.output_args.is_some();
         let mut returning_arg_binds = Vec::new();
@@ -647,7 +647,8 @@ pub fn generate_update(
         "sql query! macro input: {}"
     };
 
-    let (returning_select, execute, returning_arg_defs) = if let Some(returning) = update.returning
+    let (returning_select, execute, returning_arg_defs) = if let Some(mut returning) =
+        update.returning
     {
         let returning_type: syn::Type = returning.output_type.clone();
         let returning_has_args = returning.output_args.is_some();
@@ -902,7 +903,8 @@ pub fn generate_delete(
         "sql query! macro input: {}"
     };
 
-    let (returning_select, execute, returning_arg_defs) = if let Some(returning) = delete.returning
+    let (returning_select, execute, returning_arg_defs) = if let Some(mut returning) =
+        delete.returning
     {
         let returning_type: syn::Type = returning.output_type.clone();
         let returning_has_args = returning.output_args.is_some();

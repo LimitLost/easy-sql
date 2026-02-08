@@ -18,7 +18,7 @@ struct DefaultAttr {
 #[always_context]
 impl Parse for DefaultAttr {
     fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
-        let fields = Punctuated::<syn::Ident, syn::Token![,]>::parse_terminated(&input)?;
+        let fields = Punctuated::<syn::Ident, syn::Token![,]>::parse_terminated(input)?;
         Ok(DefaultAttr { fields })
     }
 }
@@ -66,11 +66,10 @@ pub fn sql_insert_base(
         } else {
             quote! { #mapped }
         };
-        let debug_format_str =
-            format!("Binding field `{}` to query failed", field_name.to_string());
+        let debug_format_str = format!("Binding field `{}` to query failed", field_name);
         let debug_format_str_ref = format!(
             "Failed to add `{}` (= {{:?}}) to the sqlx arguments list",
-            field_name.to_string()
+            field_name
         );
         insert_values_debug.push(quote! {
             .context(#debug_format_str)
@@ -259,8 +258,8 @@ pub fn insert(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::Token
     let supported_drivers = super::supported_drivers(&item, &compilation_data, true)?;
 
     sql_insert_base(
-        &item_name,
-        &fields,
+        item_name,
+        fields,
         &table,
         &supported_drivers,
         defaults.clone(),

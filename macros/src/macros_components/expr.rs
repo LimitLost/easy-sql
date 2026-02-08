@@ -168,7 +168,7 @@ impl syn::parse::Parse for NotChain {
 }
 
 impl NotChain {
-    pub fn into_query_string(&self) -> String {
+    pub fn into_query_string(self) -> String {
         let mut current_query = String::new();
         for _ in 0..self.not_count {
             current_query.push_str("NOT ");
@@ -195,20 +195,20 @@ fn add_operator_support_check<T>(
 
 #[derive(Debug, Clone)]
 pub enum Expr {
-    Value(Value),
+    Value(Box<Value>),
     Parenthesized(Box<Expr>),
     OperatorChain(NotChain, Box<Expr>, Vec<(NotChain, Operator, Expr)>),
-    IsNull(Value),
-    IsNotNull(Value),
-    In(Value, ValueIn),
-    Between(Value, Value, Value),
+    IsNull(Box<Value>),
+    IsNotNull(Box<Value>),
+    In(Box<Value>, Box<ValueIn>),
+    Between(Box<Value>, Box<Value>, Box<Value>),
 }
 
 #[always_context]
 impl Expr {
     ///`main_table_type` - None means we're inside of table join
     pub fn into_query_string(
-        &self,
+        self,
         data: &mut CollectedData,
         inside_count_fn: bool,
         for_custom_select: bool,
@@ -261,8 +261,8 @@ impl Expr {
                         for_custom_select,
                     )
                 );
-                for (not_chain, op, expr) in rest {
-                    let op_trait_name = match op {
+                for (not_chain, op, expr) in rest.into_iter() {
+                    let op_trait_name = match &op {
                         Operator::Mod|Operator::Concat => format!("{:?}Operator",op),
                         op=>format!("{:?}",op)
                     };
@@ -314,10 +314,10 @@ impl Expr {
                     false,
                     for_custom_select,
                 );
-                match values {
+                match *values {
                     ValueIn::Multiple(vals) => {
                         let mut in_items = Vec::new();
-                        for v in vals.iter() {
+                        for v in vals.into_iter() {
                             in_items.push(v.into_query_string(
                                 data,
                                 false,
@@ -340,7 +340,7 @@ impl Expr {
                         // Generate dynamic placeholder list based on the runtime length of the collection
                         let debug_str = format!(
                             "Failed to bind items from `{}` to query parameters",
-                            v.to_token_stream().to_string()
+                            v.to_token_stream()
                         );
 
                         let param_start = *data.current_param_n;
@@ -424,14 +424,14 @@ impl Expr {
             Expr::Parenthesized(inner) => inner.collect_indices_impl(indices),
             Expr::OperatorChain(_, first, chain) => {
                 first.collect_indices_impl(indices);
-                for (_, _, expr) in chain {
+                for (_, _, expr) in chain.iter() {
                     expr.collect_indices_impl(indices);
                 }
             }
             Expr::IsNull(v) | Expr::IsNotNull(v) => v.collect_indices_impl(indices),
             Expr::In(v, value_in) => {
                 v.collect_indices_impl(indices);
-                match value_in {
+                match &**value_in {
                     ValueIn::SingleVar(_) | ValueIn::SingleColumn(_) => {}
                     ValueIn::Multiple(exprs) => {
                         for e in exprs.iter() {
@@ -483,7 +483,7 @@ impl Value {
     }
     ///`main_table_type` - None means we're inside of table join
     fn into_query_string(
-        &self,
+        self,
         data: &mut CollectedData,
         inside_count: bool,
         for_custom_select: bool,
@@ -520,7 +520,7 @@ impl Value {
                 // Normal mode: use bind parameters
                 let debug_str = format!(
                     "Failed to bind `{}` to query parameter",
-                    lit.to_token_stream().to_string()
+                    lit.to_token_stream()
                 );
                 data.binds.push(quote::quote_spanned! {lit.span()=>
                         _easy_sql_args.add(&#lit).map_err(anyhow::Error::from_boxed).context(#debug_str)?;
@@ -529,7 +529,7 @@ impl Value {
                     sql_crate,
                     lit.span(),
                     &data.before_param_n,
-                    &*data.current_param_n,
+                    *data.current_param_n,
                 ));
                 *data.current_param_n += 1;
                 "{}".to_string()
@@ -537,22 +537,21 @@ impl Value {
             Value::OutsideVariable(expr_val) => {
                 // Check if this is an {argN} pattern for custom select
                 if for_custom_select {
-                    if let syn::Expr::Path(expr_path) = expr_val {
-                        if expr_path.path.segments.len() == 1 {
+                    let expr_val_span = expr_val.span();
+                    if let syn::Expr::Path(expr_path) = expr_val
+                        && expr_path.path.segments.len() == 1 {
                             let ident = &expr_path.path.segments[0].ident;
                             let ident_str = ident.to_string();
-                            if let Some(stripped) = ident_str.strip_prefix("arg") {
-                                if let Ok(_idx) = stripped.parse::<usize>() {
+                            if let Some(stripped) = ident_str.strip_prefix("arg")
+                                && let Ok(_idx) = stripped.parse::<usize>() {
                                     // This is an {argN} placeholder - push the identifier as a variable reference
                                     data.format_params.push(quote::quote! {
                                         #ident
                                     });
                                     return "{}".to_string();
                                 }
-                            }
                         }
-                    }
-                    data.checks.push(quote::quote_spanned! {expr_val.span()=>
+                    data.checks.push(quote::quote_spanned! {expr_val_span=>
                         {
                             compile_error!("Outside variables in custom select must be in the form {argN}, where N is the argument index. Then enter them in the query! like this: query!(SELECT CurrentType(input0, input1, ...) FROM ...)");
                         }
@@ -573,7 +572,7 @@ impl Value {
                 // Normal outside variable handling
                 let debug_str = format!(
                     "Failed to bind `{}` to query parameter",
-                    expr_val.to_token_stream().to_string()
+                    expr_val.to_token_stream()
                 );
                 data.binds.push(quote::quote_spanned! {expr_val.span()=>
                         _easy_sql_args.add(&#expr_val).map_err(anyhow::Error::from_boxed).context(#debug_str)?;
@@ -582,7 +581,7 @@ impl Value {
                     sql_crate,
                     expr_val.span(),
                     &data.before_param_n,
-                    &*data.current_param_n,
+                    *data.current_param_n,
                 ));
 
                 *data.current_param_n += 1;
@@ -603,7 +602,7 @@ impl Value {
                     inside_count,
                     for_custom_select,
                 );
-                let type_info = data.driver.type_info(sql_crate, ty);
+                let type_info = data.driver.type_info(sql_crate, &ty);
                 data.types_driver_support_needed.push(ty.to_token_stream());
                 data.format_params.push(quote_spanned! {ty.span()=>
                     #type_info
@@ -660,7 +659,7 @@ impl Value {
                 }
                 format!("{}({})", func_name, arg_strings.join(", "))
                 }else{
-                    return func_name;
+                     func_name
                 }
 
             }
@@ -683,23 +682,20 @@ impl Value {
         match self {
             Value::OutsideVariable(expr) => {
                 // Extract index from {argN} pattern
-                if let syn::Expr::Path(expr_path) = expr {
-                    if expr_path.path.segments.len() == 1 {
+                if let syn::Expr::Path(expr_path) = expr
+                    && expr_path.path.segments.len() == 1 {
                         let ident_str = expr_path.path.segments[0].ident.to_string();
-                        if let Some(stripped) = ident_str.strip_prefix("arg") {
-                            if let Ok(idx) = stripped.parse::<usize>() {
+                        if let Some(stripped) = ident_str.strip_prefix("arg")
+                            && let Ok(idx) = stripped.parse::<usize>() {
                                 indices.insert(idx);
                             }
-                        }
                     }
-                }
             }
-            Value::FunctionCall { args, .. } => {
-                if let Some(args) = args {
+            Value::FunctionCall { args:Some(args), .. } => {
                     for e in args {
                         e.collect_indices_impl(indices);
                     }
-                }
+                
             }
             Value::Cast { expr, .. } => {
                 expr.collect_indices_impl(indices);
@@ -712,7 +708,7 @@ impl Value {
 pub enum ValueIn {
     SingleVar(syn::Expr),
     SingleColumn(Column),
-    Multiple(Box<Vec<Expr>>),
+    Multiple(Vec<Expr>),
 }
 
 #[always_context]
@@ -783,7 +779,7 @@ impl Parse for Value {
                     let star_token = inside_paren.parse::<syn::Token![*]>()?;
 
                     // Add star as an Expr::Value(Value::Star)
-                    args.push(Expr::Value(Value::Star(star_token)));
+                    args.push(Expr::Value(Box::new(Value::Star(star_token))));
 
                     // No comma after star for COUNT(*)
                 } else {
@@ -851,7 +847,7 @@ impl Parse for ValueIn {
                     break;
                 }
             }
-            Ok(ValueIn::Multiple(Box::new(values)))
+            Ok(ValueIn::Multiple(values))
         } else if lookahead.peek(syn::Ident) {
             // Could be a column reference or the start of a path
             Ok(ValueIn::SingleColumn(input.parse()?))
@@ -873,7 +869,7 @@ fn continue_parse_value_no_expr(
     lookahead: syn::parse::Lookahead1<'_>,
 ) -> syn::Result<Expr> {
     if input.is_empty() || next_clause_token(&lookahead) {
-        return Ok(Expr::Value(current_value));
+        return Ok(Expr::Value(Box::new(current_value)));
     }
 
     if lookahead.peek(keyword::is) {
@@ -884,20 +880,20 @@ fn continue_parse_value_no_expr(
             let lookahead3 = input.lookahead1();
             if lookahead3.peek(keyword::null) {
                 input.parse::<keyword::null>()?;
-                Ok(Expr::IsNotNull(current_value))
+                Ok(Expr::IsNotNull(Box::new(current_value)))
             } else {
                 Err(lookahead3.error())
             }
         } else if lookahead2.peek(keyword::null) {
             input.parse::<keyword::null>()?;
-            Ok(Expr::IsNull(current_value))
+            Ok(Expr::IsNull(Box::new(current_value)))
         } else {
             Err(lookahead2.error())
         }
     } else if lookahead.peek(keyword::in_) {
         input.parse::<keyword::in_>()?;
         let right_value = input.parse::<ValueIn>()?;
-        Ok(Expr::In(current_value, right_value))
+        Ok(Expr::In(Box::new(current_value), Box::new(right_value)))
     } else if lookahead.peek(keyword::between) {
         input.parse::<keyword::between>()?;
         let middle_value = input.parse::<Value>()?;
@@ -905,7 +901,7 @@ fn continue_parse_value_no_expr(
         if lookahead2.peek(keyword::and) {
             input.parse::<keyword::and>()?;
             let right_value = input.parse::<Value>()?;
-            Ok(Expr::Between(current_value, middle_value, right_value))
+            Ok(Expr::Between(Box::new(current_value), Box::new(middle_value), Box::new(right_value)))
         } else {
             Err(lookahead2.error())
         }
@@ -919,7 +915,7 @@ fn continue_parse_value_maybe_expr(
     current_value: Value,
 ) -> syn::Result<Expr> {
     if input.is_empty() {
-        return Ok(Expr::Value(current_value));
+        return Ok(Expr::Value(Box::new(current_value)));
     }
 
     let lookahead = input.lookahead1();
@@ -950,7 +946,7 @@ fn continue_parse_value_maybe_expr(
         || lookahead.peek(keyword::like)
     {
         // We handle operators in the Expr::parse method
-        Ok(Expr::Value(current_value))
+        Ok(Expr::Value(Box::new(current_value)))
     } else {
         continue_parse_value_no_expr(input, current_value, lookahead)
     }
@@ -1002,7 +998,8 @@ impl Parse for Expr {
             let not_chain: NotChain = input.parse()?;
 
             #[allow(unused_mut)]
-            let current_expr = sub_where_expr(&input).map_err(|mut e| {
+            #[allow(clippy::map_identity)]
+            let current_expr = sub_where_expr(input).map_err(|mut e| {
                 #[cfg(feature = "parse_debug")]
                 e.combine(input.error("sub_where_expr"));
                 e

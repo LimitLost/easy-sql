@@ -8,7 +8,7 @@ use easy_macros::always_context;
 #[derive(Debug, Clone)]
 pub enum Limit {
     Literal(i64),
-    Expr(syn::Expr),
+    Expr(Box<syn::Expr>),
 }
 
 #[always_context]
@@ -23,7 +23,7 @@ impl Parse for Limit {
             let inside_braces;
             syn::braced!(inside_braces in input);
             let expr: syn::Expr = inside_braces.parse()?;
-            Ok(Limit::Expr(expr))
+            Ok(Limit::Expr(Box::new(expr)))
         } else {
             Err(lookahead.error())
         }
@@ -46,10 +46,7 @@ impl Limit {
                 });
 
                 // Add binding for the parameter
-                let debug_str = format!(
-                    "Failed to bind `{}` to LIMIT parameter",
-                    quote! {#expr}.to_string()
-                );
+                let debug_str = format!("Failed to bind `{}` to LIMIT parameter", quote! {#expr});
                 data.binds.push(quote_spanned! {expr.span()=>
                     _easy_sql_args.add(&#expr).map_err(anyhow::Error::from_boxed).context(#debug_str)?;
                 });
@@ -59,7 +56,7 @@ impl Limit {
                     data.sql_crate,
                     expr.span(),
                     &data.before_param_n,
-                    &*data.current_param_n,
+                    *data.current_param_n,
                 ));
                 *data.current_param_n += 1;
 

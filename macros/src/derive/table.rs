@@ -68,7 +68,7 @@ pub fn table(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::TokenS
         .collect::<Vec<_>>();
 
     let mut table_name = item_name.to_string().to_case(Case::Snake);
-
+    #[cfg(feature = "check_duplicate_table_names")]
     let mut table_name_attr_used = false;
 
     //Use name provided by the user if it exists
@@ -79,7 +79,10 @@ pub fn table(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::TokenS
         let lit_str: LitStr = syn::parse2(attr_data.clone())
             .context("Invalid table name provided, expected string with  quotes")?;
         table_name = lit_str.value();
-        table_name_attr_used = true;
+        #[cfg(feature = "check_duplicate_table_names")]
+        {
+            table_name_attr_used = true;
+        }
     }
     #[cfg(feature = "migrations")]
     let no_version = has_attributes!(item, #[sql(no_version)]);
@@ -320,11 +323,7 @@ Tip: Use `#[sql(table_name = ...)]` or rename one of the structs",
             let is_field_not_null = match &field_type {
                 syn::Type::Path(type_path) => {
                     if let Some(last_segment) = type_path.path.segments.last() {
-                        if last_segment.ident == "Option" {
-                            false
-                        } else {
-                            true
-                        }
+                        last_segment.ident != "Option"
                     } else {
                         true
                     }

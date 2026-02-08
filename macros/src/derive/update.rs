@@ -79,12 +79,9 @@ pub fn sql_update_base(
             &sql_crate,
         )?;
 
-        let debug_format_str =
-            format!("Binding field `{}` to query failed", field_name.to_string());
-        let debug_format_str_ref = format!(
-            "Binding field `{}` (= {{:?}}) to query failed",
-            field_name.to_string()
-        );
+        let debug_format_str = format!("Binding field `{}` to query failed", field_name);
+        let debug_format_str_ref =
+            format!("Binding field `{}` (= {{:?}}) to query failed", field_name);
 
         if maybe_update {
             let outer = option_inner_type(&field.ty).with_context(|| {
@@ -394,5 +391,5 @@ pub fn update(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::Token
     let compilation_data = CompilationData::load(Vec::<String>::new(), false)?;
     let supported_drivers = super::supported_drivers(&item, &compilation_data, true)?;
 
-    sql_update_base(&item_name, fields, &table, &supported_drivers).map(|tokens| tokens.into())
+    sql_update_base(item_name, fields, &table, &supported_drivers).map(|tokens| tokens.into())
 }

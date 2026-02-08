@@ -57,7 +57,7 @@ pub fn set_clause(clause: SetClause, data: &mut CollectedData) -> TokenStream {
                 data.sql_crate,
                 data.main_table_type
                     .expect("Update Table missing in SET Clause"),
-                type_expr,
+                *type_expr,
             );
             let current_param_n = &data.current_param_n;
             let before_param_n = &data.before_param_n;

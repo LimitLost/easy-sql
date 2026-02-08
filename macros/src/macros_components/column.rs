@@ -12,7 +12,7 @@ pub enum Column {
 
 #[always_context]
 impl Column {
-    pub fn into_query_string(&self, data: &mut CollectedData, for_custom_select: bool) -> String {
+    pub fn into_query_string(self, data: &mut CollectedData, for_custom_select: bool) -> String {
         let sql_crate = data.sql_crate;
         match self {
             Column::SpecificTableColumn(table_type, col_name) => {
@@ -54,10 +54,10 @@ impl Column {
                                         &segment.arguments
                                     {
                                         for arg in &args.args {
-                                            if let syn::GenericArgument::Type(inner_ty) = arg {
-                                                if contains_type_recursively(inner_ty, needle) {
-                                                    return true;
-                                                }
+                                            if let syn::GenericArgument::Type(inner_ty) = arg
+                                                && contains_type_recursively(inner_ty, needle)
+                                            {
+                                                return true;
                                             }
                                         }
                                     }
@@ -163,7 +163,7 @@ impl Column {
                     return if for_custom_select {
                         format!("{{delimeter}}{ident}{{delimeter}}")
                     } else {
-                        format!("{{_easy_sql_d}}{}{{_easy_sql_d}}", ident.to_string())
+                        format!("{{_easy_sql_d}}{}{{_easy_sql_d}}", ident)
                     };
                 };
 
@@ -198,7 +198,7 @@ impl Column {
                 if for_custom_select {
                     format!("{{delimeter}}{ident}{{delimeter}}")
                 } else {
-                    format!("{{_easy_sql_d}}{}{{_easy_sql_d}}", ident.to_string())
+                    format!("{{_easy_sql_d}}{}{{_easy_sql_d}}", ident)
                 }
             }
         }
@@ -214,13 +214,13 @@ impl Parse for Column {
         if lookahead2.peek(syn::Token![.]) {
             input.parse::<syn::Token![.]>()?;
             let ident: syn::Ident = input.parse()?;
-            return Ok(Column::SpecificTableColumn(path_or_ident, ident));
+            Ok(Column::SpecificTableColumn(path_or_ident, ident))
         } else if let Some(ident) = path_or_ident.first()
             && path_or_ident.len() == 1
         {
-            return Ok(Column::Column(ident.clone()));
+            Ok(Column::Column(ident.clone()))
         } else {
-            return Err(input.error("Expected identifier instead of path (or dot after path)"));
+            Err(input.error("Expected identifier instead of path (or dot after path)"))
         }
     }
 }

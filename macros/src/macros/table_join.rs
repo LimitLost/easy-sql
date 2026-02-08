@@ -1,9 +1,9 @@
 use anyhow::Context;
 use easy_macros::always_context;
 use easy_macros::{TokensBuilder, parse_macro_input};
+use easy_sql_compilation_data::CompilationData;
 use quote::ToTokens;
 use quote::quote;
-use easy_sql_compilation_data::CompilationData;
 use syn::Path;
 use syn::punctuated::Punctuated;
 use syn::{self, parse::Parse};
@@ -264,36 +264,33 @@ pub fn table_join(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::T
     let table_joins = input
         .joins
         .iter()
-        .map(|join| {
-            let format_str = match join {
-                Join::Inner { table, on } => {
-                    data.format_params
-                        .push(driver.table_name(&sql_crate, table));
-                    let on = on.clone().into_query_string(&mut data, false, false);
+        .map(|join| match join {
+            Join::Inner { table, on } => {
+                data.format_params
+                    .push(driver.table_name(&sql_crate, table));
+                let on = on.clone().into_query_string(&mut data, false, false);
 
-                    format!(" INNER JOIN {{}} ON {}", on)
-                }
-                Join::Left { table, on } => {
-                    data.format_params
-                        .push(driver.table_name(&sql_crate, table));
-                    let on = on.clone().into_query_string(&mut data, false, false);
+                format!(" INNER JOIN {{}} ON {}", on)
+            }
+            Join::Left { table, on } => {
+                data.format_params
+                    .push(driver.table_name(&sql_crate, table));
+                let on = on.clone().into_query_string(&mut data, false, false);
 
-                    format!(" LEFT JOIN {{}} ON {}", on)
-                }
-                Join::Right { table, on } => {
-                    data.format_params
-                        .push(driver.table_name(&sql_crate, table));
-                    let on = on.clone().into_query_string(&mut data, false, false);
+                format!(" LEFT JOIN {{}} ON {}", on)
+            }
+            Join::Right { table, on } => {
+                data.format_params
+                    .push(driver.table_name(&sql_crate, table));
+                let on = on.clone().into_query_string(&mut data, false, false);
 
-                    format!(" RIGHT JOIN {{}} ON {}", on)
-                }
-                Join::Cross { table } => {
-                    data.format_params
-                        .push(driver.table_name(&sql_crate, table));
-                    format!(" CROSS JOIN {{}}")
-                }
-            };
-            format_str
+                format!(" RIGHT JOIN {{}} ON {}", on)
+            }
+            Join::Cross { table } => {
+                data.format_params
+                    .push(driver.table_name(&sql_crate, table));
+                " CROSS JOIN {}".to_string()
+            }
         })
         .collect::<Vec<_>>();
 

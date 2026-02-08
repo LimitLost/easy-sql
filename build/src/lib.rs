@@ -35,13 +35,18 @@ use ::{
     anyhow::{self, Context},
     proc_macro2::LineColumn,
     quote::ToTokens,
-    syn::{self, LitStr, punctuated::Punctuated, spanned::Spanned},
+    syn::{self, LitStr, punctuated::Punctuated},
 };
-use convert_case::{Case, Casing};
+
+#[cfg(any(feature = "check_duplicate_table_names", feature = "migrations"))]
+use ::{
+    convert_case::{Case, Casing},
+    syn::spanned::Spanned,
+};
 use easy_macros::{all_syntax_cases, always_context, context, get_attributes, has_attributes};
-use sql_compilation_data::CompilationData;
+use easy_sql_compilation_data::CompilationData;
 #[cfg(feature = "check_duplicate_table_names")]
-use {sql_compilation_data::TableNameData, std::path::PathBuf};
+use {easy_sql_compilation_data::TableNameData, std::path::PathBuf};
 
 #[derive(Debug)]
 struct SearchData {
@@ -231,13 +236,13 @@ fn struct_table_handle(
             anyhow::bail!("non named fields, struct: {}", item.to_token_stream());
         }
     }
-
+    #[cfg(any(feature = "check_duplicate_table_names", feature = "migrations"))]
     let mut table_name = item.ident.to_string().to_case(Case::Snake);
     //Check if table_name was set manually
-    for attr_data in get_attributes!(item, #[sql(table_name = __unknown__)]) {
+    #[cfg(any(feature = "check_duplicate_table_names", feature = "migrations"))]
+    if let Some(attr_data) = get_attributes!(item, #[sql(table_name = __unknown__)]).first() {
         let lit_str: LitStr = syn::parse2(attr_data.clone())?;
         table_name = lit_str.value();
-        break;
     }
 
     #[cfg(feature = "check_duplicate_table_names")]

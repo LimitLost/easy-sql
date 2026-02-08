@@ -18,6 +18,7 @@ pub struct CollectedData<'a> {
 }
 
 impl<'a> CollectedData<'a> {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         format_str: &'a mut String,
         format_params: &'a mut Vec<TokenStream>,

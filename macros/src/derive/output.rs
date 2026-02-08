@@ -74,16 +74,12 @@ pub fn sql_output_base(
     let has_custom_select_args = !indices.is_empty();
 
     let joined_field_aliases = (0..joined_fields.len())
-        .into_iter()
         .map(|i| format!("___easy_sql_joined_field_{}", i))
         .collect::<Vec<_>>();
 
     let joined_checks_field_names = joined_fields
         .iter()
-        .map(|joined_field| {
-            let field_name = joined_field.field.ident.as_ref().unwrap();
-            field_name
-        })
+        .map(|joined_field| joined_field.field.ident.as_ref().unwrap())
         .collect::<Vec<_>>();
 
     let context_strs2 = joined_fields
@@ -141,7 +137,7 @@ pub fn sql_output_base(
     //Handle fields with custom select
     for field_with_sel in &fields_with_select {
         let field = &field_with_sel.field;
-        let field_name = field.ident.as_ref().unwrap();
+        let field_name = field.ident.clone().unwrap();
         let field_name_str = field_name.to_string();
         // Use the aliased name when reading from the database
         let aliased_name = format!("{}{}", CUSTOM_SELECT_ALIAS_PREFIX, field_name_str);
@@ -328,10 +324,10 @@ pub fn sql_output_base(
             }
 
             // Add custom select fields with AS alias
-            for field_with_sel in &fields_with_select {
+            for field_with_sel in fields_with_select {
                 let field_name = field_with_sel.field.ident.as_ref().unwrap();
                 let field_str = field_name.to_string();
-                let expr = &field_with_sel.expr;
+                let expr = field_with_sel.expr;
 
                 // Generate alias with prefix to avoid conflicts
                 let alias = format!("{}{}", CUSTOM_SELECT_ALIAS_PREFIX, field_str);
@@ -369,7 +365,7 @@ pub fn sql_output_base(
                     &mut before_param_n,
                     &mut before_format,
                     Some(&output_type_ts),
-                    Some(&table),
+                    Some(table),
                     &mut types_driver_support_needed,
                 );
                 let sql_template = expr.into_query_string(
@@ -607,7 +603,7 @@ pub fn output(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::Token
     let mut result = TokensBuilder::default();
 
     result.add(sql_output_base(
-        &item_name,
+        item_name,
         &fields,
         joined_fields.clone(),
         &table,

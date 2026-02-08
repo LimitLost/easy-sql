@@ -45,7 +45,7 @@ pub struct UpdateQuery {
 }
 #[derive(Debug, Clone)]
 pub enum SetClause {
-    FromType(syn::Expr),
+    FromType(Box<syn::Expr>),
     Expr(SetExpr),
 }
 
@@ -255,7 +255,7 @@ impl Parse for UpdateQuery {
             let inside_braces;
             syn::braced!(inside_braces in input);
             let type_expr = inside_braces.parse::<syn::Expr>()?;
-            SetClause::FromType(type_expr)
+            SetClause::FromType(Box::new(type_expr))
         } else {
             let set_expr = input.parse::<SetExpr>()?;
             SetClause::Expr(set_expr)

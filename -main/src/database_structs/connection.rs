@@ -21,7 +21,7 @@ pub struct Connection<D: Driver> {
 
 #[always_context]
 impl<D: Driver> Connection<D> {
-    pub(crate) fn new(conn: sqlx::pool::PoolConnection<InternalDriver<D>>) -> Self {
+    pub fn new(conn: sqlx::pool::PoolConnection<InternalDriver<D>>) -> Self {
         Connection { internal: conn }
     }
 }

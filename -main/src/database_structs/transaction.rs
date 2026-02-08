@@ -19,7 +19,7 @@ pub struct Transaction<'a, D: Driver> {
 
 #[always_context]
 impl<'a, D: Driver> Transaction<'a, D> {
-    pub(crate) fn new(internal: sqlx::Transaction<'a, D::InternalDriver>) -> Self {
+    pub fn new(internal: sqlx::Transaction<'a, D::InternalDriver>) -> Self {
         Transaction { internal }
     }
 
