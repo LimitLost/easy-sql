@@ -1,9 +1,0 @@
-X. How do we check if our class has those fields specified by user?
-
-Create instance of our class with unreachable function
-
-X. How do we handle checking if our type supports current table?
-
-#[backend(supports=ExapleTableStructure)]
-
-X. (Solution) You don't need to convert entire blocks and send them to backend, just perform them in frontend for sqlite and save them later for backend
