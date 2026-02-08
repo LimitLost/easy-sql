@@ -3,7 +3,11 @@ use anyhow::Context;
 use easy_macros::{always_context, context};
 
 use super::table_field_definition;
-use crate::{AlterTable, AlterTableSingle, EasyExecutor, traits::SetupSql};
+use crate::{
+    EasyExecutor,
+    driver::{AlterTable, AlterTableSingle},
+    traits::SetupSql,
+};
 
 #[always_context]
 impl SetupSql<Sqlite> for AlterTable {

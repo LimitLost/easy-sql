@@ -6,7 +6,7 @@ use crate::traits::{Driver, DriverArguments};
 #[always_context]
 /// Insert payload mapping for a table.
 ///
-/// Prefer implementing this trait via the [`Insert`](crate::Insert) derive macro; manual
+/// Prefer implementing this trait via the [`Insert`](macro@crate::Insert) derive macro; manual
 /// implementations may need updates across releases.
 pub trait Insert<'a, Table, D: Driver> {
     fn insert_columns() -> Vec<String>;

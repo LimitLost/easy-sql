@@ -89,68 +89,7 @@ fn main() {
 
 ## Mini demo
 
-```rust,ignore
-use easy_sql::sqlite::Database;
-use easy_sql::{DatabaseSetup, Insert, Output, Table, query};
-
-// DatabaseSetup lets you group tables into a single setup call.
-#[derive(DatabaseSetup)]
-struct PartOfDatabase {
-    users: UserTable,
-}
-
-#[derive(Table)]
-struct UserTable {
-    #[sql(primary_key)]
-    #[sql(auto_increment)]
-    id: i32,
-    email: String,
-    active: bool,
-}
-
-#[derive(Insert)]
-#[sql(table = UserTable)]
-// Required to make sure that no fields are potentially ignored
-#[sql(default = id)]
-struct NewUser {
-    email: String,
-    active: bool,
-}
-
-#[derive(Output)]
-#[sql(table = UserTable)]
-struct UserRow {
-    id: i32,
-    #[sql(select = email || " (active = " || active || ")")]
-    email_label: String,
-    active: bool,
-}
-async fn main() -> anyhow::Result<()> {
-    let db = Database::setup::<PartOfDatabase>("app.sqlite").await?;
-    let mut conn = db.conn().await?;
-
-    let data = NewUser {
-        email: "sam@example.com".to_string(),
-        active: true,
-    };
-    query!(&mut conn, INSERT INTO UserTable VALUES {data}).await?;
-
-    let email = "sam@example.com";
-    let new_email = "sammy@example.com";
-    query!(&mut conn,
-        UPDATE UserTable SET active = false, email = {new_email} WHERE UserTable.email = {email}
-    )
-    .await?;
-
-    let row: UserRow = query!(&mut conn,
-        SELECT UserRow FROM UserTable WHERE email = {email}
-    )
-    .await?;
-
-    println!("{} {}", row.id, row.email_label);
-    Ok(())
-}
-```
+<!-- docify::embed!("src/tests/general/documentation/mini_demo.rs", mini_demo) -->
 
 ## Migration system
 

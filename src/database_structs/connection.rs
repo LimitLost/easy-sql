@@ -11,7 +11,9 @@ use crate::{
     Driver, EasyExecutor,
     traits::{DriverConnection, InternalDriver, SetupSql},
 };
-
+/// Wrapper around [`sqlx::pool::PoolConnection`](https://docs.rs/sqlx/latest/sqlx/pool/struct.PoolConnection.html)
+///
+/// Will contain sql query watch data in the future (gated by a feature)
 #[derive(Debug)]
 pub struct Connection<D: Driver> {
     internal: sqlx::pool::PoolConnection<InternalDriver<D>>,

@@ -59,7 +59,7 @@ pub fn query(input_raw: proc_macro::TokenStream) -> anyhow::Result<proc_macro::T
         ProvidedDrivers::Single(quote! {#driver_path})
     } else {
         let compilation_data = CompilationData::load(Vec::<String>::new(), false).with_context(|| {
-            "Failed to load compilation data for query! macro. Make sure easy_sql::build is called in build.rs"
+            "Failed to load compilation data for query! macro. Make sure easy_sql_build::build is called in the build script"
         })?;
 
         match compilation_data.default_drivers.len() {

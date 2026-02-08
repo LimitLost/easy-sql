@@ -1,8 +1,8 @@
 [package]
 edition = "2024" 
+license = "Apache-2.0" 
 name = "easy-sql" 
-version = "0.9.0" # Table Join and Exists is required for 1.0.0
-license = "Apache-2.0"
+version = "0.100.0"
 
 [dependencies]
 
@@ -57,6 +57,7 @@ sql-build = {path = "./sql-build", features = ["migrations"]}
 default = ["check_duplicate_table_names"]
 postgres = ["sqlx/postgres", "dep:pg_escape"]
 sqlite = ["sqlx/sqlite"]
+sqlite_math = []
 
 use_output_columns = ["sql-macros/use_output_columns"]
 migrations = [
@@ -76,3 +77,5 @@ rust_decimal=["sqlx/rust_decimal", "dep:rust_decimal"]
 ipnet = ["sqlx/ipnet"]
 uuid = ["sqlx/uuid","dep:uuid"]
 chrono = ["sqlx/chrono","dep:chrono"]
+
+generate-readme = []

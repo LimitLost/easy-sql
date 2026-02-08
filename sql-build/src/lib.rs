@@ -1,3 +1,27 @@
+//! Build-time helper for easy-sql compilation data.
+//!
+//! Scans your crate's `src/` directory for [`easy_sql::Table`](https://docs.rs/easy-sql/latest/easy_sql/derive.Table.html)
+//! definitions and keeps `easy_sql.ron` in sync with your schema metadata.
+//!
+//! ## What it does
+//! - Generates missing `#[sql(unique_id = "...")]` attributes for tables.
+//! - Updates migration metadata in `easy_sql.ron` (feature `migrations`).
+//! - Writes build errors to `easy_sql_logs/YYYY-MM-DD.txt` when parsing fails.
+//!
+//! ## Example (build script)
+//! ```rust,ignore
+//! use regex::Regex;
+//!
+//! fn main() {
+//!     sql_build::build(
+//!         &[Regex::new(r"example_all\.rs").unwrap()],
+//!         &["crate::Sqlite", "crate::Postgres"],
+//!     );
+//! }
+//! ```
+//!
+//! See [`build`] for details on default drivers and ignore patterns.
+
 use std::{io::Write, path::Path};
 #[cfg(feature = "migrations")]
 use {
@@ -571,16 +595,38 @@ fn build_result(ignore_list: &[regex::Regex], default_drivers: &[&str]) -> anyho
 
     Ok(())
 }
-/// Build function that adds `#[always_context]` attribute to every function with `anyhow::Result` return type and every `trait` and `impl` block.
+/// Runs the easy-sql build step and panics on failure.
 ///
-/// To every rust file in `src` directory.
+/// Scans the `src/` directory for table definitions, updates `easy_sql.ron`, and
+/// generates missing `#[sql(unique_id = "...")]` attributes for new tables.
 ///
-/// Panics on error. Use `build_result()` for error handling.
+/// When parsing fails, detailed error logs are written to
+/// `easy_sql_logs/YYYY-MM-DD.txt`.
 ///
-/// # Arguments
+/// The `default_drivers` list is used by query macros when no `<Driver>` is
+/// specified at the call site. This mirrors the values you would normally pass
+/// from the build script.
 ///
-/// `ignore_list` - A list of regex patterns to ignore. The patterns are used on the file path. Path is ignored if match found.
+/// ## Arguments
 ///
+/// `ignore_list` - Regex patterns used to skip files or directories by path.
+///
+/// `default_drivers` - Driver paths (for example, `"crate::Sqlite"`).
+///
+/// ## Panics
+/// Panics with detailed diagnostics if parsing fails or compilation data is invalid.
+///
+/// ## Example
+/// ```rust,ignore
+/// use regex::Regex;
+///
+/// fn main() {
+///     sql_build::build(
+///         &[Regex::new(r"example_all\.rs").unwrap()],
+///         &["crate::Sqlite"],
+///     );
+/// }
+/// ```
 pub fn build(ignore_list: &[regex::Regex], default_drivers: &[&str]) {
     if let Err(err) = build_result(ignore_list, default_drivers) {
         panic!(

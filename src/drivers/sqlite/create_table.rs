@@ -7,7 +7,7 @@ use super::{Sqlite, table_field_definition};
 use crate::EasyExecutor;
 use crate::traits::SetupSql;
 
-use crate::TableField;
+use crate::driver::TableField;
 
 #[derive(Debug)]
 pub struct CreateTable {

@@ -1,3 +1,7 @@
+// Compile README.docify.md to README.md
+#[cfg(feature = "generate-readme")]
+docify::compile_markdown!("README.docify.md", "README.md");
+
 mod database_structs;
 pub mod markers;
 mod traits;
@@ -6,7 +10,7 @@ mod drivers;
 pub use drivers::*;
 
 pub use {
-    database_structs::*,
+    database_structs::{Connection, EasySqlTables, Transaction},
     traits::{DatabaseSetup, Driver, EasyExecutor, Insert, Output, Table, ToDefault, Update},
 };
 #[allow(rustdoc::broken_intra_doc_links)]
@@ -16,12 +20,56 @@ pub use {
 /// implementing a custom backend. Most application code will use the concrete drivers (like
 /// [`Postgres`] or [`Sqlite`]) rather than these internals.
 pub mod driver {
+    pub use crate::database_structs::{AlterTable, AlterTableSingle, TableField};
     pub use crate::markers::driver::*;
     pub use crate::traits::{
         DriverArguments, DriverConnection, DriverQueryResult, DriverRow, DriverTypeInfo,
         InternalDriver, SetupSql,
     };
+    /// Implement a built-in SQL function support marker for specific argument counts.
+    ///
+    /// This macro is intended for **custom drivers** to opt into the built-in SQL functions that
+    /// [`query!`](crate::query)/[`query_lazy!`](crate::query_lazy) validate at compile time (e.g.
+    /// `COUNT`, `SUBSTRING`, `DATE`). See [`supported`](crate::driver::supported) for which functions are available.
+    ///
+    /// ## Syntax
+    /// ```rust,ignore
+    /// impl_supports_fn!(DriverType, SupportsTrait, arg_count0, arg_count1, ...);
+    /// ```
+    ///
+    /// - `SupportsTrait` comes from [`crate::markers::functions`] (for example [`SupportsCount`](crate::driver::SupportsCount)).
+    /// - Provide one or more argument counts.
+    /// - Use `-1` for functions that appear without parentheses (like `CURRENT_TIMESTAMP`).
+    /// - Use [`impl_supports_fn_any`] for variadic functions.
+    /// - For custom SQL functions (not built-ins), use [`custom_sql_function!`](crate::custom_sql_function).
+    ///
+    /// ## Example
+    #[doc = docify::embed!(
+		"src/tests/general/documentation/impl_supports_fn_macro.rs",
+		impl_supports_fn_basic_example
+	)]
+    pub use sql_macros::impl_supports_fn;
+    /// Implement a built-in SQL function support marker for any argument count.
+    ///
+    /// Useful for variadic functions like `COALESCE` or `CONCAT`. This macro implements the
+    /// corresponding marker trait for all `const ARGS: isize` counts, so
+    /// [`query!`](crate::query)/[`query_lazy!`](crate::query_lazy) accept any number of arguments.  
+    /// See [`supported`](crate::driver::supported) for which functions are available.
+    ///
+    /// ## Syntax
+    /// ```rust,ignore
+    /// impl_supports_fn_any!(DriverType, SupportsTrait);
+    /// ```
+    ///
+    /// ## Example
+    #[doc = docify::embed!(
+		"src/tests/general/documentation/impl_supports_fn_macro.rs",
+		impl_supports_fn_any_example
+	)]
+    pub use sql_macros::impl_supports_fn_any;
 }
+
+pub mod supported;
 
 #[cfg(test)]
 mod tests;
@@ -134,7 +182,8 @@ pub use sql_macros::query;
 /// query_lazy!(<Driver> SQL)
 /// ```
 ///
-/// - `<Driver>` is optional; if omitted the default driver is taken from `build.rs`.
+/// - `<Driver>` is optional; if omitted the default driver is taken from the build script via
+///   [`sql_build::build`](https://docs.rs/sql-build/latest/sql_build/fn.build.html).
 ///   If multiple (or zero) defaults are configured, you must specify the driver explicitly.
 /// - Uses the same SQL syntax and helpers as [`query!`]
 /// - There is **no connection parameter** in the macro call; pass it when fetching.
@@ -192,7 +241,8 @@ pub use sql_macros::query_lazy;
 /// ## Table attributes
 /// - `#[sql(table_name = "...")]` overrides the generated `snake_case` name.
 /// - `#[sql(drivers = Driver1, Driver2)]` sets the supported drivers when no default driver is
-///   configured in `build.rs`.
+///   configured in the build script via
+///   [`sql_build::build`](https://docs.rs/sql-build/latest/sql_build/fn.build.html).
 /// - `#[sql(no_version)]` disables migrations for this table (feature `migrations`).
 /// - `#[sql(version = 1)]` enables migrations and sets the table version (feature `migrations`).
 /// - `#[sql(unique_id = "...")]` is auto generated and used by the build script for migration tracking.
@@ -297,7 +347,8 @@ pub use sql_macros::Update;
 ///
 /// - Works with named **or tuple** structs.
 /// - Use `#[sql(drivers = Driver1, Driver2)]` to select supported drivers when no defaults are
-///   configured in `build.rs`.
+///   configured in the build script via
+///   [`sql_build::build`](https://docs.rs/sql-build/latest/sql_build/fn.build.html).
 /// - Errors include the field name and type to help trace failing setup calls.
 ///
 /// ## Basic usage
@@ -327,7 +378,8 @@ pub use sql_macros::DatabaseSetup;
 /// table_join!(<Driver1, Driver2> JoinedTableStructName | TableA INNER JOIN TableB ON TableA.id = TableB.a_id)
 /// ```
 ///
-/// - The driver list is optional; when omitted, default drivers from `build.rs` are used.
+/// - The driver list is optional; when omitted, default drivers from the build script via
+///   [`sql_build::build`](https://docs.rs/sql-build/latest/sql_build/fn.build.html) are used.
 /// - Supported join types: `INNER JOIN`, `LEFT JOIN`, `RIGHT JOIN`, `CROSS JOIN`.
 /// - `CROSS JOIN` omits the `ON` clause.
 /// - Multiple joins can be chained after the main table.

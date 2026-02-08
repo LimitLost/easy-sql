@@ -21,7 +21,7 @@ pub trait ToConvert<D: Driver> {
 #[always_context]
 /// Output mapping for query results.
 ///
-/// Prefer implementing this trait via the [`Output`](crate::Output) derive macro; manual
+/// Prefer implementing this trait via the [`Output`](macro@crate::Output) derive macro; manual
 /// implementations may need updates across releases.
 pub trait Output<Table, D: Driver>: Sized {
     type DataToConvert: ToConvert<D>;

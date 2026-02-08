@@ -48,12 +48,12 @@ pub fn query_lazy(input_raw: proc_macro::TokenStream) -> anyhow::Result<proc_mac
         ProvidedDrivers::Single(quote! {#driver_path})
     } else {
         let compilation_data = CompilationData::load(Vec::<String>::new(), false).with_context(|| {
-            "Failed to load compilation data for query_lazy! macro. Make sure easy_sql::build is called in build.rs"
+            "Failed to load compilation data for query_lazy! macro. Make sure easy_sql_build::build is called in the build script"
         })?;
 
         if compilation_data.default_drivers.len() > 1 {
             return Err(anyhow::anyhow!(
-                "Multiple default drivers found in compilation data. Please specify the driver at the macro call site using <Driver> syntax (before connection) or limit to a single default driver in build.rs"
+                "Multiple default drivers found in compilation data. Please specify the driver at the macro call site using <Driver> syntax (before connection) or limit to a single default driver in the build script"
             ));
         }
 
@@ -63,7 +63,7 @@ pub fn query_lazy(input_raw: proc_macro::TokenStream) -> anyhow::Result<proc_mac
             ProvidedDrivers::Single(quote! {#driver_path})
         } else {
             return Err(anyhow::anyhow!(
-                "No default driver found in compilation data. Please specify a driver in build.rs or at the macro call site using <Driver> syntax (before connection)"
+                "No default driver found in compilation data. Please specify a driver in the build script or at the macro call site using <Driver> syntax (before connection)"
             ));
         }
     };

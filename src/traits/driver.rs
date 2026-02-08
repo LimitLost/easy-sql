@@ -2,7 +2,7 @@ use std::{collections::HashMap, fmt::Debug};
 
 use easy_macros::always_context;
 
-use crate::{TableField, traits::EasyExecutor};
+use crate::{driver::TableField, traits::EasyExecutor};
 
 pub type DriverRow<D> = <<D as Driver>::InternalDriver as sqlx::database::Database>::Row;
 

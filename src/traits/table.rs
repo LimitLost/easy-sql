@@ -4,7 +4,7 @@ use crate::Driver;
 
 /// Table metadata used by the query macros.
 ///
-/// Prefer implementing this trait via the [`Table`](crate::Table) derive macro or
+/// Prefer implementing this trait via the [`Table`](macro@crate::Table) derive macro or
 /// [`table_join!`](crate::table_join); manual implementations may need updates across releases.
 #[always_context]
 pub trait Table<D: Driver>: Sized {

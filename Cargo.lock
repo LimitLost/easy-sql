@@ -620,7 +620,7 @@ dependencies = [
 
 [[package]]
 name = "easy-sql"
-version = "0.9.0"
+version = "0.100.0"
 dependencies = [
  "anyhow",
  "bigdecimal",
@@ -636,6 +636,7 @@ dependencies = [
  "regex",
  "rust_decimal",
  "serde",
+ "serde_json",
  "sql-build",
  "sql-compilation-data",
  "sql-macros",

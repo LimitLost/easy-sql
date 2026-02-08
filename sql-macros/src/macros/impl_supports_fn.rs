@@ -68,7 +68,7 @@ pub fn impl_supports_fn_any(input: TokenStream) -> anyhow::Result<TokenStream> {
     let trait_ident = input.target_trait;
 
     let expanded = quote! {
-        impl<const ARGS: isize> #sql_crate::markers::driver::#trait_ident<ARGS> for #driver {}
+        impl<const ARGS: isize> #sql_crate::markers::functions::#trait_ident<ARGS> for #driver {}
     };
 
     Ok(expanded.into())
@@ -84,7 +84,7 @@ pub fn impl_supports_fn(input: TokenStream) -> anyhow::Result<TokenStream> {
 
     let expanded = quote! {
         #(
-            impl #sql_crate::markers::driver::#trait_ident<#args> for #driver {}
+            impl #sql_crate::markers::functions::#trait_ident<#args> for #driver {}
         )*
     };
 

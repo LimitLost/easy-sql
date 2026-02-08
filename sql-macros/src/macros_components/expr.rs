@@ -186,7 +186,7 @@ fn add_operator_support_check<T>(
     for driver_ty in data.driver.iter_for_checks() {
         data.checks.push(quote_spanned! {proc_macro2::Span::call_site()=>
             {
-                fn __easy_sql_assert_supports_operator<T: #sql_crate::markers::#trait_ident>() {}
+                fn __easy_sql_assert_supports_operator<T: #sql_crate::markers::operators::#trait_ident>() {}
                 __easy_sql_assert_supports_operator::<#driver_ty>();
             }
         });
@@ -592,7 +592,7 @@ impl Value {
                 for driver_ty in data.driver.iter_for_checks() {
                         data.checks.push(quote_spanned! {ty.span()=>
                                 {
-                                    fn __easy_sql_assert_supports_fn<T: #sql_crate::markers::SupportsCast<1>>() {}
+                                    fn __easy_sql_assert_supports_fn<T: #sql_crate::markers::functions::SupportsCast<1>>() {}
                                     __easy_sql_assert_supports_fn::<#driver_ty>();
                                 }
                             });
@@ -618,7 +618,7 @@ impl Value {
                     let func_name = func_name_str.to_uppercase();
                     let trait_name = format!("Supports{}", func_name.to_case(Case::Pascal));
                     let trait_ident = format_ident!("{}", trait_name);
-                    let trait_path = quote! {#sql_crate::markers::#trait_ident};
+                    let trait_path = quote! {#sql_crate::markers::functions::#trait_ident};
 
                     for driver_ty in data.driver.iter_for_checks() {
                         data.checks.push(quote_spanned! {name.span()=>

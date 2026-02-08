@@ -17,13 +17,18 @@ mod create_table;
 mod table_exists;
 
 use crate::{
-    Driver, EasyExecutor, TableField,
+    Driver, EasyExecutor,
+    driver::TableField,
     markers::{
-        AllowsNoPrimaryKey, SupportsAdd, SupportsAnd, SupportsBetween, SupportsBitAnd,
-        SupportsBitOr, SupportsBitShiftLeft, SupportsBitShiftRight, SupportsConcatOperator,
-        SupportsDiv, SupportsEqual, SupportsGreaterThan, SupportsGreaterThanOrEqual, SupportsIn,
-        SupportsIsNotNull, SupportsIsNull, SupportsLessThan, SupportsLessThanOrEqual, SupportsLike,
-        SupportsModOperator, SupportsMul, SupportsNotEqual, SupportsOr, SupportsSub,
+        AllowsNoPrimaryKey,
+        operators::{
+            SupportsAdd, SupportsAnd, SupportsBetween, SupportsBitAnd, SupportsBitOr,
+            SupportsBitShiftLeft, SupportsBitShiftRight, SupportsConcatOperator, SupportsDiv,
+            SupportsEqual, SupportsGreaterThan, SupportsGreaterThanOrEqual, SupportsIn,
+            SupportsIsNotNull, SupportsIsNull, SupportsLessThan, SupportsLessThanOrEqual,
+            SupportsLike, SupportsModOperator, SupportsMul, SupportsNotEqual, SupportsOr,
+            SupportsSub,
+        },
     },
 };
 use sql_macros::{impl_supports_fn, impl_supports_fn_any};

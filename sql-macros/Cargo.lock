@@ -163,20 +163,39 @@ dependencies = [
 
 [[package]]
 name = "easy-macros"
-version = "1.0.2"
+version = "1.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ee84eab6f99b3a5cba0cd146809496cf8caeee9d7d40b825c5ca07aa6ec7ee20"
 dependencies = [
  "docify",
+ "easy-macros-add-code",
  "easy-macros-all-syntax-cases",
  "easy-macros-always-context",
- "easy-macros-always-context-build",
+ "easy-macros-always-context-build 0.2.0",
  "easy-macros-anyhow-result",
  "easy-macros-attributes",
  "easy-macros-helpers",
 ]
 
 [[package]]
+name = "easy-macros-add-code"
+version = "1.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "98201fd078dce47400a9e12e9cba5e73aeb38c441f737b146a2e96d22199825d"
+dependencies = [
+ "anyhow",
+ "easy-macros-anyhow-result",
+ "easy-macros-helpers",
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
 name = "easy-macros-all-syntax-cases"
 version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "79fd6e873ee14e736738502875d1b84aa0b1ef59d2a1b278194d14ef01e8769b"
 dependencies = [
  "easy-macros-all-syntax-cases-helpers",
  "proc-macro2",
@@ -187,6 +206,8 @@ dependencies = [
 [[package]]
 name = "easy-macros-all-syntax-cases-helpers"
 version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7a4c2d31bcec68040c1498989b9ca8de974f5a7350cfaf34f76f61ab502543f5"
 dependencies = [
  "easy-macros-helpers",
  "proc-macro2",
@@ -197,6 +218,8 @@ dependencies = [
 [[package]]
 name = "easy-macros-always-context"
 version = "1.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d27e582bf94d8336c54be726091223ea4ba6012679d9fac4e567c00d56ef4054"
 dependencies = [
  "easy-macros-all-syntax-cases",
  "easy-macros-helpers",
@@ -208,7 +231,24 @@ dependencies = [
 
 [[package]]
 name = "easy-macros-always-context-build"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a2e1991ebcb7824b648a51e5e876f6e1443fb706c54f98ade2f6d622250ef9b3"
+dependencies = [
+ "anyhow",
+ "easy-macros-always-context",
+ "easy-macros-helpers",
+ "proc-macro2",
+ "quote",
+ "regex",
+ "syn",
+]
+
+[[package]]
+name = "easy-macros-always-context-build"
 version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "eb2f76db4063521247d53b8bd0cef59e520ceaafa660474c88c78fe86c2e46c8"
 dependencies = [
  "anyhow",
  "easy-macros-always-context",
@@ -222,6 +262,8 @@ dependencies = [
 [[package]]
 name = "easy-macros-anyhow-result"
 version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c4765959f7c6f68ec7305a186ed9db27bd0dd58f0516f812a2232c615a4a6bf9"
 dependencies = [
  "easy-macros-helpers",
  "proc-macro2",
@@ -232,11 +274,13 @@ dependencies = [
 [[package]]
 name = "easy-macros-attributes"
 version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "882aa7bf8f95098ccfc24e681fdb86d3d8dd6e6c11a785607e869cf86eb1e58f"
 dependencies = [
  "anyhow",
  "docify",
  "easy-macros-always-context",
- "easy-macros-always-context-build",
+ "easy-macros-always-context-build 0.1.0",
  "easy-macros-attributes-macros",
  "easy-macros-helpers",
  "lazy_static",
@@ -249,10 +293,12 @@ dependencies = [
 [[package]]
 name = "easy-macros-attributes-macros"
 version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bc88ad4771ed4281eb825e7c93b50f2f82da924d63427bf784414f76ee9f71d8"
 dependencies = [
  "anyhow",
  "easy-macros-always-context",
- "easy-macros-always-context-build",
+ "easy-macros-always-context-build 0.1.0",
  "easy-macros-anyhow-result",
  "easy-macros-helpers",
  "lazy_static",
@@ -266,6 +312,8 @@ dependencies = [
 [[package]]
 name = "easy-macros-context-internal"
 version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2473ac2ac0f4c3beb6bf0db75bba93e00b105db312e3a6b48e595bc2bd81c7a2"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -275,6 +323,8 @@ dependencies = [
 [[package]]
 name = "easy-macros-helpers"
 version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "83a8229fdf7897c00b0d8effb2f69f5246826b95ee5a9dde08719a2ae2099387"
 dependencies = [
  "docify",
  "easy-macros-context-internal",
@@ -808,7 +858,6 @@ dependencies = [
  "lazy_static",
  "proc-macro2",
  "quote",
- "replace_with",
  "sql-compilation-data",
  "syn",
 ]

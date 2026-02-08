@@ -16,15 +16,18 @@ use anyhow::Context;
 use easy_macros::always_context;
 
 use crate::{
-    Driver, EasyExecutor, TableField,
+    Driver, EasyExecutor,
+    driver::TableField,
     markers::{
-        AllowsNoPrimaryKey, SupportsAdd, SupportsAnd, SupportsAutoIncrementCompositePrimaryKey,
-        SupportsBetween, SupportsBitAnd, SupportsBitOr, SupportsBitShiftLeft,
-        SupportsBitShiftRight, SupportsConcatOperator, SupportsDiv, SupportsEqual,
-        SupportsGreaterThan, SupportsGreaterThanOrEqual, SupportsIn, SupportsIsNotNull,
-        SupportsIsNull, SupportsJsonExtract, SupportsJsonExtractText, SupportsLessThan,
-        SupportsLessThanOrEqual, SupportsLike, SupportsModOperator, SupportsMul, SupportsNotEqual,
-        SupportsOr, SupportsSub,
+        AllowsNoPrimaryKey, SupportsAutoIncrementCompositePrimaryKey,
+        operators::{
+            SupportsAdd, SupportsAnd, SupportsBetween, SupportsBitAnd, SupportsBitOr,
+            SupportsBitShiftLeft, SupportsBitShiftRight, SupportsConcatOperator, SupportsDiv,
+            SupportsEqual, SupportsGreaterThan, SupportsGreaterThanOrEqual, SupportsIn,
+            SupportsIsNotNull, SupportsIsNull, SupportsJsonExtract, SupportsJsonExtractText,
+            SupportsLessThan, SupportsLessThanOrEqual, SupportsLike, SupportsModOperator,
+            SupportsMul, SupportsNotEqual, SupportsOr, SupportsSub,
+        },
     },
 };
 use sql_macros::{impl_supports_fn, impl_supports_fn_any};

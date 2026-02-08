@@ -9,12 +9,19 @@ use easy_macros::always_context;
 use sql_macros::{Insert, Update};
 use sqlx::TypeInfo;
 
-use crate::{DatabaseSetup, EasyExecutor, Table, TableField};
+use crate::{DatabaseSetup, EasyExecutor, Table, driver::TableField};
 
+/// Internal metadata table used by Easy SQL to track per-table schema versions.
+///
+/// This table is created automatically via [`DatabaseSetup`](macro@crate::DatabaseSetup) and is used by the
+/// [`Table`](macro@crate::Table) derive macro to store the last known version of each table.
+/// It lives in the database as `easy_sql_tables`, keyed by `table_id`.
 #[derive(Insert, Debug)]
 #[sql(table = EasySqlTables)]
 pub struct EasySqlTables {
+    /// The logical identifier of the table being tracked.
     pub table_id: String,
+    /// The stored schema version for the table.
     pub version: i64,
 }
 

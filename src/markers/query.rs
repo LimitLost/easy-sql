@@ -35,7 +35,7 @@ pub trait ToConvertSingle<D: Driver>: ToConvert<D> + sqlx::Row {}
 )]
 /// Marker for outputs without custom select arguments.
 ///
-/// Implemented by the [`Output`](crate::Output) derive macro.
+/// Implemented by the [`Output`](macro@crate::Output) derive macro.
 pub trait NormalSelect {}
 
 #[diagnostic::on_unimplemented(
@@ -43,7 +43,7 @@ pub trait NormalSelect {}
 )]
 /// Marker for outputs that require custom select arguments.
 ///
-/// Implemented by the [`Output`](crate::Output) derive macro.
+/// Implemented by the [`Output`](macro@crate::Output) derive macro.
 pub trait WithArgsSelect {}
 
 /// Marker trait for tables that are not created via [`table_join!`](crate::table_join).
@@ -54,7 +54,7 @@ pub trait NotJoinedTable {}
 
 /// Support trait providing fields information for query validation.
 ///
-/// Implemented by the [`Output`](crate::Output) derive macro and used internally by the query
+/// Implemented by the [`Output`](macro@crate::Output) derive macro and used internally by the query
 /// macros.
 pub trait OutputData<Table> {
     type SelectProvider;

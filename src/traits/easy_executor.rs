@@ -5,10 +5,12 @@ use crate::Driver;
 use super::DriverConnection;
 
 #[always_context]
-/// Abstraction over `sqlx::Executor` used by the query macros.
+/// Abstraction over [`sqlx::Executor`](https://docs.rs/sqlx/latest/sqlx/trait.Executor.html) used by the query macros.
 ///
 /// Implemented for easy_sql and sqlx connections/pools; most users only need to pass a compatible
 /// connection to [`query!`](crate::query) or [`query_lazy!`](crate::query_lazy).
+///
+/// Will contain sql query watch functions in the future (gated by a feature)
 pub trait EasyExecutor<D: Driver> {
     type InternalExecutor<'b>: sqlx::Executor<'b, Database = D::InternalDriver>
     where
@@ -37,33 +39,4 @@ pub trait SetupSql<D: Driver> {
     type Output;
 
     async fn query(self, exec: &mut impl EasyExecutor<D>) -> anyhow::Result<Self::Output>;
-}
-
-#[cfg(test)]
-#[allow(dead_code)]
-#[cfg(not(all(feature = "postgres", feature = "sqlite")))]
-mod impl_test {
-    use crate::Driver;
-
-    use super::EasyExecutor;
-
-    #[cfg(feature = "postgres")]
-    type CurrentDriver = sqlx::Postgres;
-    #[cfg(feature = "postgres")]
-    type CurrentCDriver = crate::Postgres;
-    #[cfg(feature = "sqlite")]
-    type CurrentDriver = sqlx::Sqlite;
-    #[cfg(feature = "sqlite")]
-    type CurrentCDriver = crate::Sqlite;
-
-    /// Both sqlx pool and connection should have this trait auto implemented
-    fn impl_test_base<D: Driver>(_exe: impl EasyExecutor<D>) {}
-
-    fn impl_test(
-        pool: sqlx::Pool<CurrentDriver>,
-        mut conn: <CurrentDriver as sqlx::Database>::Connection,
-    ) {
-        impl_test_base::<CurrentCDriver>(&pool);
-        impl_test_base::<CurrentCDriver>(&mut conn);
-    }
 }

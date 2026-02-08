@@ -5,7 +5,7 @@ use super::{Driver, DriverArguments};
 #[always_context]
 /// Update payload mapping for a table.
 ///
-/// Prefer implementing this trait via the [`Update`](crate::Update) derive macro; manual
+/// Prefer implementing this trait via the [`Update`](macro@crate::Update) derive macro; manual
 /// implementations may need updates across releases.
 pub trait Update<'a, Table, D: Driver>: Sized {
     fn updates(

@@ -415,7 +415,7 @@ impl CompilationData {
                 //Create new field
                 changes_needed.push(quote! {
                     #sql_crate::AlterTableSingle::AddColumn{
-                        column: #sql_crate::TableField {
+                        column: #sql_crate::driver::TableField {
                             name: #field_name,
                             data_type: {
                                 #macro_support::TypeInfo::name(
@@ -443,7 +443,7 @@ impl CompilationData {
 
                 result.add(quote! {
                     if current_version_number == #version_number{
-                        #sql_crate::EasyExecutor::query_setup(conn, #sql_crate::AlterTable{
+                        #sql_crate::EasyExecutor::query_setup(conn, #sql_crate::driver::AlterTable{
                             table_name: #table_name,
                             alters: vec![#(#changes_needed),*],
                         }).await?;

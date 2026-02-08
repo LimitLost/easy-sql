@@ -9,6 +9,9 @@ use crate::{
     Driver, EasyExecutor,
     traits::{DriverConnection, InternalDriver, SetupSql},
 };
+/// Wrapper around [`sqlx::Transaction`](https://docs.rs/sqlx/latest/sqlx/struct.Transaction.html)
+///
+/// Will contain sql query watch data in the future (gated by a feature)
 #[derive(Debug)]
 pub struct Transaction<'a, D: Driver> {
     internal: sqlx::Transaction<'a, D::InternalDriver>,
