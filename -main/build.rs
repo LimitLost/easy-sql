@@ -5,7 +5,7 @@ fn main() {
         &[regex::Regex::new(r"readme\.rs").unwrap()],
         BuildOptions::new().skip(vec![Skip::MacrosShort]),
     );
-    sql_build::build(
+    easy_sql_build::build(
         &[regex::Regex::new(r"example_all\.rs").unwrap()],
         #[cfg(not(any(feature = "sqlite", feature = "postgres")))]
         &[],

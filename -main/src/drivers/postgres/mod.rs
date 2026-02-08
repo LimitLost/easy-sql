@@ -30,7 +30,7 @@ use crate::{
         },
     },
 };
-use sql_macros::{impl_supports_fn, impl_supports_fn_any};
+use easy_sql_macros::{impl_supports_fn, impl_supports_fn_any};
 
 /// Marker type for the PostgreSQL driver.
 ///

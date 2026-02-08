@@ -6,7 +6,7 @@
 //!
 //! See [`supported`](crate::supported) module
 
-use sql_macros::define_supports_operator_trait;
+use easy_sql_macros::define_supports_operator_trait;
 
 define_supports_operator_trait!(SupportsAnd, "AND");
 define_supports_operator_trait!(SupportsOr, "OR");

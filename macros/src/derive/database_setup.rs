@@ -5,7 +5,7 @@ use ::{
 };
 
 use easy_macros::{TokensBuilder, always_context, parse_macro_input};
-use sql_compilation_data::CompilationData;
+use easy_sql_compilation_data::CompilationData;
 
 use crate::sql_crate;
 

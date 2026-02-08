@@ -10,9 +10,9 @@ use convert_case::{Case, Casing};
 use easy_macros::{
     TokensBuilder, always_context, get_attributes, has_attributes, parse_macro_input,
 };
-use sql_compilation_data::CompilationData;
+use easy_sql_compilation_data::CompilationData;
 #[cfg(feature = "migrations")]
-use {easy_macros::context, sql_compilation_data::TableDataVersion, syn::LitInt};
+use {easy_macros::context, easy_sql_compilation_data::TableDataVersion, syn::LitInt};
 
 use crate::{
     derive::{sql_insert_base, sql_output_base, sql_update_base},

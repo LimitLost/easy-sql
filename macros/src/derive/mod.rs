@@ -12,9 +12,9 @@ use ::{
 };
 pub use database_setup::*;
 use easy_macros::{always_context, get_attributes};
+use easy_sql_compilation_data::CompilationData;
 pub use insert::*;
 pub use output::*;
-use sql_compilation_data::CompilationData;
 use syn::{ItemStruct, Path, punctuated::Punctuated};
 pub use table::*;
 pub use update::*;

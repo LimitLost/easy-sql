@@ -2,7 +2,7 @@
 
 use super::*;
 use anyhow::Result;
-use sql_macros::query;
+use easy_sql_macros::query;
 
 #[tokio::test]
 async fn test_vec_container_with_qualified_output_syntax() -> Result<()> {

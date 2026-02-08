@@ -7,7 +7,7 @@ use crate::tests::general::Database;
 use crate::tests::general::macros::{ExprTestData, ExprTestTable};
 use anyhow::Context;
 use easy_macros::always_context;
-use sql_macros::query;
+use easy_sql_macros::query;
 
 mod output_columns_tests {
     use super::*;

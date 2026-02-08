@@ -9,7 +9,7 @@ use super::super::macros::{
 };
 use crate::{Transaction, custom_sql_function};
 use easy_macros::{add_code, always_context};
-use sql_macros::query;
+use easy_sql_macros::query;
 
 #[always_context(skip(!))]
 #[no_context]

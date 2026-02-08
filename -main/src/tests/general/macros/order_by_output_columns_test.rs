@@ -2,7 +2,7 @@
 
 use super::*;
 use anyhow::Result;
-use sql_macros::query;
+use easy_sql_macros::query;
 
 #[tokio::test]
 async fn test_order_by_with_output_column_qualified_syntax() -> Result<()> {

@@ -3,7 +3,7 @@ use easy_macros::always_context;
 use easy_macros::{TokensBuilder, parse_macro_input};
 use quote::ToTokens;
 use quote::quote;
-use sql_compilation_data::CompilationData;
+use easy_sql_compilation_data::CompilationData;
 use syn::Path;
 use syn::punctuated::Punctuated;
 use syn::{self, parse::Parse};

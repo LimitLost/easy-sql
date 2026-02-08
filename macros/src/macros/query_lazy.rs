@@ -8,8 +8,8 @@ use crate::{
 
 use anyhow::Context;
 use easy_macros::always_context;
+use easy_sql_compilation_data::CompilationData;
 use quote::quote;
-use sql_compilation_data::CompilationData;
 use syn::{self, parse::Parse};
 
 struct Input {

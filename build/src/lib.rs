@@ -25,8 +25,8 @@
 use std::{io::Write, path::Path};
 #[cfg(feature = "migrations")]
 use {
+    easy_sql_compilation_data::{TableData, TableDataVersion},
     quote::quote,
-    sql_compilation_data::{TableData, TableDataVersion},
     std::collections::{HashMap, hash_map::Entry},
     syn::LitInt,
 };

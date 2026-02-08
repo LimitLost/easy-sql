@@ -6,7 +6,7 @@ use crate::drivers::sqlite::{Database, Sqlite as ExampleDriver};
 
 use crate::{Insert, Table, Transaction};
 use easy_macros::{add_code, always_context};
-use sql_macros::query;
+use easy_sql_macros::query;
 
 #[derive(Table, Debug, Clone)]
 #[sql(no_version)]

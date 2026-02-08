@@ -13,7 +13,7 @@ use super::*;
 use crate::{DatabaseSetup, Table, table_join};
 use anyhow::Context;
 use easy_macros::always_context;
-use sql_macros::{query, query_lazy};
+use easy_sql_macros::{query, query_lazy};
 
 // ==============================================
 // Test Tables for Join Testing
@@ -875,7 +875,7 @@ async fn test_output_with_aggregate_function() -> anyhow::Result<()> {
 #[tokio::test]
 async fn test_table_join_with_query_lazy() -> anyhow::Result<()> {
     use futures::stream::StreamExt;
-    use sql_macros::query_lazy;
+    use easy_sql_macros::query_lazy;
 
     let db = Database::setup_for_testing::<UsersTable>().await?;
     let mut conn = db.conn().await?;
@@ -910,7 +910,7 @@ async fn test_table_join_with_query_lazy() -> anyhow::Result<()> {
 #[tokio::test]
 async fn test_table_join_query_lazy_left_join() -> anyhow::Result<()> {
     use futures::stream::StreamExt;
-    use sql_macros::query_lazy;
+    use easy_sql_macros::query_lazy;
 
     let db = Database::setup_for_testing::<UsersTable>().await?;
     let mut conn = db.conn().await?;

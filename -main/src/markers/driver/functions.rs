@@ -7,7 +7,7 @@
 //!
 //! See [`supported`](crate::supported) module
 
-use sql_macros::define_supports_fn_trait;
+use easy_sql_macros::define_supports_fn_trait;
 
 define_supports_fn_trait!(SupportsCount, "COUNT");
 define_supports_fn_trait!(SupportsSum, "SUM");

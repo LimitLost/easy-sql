@@ -10,7 +10,7 @@ use super::super::macros::{
 };
 use crate::{DatabaseSetup, Insert, Output, Table, Transaction, custom_sql_function, table_join};
 use easy_macros::{add_code, always_context};
-use sql_macros::query;
+use easy_sql_macros::query;
 
 #[derive(Table, Debug, Clone)]
 #[sql(no_version)]

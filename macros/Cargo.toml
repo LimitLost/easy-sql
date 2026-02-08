@@ -1,5 +1,5 @@
 [package]
-name = "sql-macros"
+name = "easy-sql-macros"
 version = "0.1.0"
 edition = "2024"
 
@@ -9,7 +9,7 @@ proc-macro = true
 [dependencies]
 easy-macros = { version = "1.1.1", features = ["full"] }
 convert_case = "0.8.0"
-sql-compilation-data = { path = "../sql-compilation-data" }
+easy-sql-compilation-data = { path = "../compilation-data", features = ["build"]}
 
 syn = { version = "2.0", features = ["full","extra-traits"] }
 quote = { version = "1.0"}
@@ -24,5 +24,5 @@ easy-macros = { version = "1.1.1", features = ["build"] }
 default = []
 use_output_columns = []
 parse_debug = []
-migrations = ["sql-compilation-data/migrations"]
-check_duplicate_table_names = ["sql-compilation-data/check_duplicate_table_names"]
+migrations = ["easy-sql-compilation-data/migrations"]
+check_duplicate_table_names = ["easy-sql-compilation-data/check_duplicate_table_names"]

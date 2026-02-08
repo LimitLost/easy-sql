@@ -2,7 +2,7 @@
 
 use super::*;
 use easy_macros::always_context;
-use sql_macros::{custom_sql_function, query};
+use easy_sql_macros::{custom_sql_function, query};
 
 // ==============================================
 // Define Custom Functions for Testing

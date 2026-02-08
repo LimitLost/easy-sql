@@ -4,7 +4,7 @@
 use super::*;
 use anyhow::Context;
 use easy_macros::always_context;
-use sql_macros::query;
+use easy_sql_macros::query;
 #[cfg(feature = "postgres")]
 use sqlx::types::JsonValue;
 

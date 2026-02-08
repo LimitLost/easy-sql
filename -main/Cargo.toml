@@ -29,8 +29,8 @@ serde = {version = "1", features = ["derive"]}
 # Used by generated code by query_lazy! macro
 futures-core = {version = "0.3.31"}
 
-sql-compilation-data = {path = "./sql-compilation-data", default-features = false}
-sql-macros = {path = "./sql-macros"}
+easy-sql-compilation-data = {path = "../compilation-data", default-features = false}
+easy-sql-macros = {path = "../macros"}
 
 [dev-dependencies]
 dotenvy = "0.15"
@@ -51,7 +51,7 @@ easy-macros = {version = "1.1.1", features = ["add-code"]}
 [build-dependencies]
 easy-macros = {version = "1.1.1", features = ["build"]}
 regex = "*"
-sql-build = {path = "./sql-build", features = ["migrations"]}
+easy-sql-build = {path = "../build", features = ["migrations"]}
 
 [features]
 default = ["check_duplicate_table_names"]
@@ -59,14 +59,14 @@ postgres = ["sqlx/postgres", "dep:pg_escape"]
 sqlite = ["sqlx/sqlite"]
 sqlite_math = []
 
-use_output_columns = ["sql-macros/use_output_columns"]
+use_output_columns = ["easy-sql-macros/use_output_columns"]
 migrations = [
-  "sql-macros/migrations",
-  "sql-compilation-data/migrations",
+  "easy-sql-macros/migrations",
+  "easy-sql-compilation-data/migrations",
 ]
 check_duplicate_table_names = [
-  "sql-macros/check_duplicate_table_names",
-  "sql-compilation-data/check_duplicate_table_names",
+  "easy-sql-macros/check_duplicate_table_names",
+  "easy-sql-compilation-data/check_duplicate_table_names",
 ]
 
 # Adds ToDefault implementation for BigDecimal

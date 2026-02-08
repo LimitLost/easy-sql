@@ -3,7 +3,7 @@ use super::TestDriver;
 use crate::{Output, Table};
 use anyhow::Context;
 use easy_macros::always_context;
-use sql_macros::query;
+use easy_sql_macros::query;
 
 #[derive(Table)]
 #[sql(no_version)]

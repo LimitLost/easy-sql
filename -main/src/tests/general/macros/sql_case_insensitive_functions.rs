@@ -1,7 +1,7 @@
 // Test that SQL functions can be called with any case
 use super::*;
 use easy_macros::always_context;
-use sql_macros::query;
+use easy_sql_macros::query;
 
 #[derive(Table, Debug, Clone)]
 #[sql(no_version)]

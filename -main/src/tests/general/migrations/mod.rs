@@ -2,7 +2,7 @@ use super::{Database, TestDriver};
 use crate::{DatabaseSetup, Insert, Output, Table};
 use anyhow::Context;
 use easy_macros::always_context;
-use sql_macros::query;
+use easy_sql_macros::query;
 
 #[derive(Table, Debug)]
 #[sql(version_test = 1)]

@@ -11,8 +11,8 @@ use super::super::macros::{
 use crate::{EasyExecutor, Insert, Output, Table, Transaction};
 use anyhow::Context;
 use easy_macros::{add_code, always_context};
+use easy_sql_macros::query_lazy;
 use futures::StreamExt;
-use sql_macros::query_lazy;
 
 #[derive(Table, Debug, Clone)]
 #[sql(no_version)]

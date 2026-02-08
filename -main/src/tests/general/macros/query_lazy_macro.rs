@@ -5,7 +5,7 @@ use super::*;
 use anyhow::Context;
 use easy_macros::always_context;
 use futures::StreamExt;
-use sql_macros::{query, query_lazy};
+use easy_sql_macros::{query, query_lazy};
 
 /// Test query_lazy! with SELECT (basic usage)
 #[always_context(skip(!))]

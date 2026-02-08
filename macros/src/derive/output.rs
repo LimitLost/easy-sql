@@ -10,8 +10,8 @@ use ::{
 use easy_macros::{
     TokensBuilder, always_context, context, get_attributes, has_attributes, parse_macro_input,
 };
+use easy_sql_compilation_data::CompilationData;
 use quote::quote_spanned;
-use sql_compilation_data::CompilationData;
 
 use crate::{
     CUSTOM_SELECT_ALIAS_PREFIX,

@@ -5,7 +5,7 @@ use super::*;
 use anyhow::Context;
 use easy_macros::{always_context /* always_context_debug as always_context */};
 use serde::{Deserialize, Serialize};
-use sql_macros::query;
+use easy_sql_macros::query;
 
 // ==============================================
 // 1. SELECT QUERIES

@@ -48,7 +48,7 @@ pub mod driver {
 		"src/tests/general/documentation/impl_supports_fn_macro.rs",
 		impl_supports_fn_basic_example
 	)]
-    pub use sql_macros::impl_supports_fn;
+    pub use easy_sql_macros::impl_supports_fn;
     /// Implement a built-in SQL function support marker for any argument count.
     ///
     /// Useful for variadic functions like `COALESCE` or `CONCAT`. This macro implements the
@@ -66,7 +66,7 @@ pub mod driver {
 		"src/tests/general/documentation/impl_supports_fn_macro.rs",
 		impl_supports_fn_any_example
 	)]
-    pub use sql_macros::impl_supports_fn_any;
+    pub use easy_sql_macros::impl_supports_fn_any;
 }
 
 pub mod supported;
@@ -167,7 +167,7 @@ pub mod macro_support;
 /// ## Generic connection
 /// `*conn` syntax might be needed when using `&mut EasyExecutor<D>` as connection
 #[doc = docify::embed!("src/tests/general/documentation/query_macro.rs", generic_connection_example)]
-pub use sql_macros::query;
+pub use easy_sql_macros::query;
 
 /// Type-safe SQL macro that builds a lazy query and returns a stream on execution.
 ///
@@ -207,7 +207,7 @@ pub use sql_macros::query;
 #[doc = docify::embed!("src/tests/general/documentation/query_lazy_macro.rs", query_lazy_basic_example)]
 #[doc = docify::embed!("src/tests/general/documentation/query_lazy_macro.rs", query_lazy_streaming_example)]
 #[doc = docify::embed!("src/tests/general/documentation/query_lazy_macro.rs", generic_executor_example)]
-pub use sql_macros::query_lazy;
+pub use easy_sql_macros::query_lazy;
 
 /// Defines a SQL table schema.
 ///
@@ -252,7 +252,7 @@ pub use sql_macros::query_lazy;
 /// - Some drivers require at least one primary key; if none is specified, compilation will fail.
 /// - Auto-increment may be restricted when using composite primary keys, depending on the driver.
 /// - `#[sql(bytes)]` requires the field type to implement [`serde::Serialize`](https://docs.rs/serde/latest/serde/trait.Serialize.html)/[`Deserialize`](https://docs.rs/serde/latest/serde/trait.Deserialize.html).
-pub use sql_macros::Table;
+pub use easy_sql_macros::Table;
 
 /// Defines insertable data for a table.
 ///
@@ -275,7 +275,7 @@ pub use sql_macros::Table;
 /// ## Notes
 /// - `#[sql(table = TableStruct)]` is required and must point to a [`Table`] type.
 /// - You can insert a single value, borrow or a collection (`&T`, `Vec<T>`, `&Vec<T>`, `&[T]`).
-pub use sql_macros::Insert;
+pub use easy_sql_macros::Insert;
 /// Defines a SQL output mapping.
 ///
 /// Implements [`Output`] for the struct, enabling type-safe selection and decoding of rows in
@@ -313,7 +313,7 @@ pub use sql_macros::Insert;
 /// - With `use_output_columns`, you can reference `OutputType.column` (or bare columns) in
 ///   `query!` expressions.
 /// - Custom select arguments must be sequential (`arg0`, `arg1`, ...).
-pub use sql_macros::Output;
+pub use easy_sql_macros::Output;
 
 /// Defines update data for a table.
 ///
@@ -338,7 +338,7 @@ pub use sql_macros::Output;
 ///
 /// ## Notes
 /// - `#[sql(table = TableStruct)]` is required and must point to a [`Table`] type.
-pub use sql_macros::Update;
+pub use easy_sql_macros::Update;
 
 /// Composes database structure from nested types.
 ///
@@ -366,7 +366,7 @@ pub use sql_macros::Update;
 /// ## Notes
 /// - Every field must implement [`DatabaseSetup`] for the selected driver(s).
 /// - Setup order follows field order;
-pub use sql_macros::DatabaseSetup;
+pub use easy_sql_macros::DatabaseSetup;
 
 /// Defines a joined table type for use in [`query!`](crate::query) and [`query_lazy!`](crate::query_lazy).
 ///
@@ -398,7 +398,7 @@ pub use sql_macros::DatabaseSetup;
 	"src/tests/general/documentation/table_join_macro.rs",
 	table_join_left_example
 )]
-pub use sql_macros::table_join;
+pub use easy_sql_macros::table_join;
 
 /// Define a custom SQL function for use in [`query!`](crate::query) and [`query_lazy!`](crate::query_lazy).
 ///
@@ -435,4 +435,4 @@ pub use sql_macros::table_join;
 /// - Function names are case-insensitive in queries, but the emitted SQL name preserves casing.
 /// - The macro only validates SQL syntax; the function must exist in your database.
 /// - `Any` disables argument-count validation; otherwise invalid counts cause a compile-time error.
-pub use sql_macros::custom_sql_function;
+pub use easy_sql_macros::custom_sql_function;

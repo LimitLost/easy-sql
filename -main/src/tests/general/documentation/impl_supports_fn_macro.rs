@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use crate::{Driver, EasyExecutor, driver::TableField};
 use anyhow::Result;
 use easy_macros::always_context;
-use sql_macros::{impl_supports_fn, impl_supports_fn_any};
+use easy_sql_macros::{impl_supports_fn, impl_supports_fn_any};
 
 #[cfg(feature = "postgres")]
 type ExampleInternal = sqlx::Postgres;

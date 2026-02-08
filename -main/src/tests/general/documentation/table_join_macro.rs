@@ -7,7 +7,7 @@ use crate::drivers::sqlite::{Database, Sqlite as ExampleDriver};
 use super::super::macros::{ExprTestData, ExprTestTable, RelatedTestData, RelatedTestTable};
 use crate::{DatabaseSetup, Output, Transaction, table_join};
 use easy_macros::{add_code, always_context};
-use sql_macros::query;
+use easy_sql_macros::query;
 
 type ExampleTable = ExprTestTable;
 type RelatedTable = RelatedTestTable;

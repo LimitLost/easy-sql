@@ -1,6 +1,6 @@
 [package]
-name = "sql-build"
-version = "0.1.0"
+name = "easy-sql-build"
+version = "1.0.0"
 edition = "2024"
 
 [dependencies]
@@ -15,10 +15,10 @@ syn = { version = "2.0", features = ["full","extra-traits"]}
 quote = { version = "1.0" }
 anyhow = { version = "1" }
 
-sql-compilation-data = { path = "../sql-compilation-data", features = [
+easy-sql-compilation-data = { path = "../compilation-data", features = [
     "build",
 ] }
 
 [features]
-migrations = ["sql-compilation-data/migrations"]
-check_duplicate_table_names = ["sql-compilation-data/check_duplicate_table_names"]
+migrations = ["easy-sql-compilation-data/migrations"]
+check_duplicate_table_names = ["easy-sql-compilation-data/check_duplicate_table_names"]

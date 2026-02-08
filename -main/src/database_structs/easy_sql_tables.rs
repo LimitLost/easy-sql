@@ -6,7 +6,7 @@ use crate::{
     traits::{DriverConnection, InternalDriver},
 };
 use easy_macros::always_context;
-use sql_macros::{Insert, Update};
+use easy_sql_macros::{Insert, Update};
 use sqlx::TypeInfo;
 
 use crate::{DatabaseSetup, EasyExecutor, Table, driver::TableField};
