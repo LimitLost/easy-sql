@@ -6,9 +6,9 @@ edition = "2024"
 [dependencies]
 easy-macros = { version = "1.1.1", features = [
     "full",
-], optional = true }
+] }
 
-ron = { version = "0.10.1", optional = true }
+ron = { version = "0.10.1"}
 serde = { version = "*", features = ["derive"] }
 
 uuid = {version = "1.16.0", features = ["v4" ]}
@@ -19,8 +19,6 @@ proc-macro2 = { version = "1.0.100" }
 anyhow = { version = "1" }
 
 [features]
-default = ["data"]
-data = ["ron", "easy-macros"]
 build=[]
 check_duplicate_table_names = []
 migrations = []
