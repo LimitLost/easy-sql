@@ -457,8 +457,3 @@ impl CompilationData {
         Ok(result.finalize())
     }
 }
-
-//TODO Check for table removal inside of build script
-
-//In sqlite you can only add new columns and rename old ones
-//(without recreating a table https://www.sqlitetutorial.net/sqlite-alter-table/ )

@@ -45,7 +45,7 @@ async fn _test_select() -> anyhow::Result<Vec<ExampleOutput>> {
 
     // query! macro output
     let mut lazy_handler = {
-        //TODO Security checks
+        //Place Security checks here
         let _ = || {
             fn to_convert_single_impl<
                 Y: crate::markers::ToConvertSingle<TestDriver>,
