@@ -100,6 +100,13 @@ if [ "$USE_MIGRATIONS" = true ]; then
         FEATURES="migrations"
     fi
 fi
+if [ "$USE_MATH" = true ]; then
+    if [ -n "$FEATURES" ]; then
+        FEATURES="$FEATURES,sqlite_math,rust_decimal"
+    else
+        FEATURES="sqlite_math,rust_decimal"
+    fi
+fi
 if [ "$USE_CHECK_DUPLICATE_TABLE_NAMES" = true ]; then
     if [ -n "$FEATURES" ]; then
         FEATURES="$FEATURES,check_duplicate_table_names"
