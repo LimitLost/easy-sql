@@ -11,7 +11,7 @@ authors = ["LimitLost (JQ) <jq@limitlost.com>"]
 documentation = "https://docs.rs/easy-sql"
 homepage = "https://github.com/LimitLost/easy-sql"
 repository = "https://github.com/LimitLost/easy-sql"
-keywords = ["sql", "sqlx", "sqlite", "postgres", "macros", "migrations"]
+keywords = ["sql", "sqlx", "sqlite", "postgres", "macros"]
 categories = ["database", "development-tools", "development-tools::build-utils"]
 
 [dependencies]
