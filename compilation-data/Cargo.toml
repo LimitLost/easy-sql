@@ -3,6 +3,15 @@ name = "easy-sql-compilation-data"
 version = "1.0.0"
 edition = "2024"
 
+description = "Easy SQL support library"
+readme = "README-CRATES-IO.md"
+
+license = "Apache-2.0"
+authors = ["LimitLost (JQ) <jq@limitlost.com>"]
+documentation = "https://docs.rs/easy-sql"
+homepage = "https://github.com/LimitLost/easy-sql"
+repository = "https://github.com/LimitLost/easy-sql"
+
 [dependencies]
 easy-macros = { version = "1.1.1", features = [
     "full",
