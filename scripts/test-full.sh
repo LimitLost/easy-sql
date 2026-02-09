@@ -2,7 +2,7 @@
 
 # test.sh - Comprehensive test script for easy-sql
 # Tests all combinations of features: postgres, sqlite, use_output_columns, migrations, check_duplicate_table_names
-# Also tests with and without LIBSQLITE3_FLAGS environment variable
+# Also tests with and without math (sqlite_math + rust_decimal + LIBSQLITE3_FLAGS)
 
 # Don't exit on error - we want to test all combinations
 set +e
@@ -14,6 +14,17 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 CYAN='\033[0;36m'
 NC='\033[0m' # No Color
+
+SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+ROOT_DIR=$(dirname "$SCRIPT_DIR")
+MAIN_DIR="$ROOT_DIR/-main"
+
+if [ ! -d "$MAIN_DIR" ]; then
+    echo -e "${RED}Error: -main directory not found at $MAIN_DIR${NC}"
+    exit 1
+fi
+
+cd "$MAIN_DIR" || exit 1
 
 # Counters
 TOTAL_TESTS=0
@@ -96,26 +107,40 @@ print_summary_table() {
 # Function to run a single test configuration
 run_test() {
     local features=$1
-    local use_env=$2
+    local use_math=$2
     local config_name=$3
     
     local env_info=""
-    if [ "$use_env" = "true" ]; then
-        env_info="[with LIBSQLITE3_FLAGS]"
+    if [ "$use_math" = "true" ]; then
+        env_info="[with math]"
         export LIBSQLITE3_FLAGS="-DSQLITE_ENABLE_MATH_FUNCTIONS"
     else
-        env_info="[without LIBSQLITE3_FLAGS]"
+        env_info="[without math]"
         unset LIBSQLITE3_FLAGS
+    fi
+
+    local full_features="$features"
+    if [ "$use_math" = "true" ]; then
+        if [ -n "$full_features" ]; then
+            full_features="$full_features,sqlite_math,rust_decimal"
+        else
+            full_features="sqlite_math,rust_decimal"
+        fi
+    fi
+
+    local display_features="$full_features"
+    if [ -z "$display_features" ]; then
+        display_features="(none)"
     fi
     
     echo -e "\n${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
     echo -e "${YELLOW}Testing:${NC} $config_name $env_info"
-    echo -e "${YELLOW}Features:${NC} $features"
+    echo -e "${YELLOW}Features:${NC} $display_features"
     echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
     
     # Build first
-    echo -e "${BLUE}[BUILD]${NC} cargo build --no-default-features --features \"$features\""
-    local build_output=$(cargo build --no-default-features --features "$features" 2>&1)
+    echo -e "${BLUE}[BUILD]${NC} cargo build --no-default-features --features \"$full_features\""
+    local build_output=$(cargo build --no-default-features --features "$full_features" 2>&1)
     local build_status=$?
     if echo "$build_output" | grep -q "error"; then
         print_error_context "$build_output"
@@ -130,8 +155,8 @@ run_test() {
     
     if [ $build_status -eq 0 ]; then
         # Run tests
-        echo -e "${BLUE}[TEST]${NC} cargo test --no-default-features --features \"$features\""
-        local test_output=$(cargo test --no-default-features --features "$features" 2>&1)
+    echo -e "${BLUE}[TEST]${NC} cargo test --no-default-features --features \"$full_features\""
+    local test_output=$(cargo test --no-default-features --features "$full_features" 2>&1)
         local test_status=$?
         if echo "$test_output" | grep -q "error"; then
             print_error_context "$test_output"
@@ -158,7 +183,7 @@ run_test() {
         return 1
     fi
     
-    if [ "$use_env" = "true" ]; then
+    if [ "$use_math" = "true" ]; then
         unset LIBSQLITE3_FLAGS
     fi
 }
@@ -172,39 +197,43 @@ echo "  - sqlite (feature)"
 echo "  - use_output_columns (feature)"
 echo "  - migrations (feature)"
 echo "  - check_duplicate_table_names (feature)"
-echo "  - LIBSQLITE3_FLAGS environment variable"
+echo "  - math (sqlite_math + rust_decimal + LIBSQLITE3_FLAGS)"
 echo ""
 echo "Each combination will be built and tested with --no-default-features"
 echo ""
 
 # Generate all feature combinations
 # Features: postgres, sqlite, use_output_columns, migrations, check_duplicate_table_names
-# We'll test each combination with and without LIBSQLITE3_FLAGS
+# We'll test each combination with and without math
 
 declare -a FEATURE_COMBINATIONS=(
     # Single features
-    "postgres|Postgres only"
-    "sqlite|SQLite only"
     "use_output_columns|use_output_columns only"
     "migrations|migrations only"
     "check_duplicate_table_names|check_duplicate_table_names only"
-    
-    # Two features
-    "postgres,use_output_columns|Postgres + use_output_columns"
-    "postgres,migrations|Postgres + migrations"
+
+    # sqlite
+    "sqlite|SQLite only"
     "sqlite,use_output_columns|SQLite + use_output_columns"
     "sqlite,migrations|SQLite + migrations"
+    "sqlite,migrations,check_duplicate_table_names|SQLite + migrations + check_duplicate_table_names"
+    "sqlite,use_output_columns,check_duplicate_table_names|SQLite + use_output_columns + check_duplicate_table_names"
+    "sqlite,use_output_columns,migrations|SQLite + use_output_columns + migrations"
+    
+    # Postgres
+    "postgres|Postgres only"
+    "postgres,use_output_columns|Postgres + use_output_columns"
+    "postgres,migrations|Postgres + migrations"
+    "postgres,use_output_columns,migrations|Postgres + use_output_columns + migrations"
+    "postgres,use_output_columns,check_duplicate_table_names|Postgres + use_output_columns + check_duplicate_table_names"
+    "postgres,migrations,check_duplicate_table_names|Postgres + migrations + check_duplicate_table_names"
+    
+    # Two features
     "use_output_columns,migrations|use_output_columns + migrations"
     "use_output_columns,check_duplicate_table_names|use_output_columns + check_duplicate_table_names"
     "migrations,check_duplicate_table_names|migrations + check_duplicate_table_names"
     
     # Three features
-    "postgres,use_output_columns,migrations|Postgres + use_output_columns + migrations"
-    "sqlite,use_output_columns,migrations|SQLite + use_output_columns + migrations"
-    "postgres,use_output_columns,check_duplicate_table_names|Postgres + use_output_columns + check_duplicate_table_names"
-    "sqlite,use_output_columns,check_duplicate_table_names|SQLite + use_output_columns + check_duplicate_table_names"
-    "postgres,migrations,check_duplicate_table_names|Postgres + migrations + check_duplicate_table_names"
-    "sqlite,migrations,check_duplicate_table_names|SQLite + migrations + check_duplicate_table_names"
     
     # Note: postgres + sqlite combination doesn't make sense as they're mutually exclusive database backends
     # But we can test them together to verify the build handles it
@@ -218,106 +247,21 @@ declare -a FEATURE_COMBINATIONS=(
     "postgres,sqlite,use_output_columns,migrations,check_duplicate_table_names|All features + check_duplicate_table_names"
 )
 
-# Test each feature combination with and without LIBSQLITE3_FLAGS
+# Test each feature combination with and without math
 for combo in "${FEATURE_COMBINATIONS[@]}"; do
     IFS='|' read -r features name <<< "$combo"
     
-    # Test without LIBSQLITE3_FLAGS
+    # Test without math
     run_test "$features" "false" "$name"
     
-    # Test with LIBSQLITE3_FLAGS
+    # Test with math
     run_test "$features" "true" "$name"
 done
 
 # Also test with no features at all
 print_header "Testing with no features"
-echo -e "\n${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo -e "${YELLOW}Testing:${NC} No features [without LIBSQLITE3_FLAGS]"
-echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo -e "${BLUE}[BUILD]${NC} cargo build --no-default-features"
-build_output=$(cargo build --no-default-features 2>&1)
-build_status=$?
-if echo "$build_output" | grep -q "error"; then
-    print_error_context "$build_output"
-else
-    echo "$build_output" | tail -10
-fi
-
-# Also check if build output contains "error" to catch compile errors
-if echo "$build_output" | grep -q "^error"; then
-    build_status=1
-fi
-
-if [ $build_status -eq 0 ]; then
-    echo -e "${BLUE}[TEST]${NC} cargo test --no-default-features"
-    test_output=$(cargo test --no-default-features 2>&1)
-    test_status=$?
-    if echo "$test_output" | grep -q "error"; then
-        print_error_context "$test_output"
-    else
-        echo "$test_output" | tail -20
-    fi
-    
-    # Also check if test output contains "error" to catch test errors
-    if echo "$test_output" | grep -q "^error"; then
-        test_status=1
-    fi
-    
-    if [ $test_status -eq 0 ]; then
-        print_result 0 "No features" "[without LIBSQLITE3_FLAGS]"
-    else
-        print_result 1 "No features" "[without LIBSQLITE3_FLAGS]"
-    fi
-else
-    echo -e "${RED}Build failed${NC}"
-    print_error_context "$build_output"
-    print_result 1 "No features" "[without LIBSQLITE3_FLAGS]"
-fi
-
-echo -e "\n${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo -e "${YELLOW}Testing:${NC} No features [with LIBSQLITE3_FLAGS]"
-echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-export LIBSQLITE3_FLAGS="-DSQLITE_ENABLE_MATH_FUNCTIONS"
-echo -e "${BLUE}[BUILD]${NC} cargo build --no-default-features"
-build_output=$(cargo build --no-default-features 2>&1)
-build_status=$?
-if echo "$build_output" | grep -q "error"; then
-    print_error_context "$build_output"
-else
-    echo "$build_output" | tail -10
-fi
-
-# Also check if build output contains "error" to catch compile errors
-if echo "$build_output" | grep -q "^error"; then
-    build_status=1
-fi
-
-if [ $build_status -eq 0 ]; then
-    echo -e "${BLUE}[TEST]${NC} cargo test --no-default-features"
-    test_output=$(cargo test --no-default-features 2>&1)
-    test_status=$?
-    if echo "$test_output" | grep -q "error"; then
-        print_error_context "$test_output"
-    else
-        echo "$test_output" | tail -20
-    fi
-    
-    # Also check if test output contains "error" to catch test errors
-    if echo "$test_output" | grep -q "^error"; then
-        test_status=1
-    fi
-    
-    if [ $test_status -eq 0 ]; then
-        print_result 0 "No features" "[with LIBSQLITE3_FLAGS]"
-    else
-        print_result 1 "No features" "[with LIBSQLITE3_FLAGS]"
-    fi
-else
-    echo -e "${RED}Build failed${NC}"
-    print_error_context "$build_output"
-    print_result 1 "No features" "[with LIBSQLITE3_FLAGS]"
-fi
-unset LIBSQLITE3_FLAGS
+run_test "" "false" "No features"
+run_test "" "true" "Math only"
 
 # Print detailed summary table
 print_summary_table

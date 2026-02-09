@@ -17,6 +17,17 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
+SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+ROOT_DIR=$(dirname "$SCRIPT_DIR")
+MAIN_DIR="$ROOT_DIR/-main"
+
+if [ ! -d "$MAIN_DIR" ]; then
+    echo -e "${RED}Error: -main directory not found at $MAIN_DIR${NC}"
+    exit 1
+fi
+
+cd "$MAIN_DIR" || exit 1
+
 # Parse arguments
 USE_MATH=false
 USE_OUTPUT_COLUMNS=false
