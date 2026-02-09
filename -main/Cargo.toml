@@ -60,7 +60,7 @@ easy-macros = {version = "1.1.1", features = ["add-code"]}
 
 [build-dependencies]
 easy-macros = {version = "1.1.1", features = ["build"]}
-regex = "*"
+regex = "1"
 easy-sql-build = { version = "1.0.0", features = ["migrations"] }
 
 [features]
