@@ -1,8 +1,18 @@
 [package]
-edition = "2024" 
-license = "Apache-2.0" 
-name = "easy-sql" 
+edition = "2024"
+license = "Apache-2.0"
+name = "easy-sql"
 version = "0.100.0"
+
+description = "Macro-first SQL toolkit with compile-time checked queries, optional migrations on top of sqlx."
+readme = "README.md"
+
+authors = ["LimitLost (JQ) <jq@limitlost.com>"]
+documentation = "https://docs.rs/easy-sql"
+homepage = "https://github.com/LimitLost/easy-sql"
+repository = "https://github.com/LimitLost/easy-sql"
+keywords = ["sql", "sqlx", "sqlite", "postgres", "macros", "migrations"]
+categories = ["database", "development-tools", "development-tools::build-utils"]
 
 [dependencies]
 
@@ -11,13 +21,13 @@ sqlx = {version = "0.8"}
 docify = "0.4.1"
 
 pg_escape = {version = "0.1.1", optional = true}
-uuid = {version = "*", features = ["serde"], optional = true}
+uuid = {version = "1", features = ["serde"], optional = true}
 # Add serde impl to bigdecimal
-bigdecimal = {version = "*", features = ["serde-json"], optional = true}
+bigdecimal = {version = "0.4", features = ["serde-json"], optional = true}
 # Add serde impl to decimal
 rust_decimal = {version = "1.37.1", features = ["serde-str"], optional = true}
 easy-macros = {version = "1.1.1", features = ["always-context"]}
-chrono = {version = "*", features = ["serde"], optional = true}
+chrono = {version = "0.4", features = ["serde"], optional = true}
 
 
 anyhow = {version = "1"}
@@ -29,15 +39,15 @@ serde = {version = "1", features = ["derive"]}
 # Used by generated code by query_lazy! macro
 futures-core = {version = "0.3.31"}
 
-easy-sql-compilation-data = {path = "../compilation-data", default-features = false}
-easy-sql-macros = {path = "../macros"}
+easy-sql-compilation-data = { version = "1.0.0", default-features = false }
+easy-sql-macros = { version = "1.0.0" }
 
 [dev-dependencies]
 dotenvy = "0.15"
 tokio = {version = "1", features = ["full"]}
 tracing = "0.1"
 tracing-subscriber = {version = "0.3", features = ["fmt", "env-filter"]}
-lazy_static = {version = "*"}
+lazy_static = {version = "1"}
 futures = {version = "0.3.31"}
 serde_json = {version = "1"}
 
@@ -51,7 +61,7 @@ easy-macros = {version = "1.1.1", features = ["add-code"]}
 [build-dependencies]
 easy-macros = {version = "1.1.1", features = ["build"]}
 regex = "*"
-easy-sql-build = {path = "../build", features = ["migrations"]}
+easy-sql-build = { version = "1.0.0", features = ["migrations"] }
 
 [features]
 default = ["check_duplicate_table_names"]
