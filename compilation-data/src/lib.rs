@@ -331,7 +331,7 @@ impl CompilationData {
                 let new_name = latest_version.table_name.as_str();
 
                 rename_table = Some(quote! {
-                    #sql_crate::AlterTableSingle::RenameTable{
+                    #sql_crate::driver::AlterTableSingle::RenameTable{
                         new_table_name: #new_name,
                     }
                 });
@@ -346,7 +346,7 @@ impl CompilationData {
                     let new_name = new_field.name.as_str();
 
                     changes_needed.push(quote! {
-                        #sql_crate::AlterTableSingle::RenameColumn{
+                        #sql_crate::driver::AlterTableSingle::RenameColumn{
                             old_column_name: #old_name,
                             new_column_name: #new_name,
                         }
@@ -422,7 +422,7 @@ impl CompilationData {
 
                 //Create new field
                 changes_needed.push(quote! {
-                    #sql_crate::AlterTableSingle::AddColumn{
+                    #sql_crate::driver::AlterTableSingle::AddColumn{
                         column: #sql_crate::driver::TableField {
                             name: #field_name,
                             data_type: {
