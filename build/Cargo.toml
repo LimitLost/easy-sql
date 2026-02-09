@@ -3,9 +3,17 @@ name = "easy-sql-build"
 version = "1.0.0"
 edition = "2024"
 
+description = "Easy SQL Build-time helper crate"
+readme = "README-CRATES-IO.md"
+
+license = "Apache-2.0"
+authors = ["LimitLost (JQ) <jq@limitlost.com>"]
+homepage = "https://github.com/LimitLost/easy-sql"
+repository = "https://github.com/LimitLost/easy-sql"
+
 [dependencies]
 easy-macros = { version = "1.1.1",  features = ["full"] }
-proc-macro2 = { version = "*", features = ["span-locations"] }
+proc-macro2 = { version = "1", features = ["span-locations"] }
 
 regex = "1.11.1"
 convert_case = "0.8.0"
@@ -15,7 +23,7 @@ syn = { version = "2.0", features = ["full","extra-traits"]}
 quote = { version = "1.0" }
 anyhow = { version = "1" }
 
-easy-sql-compilation-data = { path = "../compilation-data", features = [
+easy-sql-compilation-data = { version = "1.0.0", features = [
     "build",
 ] }
 
