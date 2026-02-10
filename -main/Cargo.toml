@@ -2,7 +2,7 @@
 edition = "2024"
 license = "Apache-2.0"
 name = "easy-sql"
-version = "0.100.0"
+version = "0.100.1"
 
 description = "Macro-first SQL toolkit with compile-time checked queries, optional migrations on top of sqlx."
 readme = "README.md"
@@ -39,7 +39,7 @@ serde = {version = "1", features = ["derive"]}
 # Used by generated code by query_lazy! macro
 futures-core = {version = "0.3.31"}
 
-easy-sql-compilation-data = { version = "1.0.0", default-features = false }
+easy-sql-compilation-data = { version = "1.0.1", default-features = false }
 easy-sql-macros = { version = "1.0.0" }
 
 [dev-dependencies]
@@ -61,7 +61,7 @@ easy-macros = {version = "1.1.1", features = ["add-code"]}
 [build-dependencies]
 easy-macros = {version = "1.1.1", features = ["build"]}
 regex = "1"
-easy-sql-build = { version = "1.0.0", features = ["migrations"] }
+easy-sql-build = { version = "1.0.1", features = ["migrations"] }
 
 [features]
 default = ["check_duplicate_table_names"]
