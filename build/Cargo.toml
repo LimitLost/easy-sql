@@ -1,6 +1,6 @@
 [package]
 name = "easy-sql-build"
-version = "1.0.0"
+version = "1.0.1"
 edition = "2024"
 
 description = "Easy SQL Build-time helper crate"
@@ -23,7 +23,7 @@ syn = { version = "2.0", features = ["full","extra-traits"]}
 quote = { version = "1.0" }
 anyhow = { version = "1" }
 
-easy-sql-compilation-data = { version = "1.0.0", features = [
+easy-sql-compilation-data = { version = "1.0.1", features = [
     "build",
 ] }
 
