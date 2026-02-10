@@ -221,7 +221,15 @@ impl CompilationData {
         let data =
             ron::ser::to_string_pretty(self, ron::ser::PrettyConfig::new().struct_names(true))?;
 
-        std::fs::write(&data_path, &data).context("Failed to write easy_sql.ron file")?;
+        let result = std::fs::write(&data_path, &data);
+
+        if let Err(e) = &result
+            && let std::io::ErrorKind::ReadOnlyFilesystem = e.kind()
+        {
+            return Ok(());
+        }
+
+        result.context("Failed to write easy_sql.ron file")?;
 
         Ok(())
     }

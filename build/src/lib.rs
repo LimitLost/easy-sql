@@ -507,10 +507,6 @@ fn handle_dir(
 }
 
 #[always_context]
-/// Build function that adds `#[always_context]` attribute to every function with `anyhow::Result` return type and every `trait` and `impl` block.
-///
-/// To every rust file in `src` directory.
-///
 /// # Arguments
 ///
 /// `ignore_list` - A list of regex patterns to ignore. The patterns are used on the file path. Path is ignored if match found.
@@ -548,7 +544,14 @@ fn build_result(ignore_list: &[regex::Regex], default_drivers: &[&str]) -> anyho
     if !search_data.file_matched_errors.is_empty() {
         let log_folder = current_dir.join("easy_sql_logs");
         if !log_folder.exists() {
-            std::fs::create_dir_all(&log_folder)?;
+            let result = std::fs::create_dir_all(&log_folder);
+            if let Err(e) = &result
+                && let std::io::ErrorKind::ReadOnlyFilesystem = e.kind()
+            {
+                //If we can't create log folder, just skip logging
+                return Ok(());
+            }
+            result.context("Creating easy_sql_logs folder failed")?;
         }
         let current_date = chrono::Utc::now();
         let log_file = log_folder.join(format!("{}.txt", current_date.format("%Y-%m-%d")));
