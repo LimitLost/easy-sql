@@ -183,6 +183,7 @@ with open(file_path, "r", encoding="utf-8") as handle:
 
 new_lines = []
 for line in lines:
+    line = line.rstrip("\r\n")
     base, comment = split_comment(line)
     updated = base
     for name, path, version in deps:
