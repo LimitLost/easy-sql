@@ -47,7 +47,7 @@ pub fn driver_identifier_delimiter<D: Driver>(_exec: &impl crate::EasyExecutor<D
 ///This function extracts Driver from connection (that's the only reason why it exists instead of direct call)
 pub fn driver_parameter_placeholder<D: Driver>(
     _exec: &impl crate::EasyExecutor<D>,
-) -> Box<dyn Fn(usize) -> String> {
+) -> Box<dyn Fn(usize) -> String + Send + Sync> {
     Box::new(|index: usize| D::parameter_placeholder(index))
 }
 
