@@ -2,7 +2,7 @@
 edition = "2024"
 license = "Apache-2.0"
 name = "easy-sql"
-version = "0.100.1"
+version = "0.100.2"
 
 description = "Macro-first SQL toolkit with compile-time checked queries, optional migrations on top of sqlx."
 readme = "README.md"
