@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Script to build all subfolders that have both Cargo.toml and README.docify.md
-# This script runs `cargo build --features generate-readme --no-default-features`
+# This script runs `cargo build --features _generate_readme --no-default-features`
 # on each qualifying folder.
 #
 # Usage: ./build_readme_docs.sh [--help|-h]
@@ -17,7 +17,7 @@ if [[ "$1" == "--help" || "$1" == "-h" ]]; then
     echo "  - README.docify.md"
     echo ""
     echo "It runs the following command in each qualifying folder:"
-    echo "  cargo build --features generate-readme --no-default-features"
+    echo "  cargo build --features _generate_readme --no-default-features"
     echo ""
     echo "Options:"
     echo "  --help, -h    Show this help message and exit"
@@ -34,8 +34,8 @@ echo "Building documentation for folders with both Cargo.toml and README.docify.
 processed=0
 
 # Find all directories that contain both Cargo.toml and README.docify.md
-# Use a different approach to avoid issues with the while loop
-cargo_tomls=($(find "$PROJECT_ROOT" -name "Cargo.toml" -type f))
+# Skip target directories to avoid building packaged crates.
+cargo_tomls=($(find "$PROJECT_ROOT" -path "*/target/*" -prune -o -name "Cargo.toml" -type f -print))
 
 for cargo_toml in "${cargo_tomls[@]}"; do
     dir="$(dirname "$cargo_toml")"
@@ -56,8 +56,8 @@ for cargo_toml in "${cargo_tomls[@]}"; do
         # Change to the directory and run cargo build
         cd "$dir"
         
-        echo "Running: cargo build --features generate-readme --no-default-features"
-        if cargo build --features generate-readme --no-default-features; then
+        echo "Running: cargo build --features _generate_readme --no-default-features"
+        if cargo build --features _generate_readme --no-default-features; then
             echo "✅ Successfully built $(basename "$dir")"
             processed=$((processed + 1))
         else

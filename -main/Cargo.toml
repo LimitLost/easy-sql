@@ -88,7 +88,8 @@ ipnet = ["sqlx/ipnet"]
 uuid = ["sqlx/uuid","dep:uuid"]
 chrono = ["sqlx/chrono","dep:chrono"]
 
-generate-readme = []
+# Compile README.docify.md to README.md (needed because docify crashes rust analyzer with this feature enabled by default)
+_generate_readme = []
 
 # Note: written so that it may be copy-pasted to other crates
 [package.metadata.docs.rs]
