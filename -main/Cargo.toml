@@ -89,3 +89,7 @@ uuid = ["sqlx/uuid","dep:uuid"]
 chrono = ["sqlx/chrono","dep:chrono"]
 
 generate-readme = []
+
+# Note: written so that it may be copy-pasted to other crates
+[package.metadata.docs.rs]
+rustdoc-args = ["--cfg", "docsrs"]

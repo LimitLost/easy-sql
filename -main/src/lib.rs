@@ -1,3 +1,5 @@
+#![cfg_attr(docsrs, feature(doc_cfg))]
+
 // Compile README.docify.md to README.md
 #[cfg(feature = "generate-readme")]
 docify::compile_markdown!("README.docify.md", "README.md");
