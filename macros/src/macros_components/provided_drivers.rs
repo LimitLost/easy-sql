@@ -48,7 +48,7 @@ impl ProvidedDrivers {
             }
             ProvidedDrivers::MultipleWithConn { drivers: _, conn } => {
                 quote_spanned! {conn.span()=>
-                    #sql_crate::macro_support::args_for_driver(&(#conn))
+                    #sql_crate::macro_support::args_for_driver(#conn)
                 }
             }
         }
@@ -63,7 +63,7 @@ impl ProvidedDrivers {
             }
             ProvidedDrivers::MultipleWithConn { drivers: _, conn } => {
                 quote_spanned! {conn.span()=>
-                    #sql_crate::macro_support::driver_identifier_delimiter(& (#conn))
+                    #sql_crate::macro_support::driver_identifier_delimiter(#conn)
                 }
             }
         }
@@ -85,7 +85,7 @@ impl ProvidedDrivers {
                 quote_spanned! {output_type.span()=>
                     #sql_crate::macro_support::query_add_selected::<#table_type, #output_type, _>(
                         &mut query,
-                        &(#conn),
+                        #conn,
                     );
                 }
             }
@@ -111,7 +111,7 @@ impl ProvidedDrivers {
             ProvidedDrivers::MultipleWithConn { conn, .. } => {
                 quote! {
                     query.push_str(&<#output_type as #sql_crate::macro_support::OutputData<#table_type>>::SelectProvider::__easy_sql_select_driver_from_conn(
-                        &(#conn),
+                        #conn,
                         _easy_sql_d,
                         #(#output_arg_tokens),*
                     ));
@@ -142,7 +142,7 @@ impl ProvidedDrivers {
                         #[allow(unused_braces)]
                         {#to_insert},
                         _easy_sql_args,
-                        &(#conn),
+                        #conn,
                     )
                 }
             }
@@ -174,7 +174,7 @@ impl ProvidedDrivers {
                         _easy_sql_args,
                         &mut query,
                         &mut current_arg_n,
-                        &(#conn),
+                        #conn,
                     )
                 }
             }
@@ -192,7 +192,7 @@ impl ProvidedDrivers {
                 quote_spanned! {table_type.span()=>
                     #sql_crate::macro_support::driver_table_joins::<#table_type, _>(
                         &mut query,
-                        & (#conn),
+                        #conn,
                     );
                 }
             }
@@ -207,7 +207,7 @@ impl ProvidedDrivers {
             ProvidedDrivers::MultipleWithConn { drivers: _, conn } => {
                 quote_spanned! {conn.span()=>
                     let mut __easy_sql_parameter_placeholder =
-                        #sql_crate::macro_support::driver_parameter_placeholder(&(#conn));
+                        #sql_crate::macro_support::driver_parameter_placeholder(#conn);
                 }
             }
         }
@@ -259,7 +259,7 @@ impl ProvidedDrivers {
             }
             ProvidedDrivers::MultipleWithConn { drivers: _, conn } => {
                 quote_spanned! {field_type.span()=>
-                    #sql_crate::macro_support::driver_type_info::<#field_type, _>(& (#conn))
+                    #sql_crate::macro_support::driver_type_info::<#field_type, _>(#conn)
                 }
             }
         }
@@ -278,7 +278,7 @@ impl ProvidedDrivers {
             }
             ProvidedDrivers::MultipleWithConn { drivers: _, conn } => {
                 quote_spanned! {table_type.span()=>
-                    #sql_crate::macro_support::driver_related_table_name::<#table_type,_>(& (#conn))
+                    #sql_crate::macro_support::driver_related_table_name::<#table_type,_>(#conn)
                 }
             }
         }

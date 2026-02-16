@@ -176,7 +176,7 @@ pub fn generate_select(
             let built_query = builder.build();
 
             // Execute query
-            #macro_support::query_execute::<#table_type, #output_type, _>(&mut (#connection), built_query)
+            #macro_support::query_execute::<#table_type, #output_type, _>(#connection, built_query)
                 .await
                 .with_context(|| format!(#debug_format_str, #macro_input))
         }
@@ -201,7 +201,6 @@ pub fn generate_select(
         };
 
         let fetch_internals_normal = fetch_internals(quote! {into_executor});
-        let fetch_internals_mut = fetch_internals(quote! {executor});
 
         quote! {
             struct LazyQueryResult<'_easy_sql_a> {
@@ -211,26 +210,15 @@ pub fn generate_select(
             impl<'_easy_sql_q> LazyQueryResult<'_easy_sql_q> {
                 fn fetch<'_easy_sql_e, E>(
                     &'_easy_sql_e mut self,
-                    mut conn: &'_easy_sql_e mut E,
+                    mut conn: E,
                 ) -> impl #macro_support::Stream<
                     Item = #macro_support::Result<#output_type>,
                 > + '_easy_sql_e
                 where
-                    &'_easy_sql_e mut E: #sql_crate::EasyExecutor<#lazy_mode_driver> + '_easy_sql_e,
+                    E: #sql_crate::EasyExecutorInto<#lazy_mode_driver> + '_easy_sql_e,
                     '_easy_sql_q: '_easy_sql_e,
                 {
                     #fetch_internals_normal
-                }
-                /// Useful when you're passing a generic `&mut impl EasyExecutor` as an argument
-                fn fetch_mut<'_easy_sql_e, E>(
-                    &'_easy_sql_e mut self,
-                    mut conn: &'_easy_sql_e mut E,
-                ) -> impl #macro_support::Stream<Item = #macro_support::Result<#output_type>> + '_easy_sql_e
-                where
-                    E: #sql_crate::EasyExecutor<#lazy_mode_driver> + '_easy_sql_e,
-                    '_easy_sql_q: '_easy_sql_e,
-                {
-                    #fetch_internals_mut
                 }
             }
 
@@ -382,7 +370,6 @@ pub fn generate_insert(
             };
 
             let fetch_internals_normal = fetch_internals(quote! {into_executor});
-            let fetch_internals_mut = fetch_internals(quote! {executor});
 
             let returning_select = if returning_has_args {
                 quote! {
@@ -422,27 +409,15 @@ pub fn generate_insert(
                     impl<'_easy_sql_q> LazyQueryResult<'_easy_sql_q> {
                         fn fetch<'_easy_sql_e, E>(
                             &'_easy_sql_e mut self,
-                            mut conn: &'_easy_sql_e mut E,
+                            mut conn: E,
                         ) -> impl #macro_support::Stream<
                             Item = #macro_support::Result<#returning_type>,
                         > + '_easy_sql_e
                         where
-                            &'_easy_sql_e mut E: #sql_crate::EasyExecutor<#driver> + '_easy_sql_e,
+                            E: #sql_crate::EasyExecutorInto<#driver> + '_easy_sql_e,
                             '_easy_sql_q: '_easy_sql_e,
                         {
                             #fetch_internals_normal
-                        }
-
-                        /// Useful when you're passing a generic `&mut impl EasyExecutor` as an argument
-                        fn fetch_mut<'_easy_sql_e, E>(
-                            &'_easy_sql_e mut self,
-                            mut conn: &'_easy_sql_e mut E,
-                        ) -> impl #macro_support::Stream<Item = #macro_support::Result<#returning_type>> + '_easy_sql_e
-                        where
-                            E: #sql_crate::EasyExecutor<#driver> + '_easy_sql_e,
-                            '_easy_sql_q: '_easy_sql_e,
-                        {
-                            #fetch_internals_mut
                         }
                     }
                 },
@@ -469,7 +444,7 @@ pub fn generate_insert(
                 },
                 quote! {
                     let built_query = builder.build();
-                    #macro_support::query_execute::<#table_type,#returning_type,_>(&mut (#connection),built_query).await.with_context(|| format!(#debug_format_str, #macro_input))
+                    #macro_support::query_execute::<#table_type,#returning_type,_>(#connection,built_query).await.with_context(|| format!(#debug_format_str, #macro_input))
                 },
                 quote! {},
                 returning_arg_defs,
@@ -488,7 +463,7 @@ pub fn generate_insert(
             quote! {},
             quote! {
                 let built_query = builder.build();
-                #macro_support::query_execute_no_output(&mut (#connection),built_query).await.with_context(|| format!(#debug_format_str, #macro_input))
+                #macro_support::query_execute_no_output(#connection,built_query).await.with_context(|| format!(#debug_format_str, #macro_input))
             },
             quote! {},
             Vec::new(),
@@ -675,7 +650,7 @@ pub fn generate_update(
                 quote! {
                     let mut builder = #macro_support::QueryBuilder::with_arguments(&query, _easy_sql_args);
                     let built_query = builder.build();
-                    #macro_support::query_execute::<#table_type, #returning_type, _>(&mut #connection, built_query)
+                    #macro_support::query_execute::<#table_type, #returning_type, _>(#connection, built_query)
                         .await
                         .with_context(|| format!(#debug_format_str, #macro_input))
                 },
@@ -702,7 +677,6 @@ pub fn generate_update(
             };
 
             let fetch_internals_normal = fetch_internals(quote! {into_executor});
-            let fetch_internals_mut = fetch_internals(quote! {executor});
 
             checks.push(quote! {
                 {
@@ -743,27 +717,15 @@ pub fn generate_update(
                     impl<'_easy_sql_q> LazyQueryResult<'_easy_sql_q> {
                         fn fetch<'_easy_sql_e, E>(
                             &'_easy_sql_e mut self,
-                            mut conn: &'_easy_sql_e mut E,
+                            mut conn: E,
                         ) -> impl #macro_support::Stream<
                             Item = #macro_support::Result<#returning_type>,
                         > + '_easy_sql_e
                         where
-                            &'_easy_sql_e mut E: #sql_crate::EasyExecutor<#lazy_mode_driver> + '_easy_sql_e,
+                            E: #sql_crate::EasyExecutorInto<#lazy_mode_driver> + '_easy_sql_e,
                             '_easy_sql_q: '_easy_sql_e,
                         {
                             #fetch_internals_normal
-                        }
-
-                        /// Useful when you're passing a generic `&mut impl EasyExecutor` as an argument
-                        fn fetch_mut<'_easy_sql_e, E>(
-                            &'_easy_sql_e mut self,
-                            mut conn: &'_easy_sql_e mut E,
-                        ) -> impl #macro_support::Stream<Item = #macro_support::Result<#returning_type>> + '_easy_sql_e
-                        where
-                            E: #sql_crate::EasyExecutor<#lazy_mode_driver> + '_easy_sql_e,
-                            '_easy_sql_q: '_easy_sql_e,
-                        {
-                            #fetch_internals_mut
                         }
                     }
 
@@ -784,7 +746,7 @@ pub fn generate_update(
             quote! {},
             quote! {
                 let query = #macro_support::query_with(&query, _easy_sql_args);
-                #macro_support::query_execute_no_output(&mut (#connection), query)
+                #macro_support::query_execute_no_output(#connection, query)
                     .await
                     .with_context(|| format!(#debug_format_str, #macro_input))
             },
@@ -931,7 +893,7 @@ pub fn generate_delete(
                 quote! {
                     let mut builder = #macro_support::QueryBuilder::with_arguments(&query, _easy_sql_args);
                     let built_query = builder.build();
-                    #macro_support::query_execute(&mut #connection, built_query)
+                    #macro_support::query_execute(#connection, built_query)
                         .await
                         .with_context(|| format!(#debug_format_str, #macro_input))
                 },
@@ -958,7 +920,6 @@ pub fn generate_delete(
             };
 
             let fetch_internals_normal = fetch_internals(quote! {into_executor});
-            let fetch_internals_mut = fetch_internals(quote! {executor});
 
             checks.push(quote! {
                 {
@@ -999,27 +960,15 @@ pub fn generate_delete(
                     impl<'_easy_sql_q> LazyQueryResult<'_easy_sql_q> {
                         fn fetch<'_easy_sql_e, E>(
                             &'_easy_sql_e mut self,
-                            mut conn: &'_easy_sql_e mut E,
+                            mut conn: E,
                         ) -> impl #macro_support::Stream<
                             Item = #macro_support::Result<#returning_type>,
                         > + '_easy_sql_e
                         where
-                            &'_easy_sql_e mut E: #sql_crate::EasyExecutor<#lazy_mode_driver> + '_easy_sql_e,
+                            E: #sql_crate::EasyExecutorInto<#lazy_mode_driver> + '_easy_sql_e,
                             '_easy_sql_q: '_easy_sql_e,
                         {
                             #fetch_internals_normal
-                        }
-
-                        /// Useful when you're passing a generic `&mut impl EasyExecutor` as an argument
-                        fn fetch_mut<'_easy_sql_e, E>(
-                            &'_easy_sql_e mut self,
-                            mut conn: &'_easy_sql_e mut E,
-                        ) -> impl #macro_support::Stream<Item = #macro_support::Result<#returning_type>> + '_easy_sql_e
-                        where
-                            E: #sql_crate::EasyExecutor<#lazy_mode_driver> + '_easy_sql_e,
-                            '_easy_sql_q: '_easy_sql_e,
-                        {
-                            #fetch_internals_mut
                         }
                     }
 
@@ -1041,7 +990,7 @@ pub fn generate_delete(
             quote! {
                 let mut builder = #macro_support::QueryBuilder::with_arguments(&query, _easy_sql_args);
                 let built_query = builder.build();
-                #macro_support::query_execute_no_output(&mut #connection, built_query)
+                #macro_support::query_execute_no_output(#connection, built_query)
                     .await
                     .with_context(|| format!(#debug_format_str, #macro_input))
             },
@@ -1205,7 +1154,7 @@ pub fn generate_exists(
                 let mut builder = #macro_support::QueryBuilder::with_arguments(query, _easy_sql_args);
                 let built_query = builder.build();
 
-                #macro_support::query_exists_execute(&mut (#connection), built_query)
+                #macro_support::query_exists_execute(#connection, built_query)
                     .await
                     .with_context(|| format!("sql query! macro input: {}", #macro_input))
             }

@@ -10,7 +10,7 @@ use anyhow::Context;
 use easy_macros::always_context;
 use easy_sql_compilation_data::CompilationData;
 use proc_macro2::TokenStream;
-use quote::{ToTokens, quote};
+use quote::quote;
 use syn::{self, parse::Parse};
 
 /// Input structure for query! macro: optional driver, connection, query_type
@@ -18,6 +18,25 @@ struct QueryInput {
     driver: Option<syn::Path>,
     connection: syn::Expr,
     query: QueryType,
+}
+
+fn connection_tokens(connection: &syn::Expr) -> (TokenStream, TokenStream) {
+    match connection {
+        syn::Expr::Reference(reference) => {
+            let shared = quote! {&( #connection )};
+            let mutable = if reference.mutability.is_some() {
+                quote! {#connection}
+            } else {
+                quote! {&mut ( #connection )}
+            };
+            (shared, mutable)
+        }
+        _ => {
+            let shared = quote! {&( #connection )};
+            let mutable = quote! {&mut ( #connection )};
+            (shared, mutable)
+        }
+    }
 }
 
 #[always_context]
@@ -49,7 +68,8 @@ pub fn query(input_raw: proc_macro::TokenStream) -> anyhow::Result<proc_macro::T
     let input_str = input_raw.to_string();
     let input = easy_macros::parse_macro_input!(input_raw as QueryInput);
 
-    let connection = input.connection.into_token_stream();
+    let connection = input.connection;
+    let (connection_shared, connection_mut) = connection_tokens(&connection);
 
     // Load compilation data to get driver information
     let sql_crate = sql_crate();
@@ -72,7 +92,7 @@ pub fn query(input_raw: proc_macro::TokenStream) -> anyhow::Result<proc_macro::T
                     .with_context(|| format!("Failed to parse driver path: {}", driver))?;
                 ProvidedDrivers::MultipleWithConn {
                     drivers: vec![driver_parsed],
-                    conn: connection.clone(),
+                    conn: connection_shared.clone(),
                 }
             }
             _ => {
@@ -86,7 +106,7 @@ pub fn query(input_raw: proc_macro::TokenStream) -> anyhow::Result<proc_macro::T
 
                 ProvidedDrivers::MultipleWithConn {
                     drivers: parsed_drivers,
-                    conn: connection.clone(),
+                    conn: connection_shared.clone(),
                 }
             }
         }
@@ -95,35 +115,35 @@ pub fn query(input_raw: proc_macro::TokenStream) -> anyhow::Result<proc_macro::T
     let result = match input.query {
         QueryType::Select(select) => generate_select(
             select.clone(),
-            Some(&connection),
+            Some(&connection_mut),
             driver.clone(),
             &sql_crate,
             &input_str,
         )?,
         QueryType::Insert(insert) => generate_insert(
             insert.clone(),
-            Some(&connection),
+            Some(&connection_mut),
             driver.clone(),
             &sql_crate,
             &input_str,
         )?,
         QueryType::Update(update) => generate_update(
             update.clone(),
-            Some(&connection),
+            Some(&connection_mut),
             driver.clone(),
             &sql_crate,
             &input_str,
         )?,
         QueryType::Delete(delete) => generate_delete(
             delete.clone(),
-            Some(&connection),
+            Some(&connection_mut),
             driver.clone(),
             &sql_crate,
             &input_str,
         )?,
         QueryType::Exists(exists) => generate_exists(
             exists.clone(),
-            &connection,
+            &connection_mut,
             driver.clone(),
             &sql_crate,
             &input_str,
