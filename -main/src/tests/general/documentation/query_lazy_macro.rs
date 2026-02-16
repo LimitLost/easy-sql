@@ -8,7 +8,7 @@ use super::super::macros::{
     ExprTestData, ExprTestTable, default_expr_test_data, expr_test_data, insert_multiple_test_data,
     insert_test_data,
 };
-use crate::{EasyExecutor, Insert, Output, Table, Transaction};
+use crate::{EasyExecutor, Insert, Output, PoolTransaction, Table};
 use anyhow::Context;
 use easy_macros::{add_code, always_context};
 use easy_sql_macros::query_lazy;
@@ -41,7 +41,7 @@ type Sqlite = ExampleDriver;
     Ok(())
 })]
 #[docify::export_content]
-async fn query_lazy_basic_example(mut conn: Transaction<'_, ExampleDriver>) -> anyhow::Result<()> {
+async fn query_lazy_basic_example(mut conn: PoolTransaction<ExampleDriver>) -> anyhow::Result<()> {
     let mut lazy = query_lazy!(<Sqlite> SELECT OutputType FROM TableType WHERE column = 42)?;
     let mut stream = lazy.fetch(&mut conn);
     let row = stream.next().await.context("Expected at least one row")?;
@@ -56,7 +56,7 @@ async fn query_lazy_basic_example(mut conn: Transaction<'_, ExampleDriver>) -> a
 })]
 #[docify::export_content]
 async fn query_lazy_streaming_example(
-    mut conn: Transaction<'_, ExampleDriver>,
+    mut conn: PoolTransaction<ExampleDriver>,
 ) -> anyhow::Result<()> {
     let min_val = 10;
     let mut lazy = query_lazy!(
@@ -80,7 +80,7 @@ async fn external_generic_executor_example(
         conn: &mut impl EasyExecutor<ExampleDriver>,
     ) -> anyhow::Result<()> {
         let mut lazy = query_lazy!(SELECT ExprTestData FROM ExprTestTable)?;
-        let mut stream = lazy.fetch_mut(conn);
+        let mut stream = lazy.fetch(conn);
         let maybe = stream.next().await.transpose()?;
         assert!(maybe.is_some());
         Ok(())

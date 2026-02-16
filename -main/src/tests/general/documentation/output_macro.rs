@@ -5,7 +5,7 @@ use crate::drivers::postgres::{Database, Postgres as TestDriver};
 use crate::drivers::sqlite::{Database, Sqlite as TestDriver};
 
 use super::super::macros::{ExprTestData, ExprTestTable, RelatedTestData, RelatedTestTable};
-use crate::{DatabaseSetup, Output, Transaction, table_join};
+use crate::{DatabaseSetup, Output, PoolTransaction, table_join};
 use easy_macros::{add_code, always_context};
 use easy_sql_macros::query;
 
@@ -20,7 +20,7 @@ type RelatedTable = RelatedTestTable;
     Ok(())
 })]
 #[docify::export_content]
-async fn output_basic_example(mut conn: Transaction<'_, TestDriver>) -> anyhow::Result<()> {
+async fn output_basic_example(mut conn: PoolTransaction<TestDriver>) -> anyhow::Result<()> {
     #[derive(Output)]
     #[sql(table = ExampleTable)]
     struct BasicOutput {
@@ -43,7 +43,7 @@ async fn output_basic_example(mut conn: Transaction<'_, TestDriver>) -> anyhow::
     Ok(())
 })]
 #[docify::export_content]
-async fn output_custom_select_example(mut conn: Transaction<'_, TestDriver>) -> anyhow::Result<()> {
+async fn output_custom_select_example(mut conn: PoolTransaction<TestDriver>) -> anyhow::Result<()> {
     #[derive(Output)]
     #[sql(table = ExampleTable)]
     struct CustomSelectOutput {
@@ -66,7 +66,7 @@ async fn output_custom_select_example(mut conn: Transaction<'_, TestDriver>) -> 
 })]
 #[docify::export_content]
 async fn output_custom_select_args_example(
-    mut conn: Transaction<'_, TestDriver>,
+    mut conn: PoolTransaction<TestDriver>,
 ) -> anyhow::Result<()> {
     #[derive(Output)]
     #[sql(table = ExampleTable)]
@@ -91,7 +91,7 @@ async fn output_custom_select_args_example(
     Ok(())
 })]
 #[docify::export_content]
-async fn output_joined_fields_example(mut conn: Transaction<'_, TestDriver>) -> anyhow::Result<()> {
+async fn output_joined_fields_example(mut conn: PoolTransaction<TestDriver>) -> anyhow::Result<()> {
     table_join!(ExampleJoin | ExampleTable INNER JOIN RelatedTable ON ExampleTable.id = RelatedTable.parent_id);
 
     #[derive(Output)]

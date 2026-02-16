@@ -95,9 +95,9 @@ impl Database {
         Ok(Connection::new(conn))
     }
 
-    pub async fn transaction(&self) -> anyhow::Result<Transaction<'_, Sqlite>> {
+    pub async fn transaction(&self) -> anyhow::Result<PoolTransaction<Sqlite>> {
         let conn = self.connection_pool.begin().await?;
-        Ok(Transaction::new(conn))
+        Ok(PoolTransaction::new(conn))
     }
     #[cfg(test)]
     pub async fn setup_for_testing<T: DatabaseSetup<Sqlite>>() -> anyhow::Result<Self> {

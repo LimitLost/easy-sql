@@ -7,7 +7,7 @@ use crate::drivers::sqlite::{Database, Sqlite as ExampleDriver};
 use super::super::macros::{
     ExprTestData, ExprTestTable, expr_test_data, insert_multiple_test_data,
 };
-use crate::{Transaction, custom_sql_function};
+use crate::{PoolTransaction, custom_sql_function};
 use easy_macros::{add_code, always_context};
 use easy_sql_macros::query;
 
@@ -21,7 +21,7 @@ use easy_sql_macros::query;
 #[allow(non_local_definitions)]
 #[docify::export_content]
 async fn custom_sql_function_basic_example(
-    mut conn: Transaction<'_, ExampleDriver>,
+    mut conn: PoolTransaction<ExampleDriver>,
 ) -> anyhow::Result<()> {
     custom_sql_function!(Capitalize; "UPPER"; 1);
 
@@ -42,7 +42,7 @@ async fn custom_sql_function_basic_example(
 #[allow(non_local_definitions)]
 #[docify::export_content]
 async fn custom_sql_function_multiple_args_example(
-    mut conn: Transaction<'_, ExampleDriver>,
+    mut conn: PoolTransaction<ExampleDriver>,
 ) -> anyhow::Result<()> {
     custom_sql_function!(SubstrSlice; "SUBSTR"; 2 | 3);
 
@@ -69,7 +69,7 @@ async fn custom_sql_function_multiple_args_example(
 #[allow(non_local_definitions)]
 #[docify::export_content]
 async fn custom_sql_function_any_args_example(
-    mut conn: Transaction<'_, ExampleDriver>,
+    mut conn: PoolTransaction<ExampleDriver>,
 ) -> anyhow::Result<()> {
     custom_sql_function!(CoalesceAnyDoc; "COALESCE"; Any);
 

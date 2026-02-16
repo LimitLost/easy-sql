@@ -12,8 +12,11 @@ mod drivers;
 pub use drivers::*;
 
 pub use {
-    database_structs::{Connection, EasySqlTables, Transaction},
-    traits::{DatabaseSetup, Driver, EasyExecutor, Insert, Output, Table, ToDefault, Update},
+    database_structs::{Connection, EasySqlTables, PoolTransaction, Transaction},
+    traits::{
+        DatabaseSetup, Driver, EasyExecutor, EasyExecutorInto, Insert, Output, Table, ToDefault,
+        Update,
+    },
 };
 #[allow(rustdoc::broken_intra_doc_links)]
 /// Driver-facing traits and helper types.
@@ -191,9 +194,10 @@ pub use easy_sql_macros::query;
 /// - There is **no connection parameter** in the macro call; pass it when fetching.
 ///
 /// ### Return value
-/// returns a `anyhow::Result<LazyQueryResult>` with the following methods:
-/// - `fetch(impl EasyExecutor)` - use when you have a **concrete** connection/transaction type
-/// - `fetch_mut(&mut impl EasyExecutor)` - use when you have a **generic** `&mut impl EasyExecutor`
+/// returns a `anyhow::Result<LazyQueryResult>` with the following method:
+/// - `fetch(impl EasyExecutorInto)`
+///     - when using a generic `&mut impl EasyExecutor` connection, use `fetch(&mut *conn)`
+///     - otherwise pass a connection or transaction directly (e.g., `fetch(conn)` or `fetch(&mut transaction)`)
 ///
 /// Both return `futures::Stream<Item = anyhow::Result<Output>>`. The stream borrows the
 /// connection; drop or fully consume it before reusing the connection.

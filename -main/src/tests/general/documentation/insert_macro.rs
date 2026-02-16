@@ -4,7 +4,7 @@ use crate::drivers::postgres::{Database, Postgres as ExampleDriver};
 #[cfg(all(feature = "sqlite", not(feature = "postgres")))]
 use crate::drivers::sqlite::{Database, Sqlite as ExampleDriver};
 
-use crate::{Insert, Table, Transaction};
+use crate::{Insert, PoolTransaction, Table};
 use easy_macros::{add_code, always_context};
 use easy_sql_macros::query;
 
@@ -35,7 +35,7 @@ type ExampleTable = DocInsertTable;
     Ok(())
 })]
 #[docify::export_content]
-async fn insert_basic_example(mut conn: Transaction<'_, ExampleDriver>) -> anyhow::Result<()> {
+async fn insert_basic_example(mut conn: PoolTransaction<ExampleDriver>) -> anyhow::Result<()> {
     #[derive(Insert)]
     #[sql(table = ExampleTable)]
     struct ExampleInsert {
@@ -69,7 +69,7 @@ async fn insert_basic_example(mut conn: Transaction<'_, ExampleDriver>) -> anyho
     Ok(())
 })]
 #[docify::export_content]
-async fn insert_defaults_example(mut conn: Transaction<'_, ExampleDriver>) -> anyhow::Result<()> {
+async fn insert_defaults_example(mut conn: PoolTransaction<ExampleDriver>) -> anyhow::Result<()> {
     #[derive(Insert)]
     #[sql(table = ExampleTable)]
     #[sql(default = id, role)]

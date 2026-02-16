@@ -8,7 +8,9 @@ use super::super::macros::{
     ExprTestData, ExprTestTable, RelatedTestData, RelatedTestTable, default_expr_test_data,
     expr_test_data, insert_multiple_test_data, insert_test_data,
 };
-use crate::{DatabaseSetup, Insert, Output, Table, Transaction, custom_sql_function, table_join};
+use crate::{
+    DatabaseSetup, Insert, Output, PoolTransaction, Table, custom_sql_function, table_join,
+};
 use easy_macros::{add_code, always_context};
 use easy_sql_macros::query;
 
@@ -39,7 +41,7 @@ type Sqlite = TestDriver;
     Ok(())
 })]
 #[docify::export_content]
-async fn query_basic_example(mut conn: Transaction<'_, TestDriver>) -> anyhow::Result<()> {
+async fn query_basic_example(mut conn: PoolTransaction<TestDriver>) -> anyhow::Result<()> {
     let value = 42;
     let result =
         query!(<Sqlite> &mut conn, SELECT OutputType From TableType where column = {value}).await?;
@@ -54,7 +56,7 @@ async fn query_basic_example(mut conn: Transaction<'_, TestDriver>) -> anyhow::R
     Ok(())
 })]
 #[docify::export_content]
-async fn select_examples(mut conn: Transaction<'_, TestDriver>) -> anyhow::Result<()> {
+async fn select_examples(mut conn: PoolTransaction<TestDriver>) -> anyhow::Result<()> {
     let id = 1;
     let one: ExprTestData = query!(&mut conn,
         SELECT ExprTestData FROM ExprTestTable WHERE ExprTestTable.id = {id}
@@ -80,7 +82,7 @@ async fn select_examples(mut conn: Transaction<'_, TestDriver>) -> anyhow::Resul
 })]
 #[docify::export_content]
 async fn select_output_columns_example(
-    mut conn: Transaction<'_, TestDriver>,
+    mut conn: PoolTransaction<TestDriver>,
 ) -> anyhow::Result<()> {
     let min_val = 10;
     let results: Vec<ExprTestData> = query!(&mut conn,
@@ -102,7 +104,7 @@ async fn select_output_columns_example(
     Ok(())
 })]
 #[docify::export_content]
-async fn insert_example(mut conn: Transaction<'_, TestDriver>) -> anyhow::Result<()> {
+async fn insert_example(mut conn: PoolTransaction<TestDriver>) -> anyhow::Result<()> {
     let data = ExprTestData {
         int_field: 42,
         str_field: "ready".to_string(),
@@ -120,7 +122,7 @@ async fn insert_example(mut conn: Transaction<'_, TestDriver>) -> anyhow::Result
     Ok(())
 })]
 #[docify::export_content]
-async fn insert_returning_example(mut conn: Transaction<'_, TestDriver>) -> anyhow::Result<()> {
+async fn insert_returning_example(mut conn: PoolTransaction<TestDriver>) -> anyhow::Result<()> {
     let data = ExprTestData {
         int_field: 7,
         str_field: "added".to_string(),
@@ -144,7 +146,7 @@ async fn insert_returning_example(mut conn: Transaction<'_, TestDriver>) -> anyh
     Ok(())
 })]
 #[docify::export_content]
-async fn update_struct_example(mut conn: Transaction<'_, TestDriver>) -> anyhow::Result<()> {
+async fn update_struct_example(mut conn: PoolTransaction<TestDriver>) -> anyhow::Result<()> {
     let id = 1;
     let updated = ExprTestData {
         int_field: 5,
@@ -170,7 +172,7 @@ async fn update_struct_example(mut conn: Transaction<'_, TestDriver>) -> anyhow:
     Ok(())
 })]
 #[docify::export_content]
-async fn update_inline_example(mut conn: Transaction<'_, TestDriver>) -> anyhow::Result<()> {
+async fn update_inline_example(mut conn: PoolTransaction<TestDriver>) -> anyhow::Result<()> {
     let id = 1;
     query!(&mut conn,
         UPDATE ExprTestTable SET str_field = "inline", bool_field = false WHERE ExprTestTable.id = {id}
@@ -186,7 +188,7 @@ async fn update_inline_example(mut conn: Transaction<'_, TestDriver>) -> anyhow:
     Ok(())
 })]
 #[docify::export_content]
-async fn update_returning_example(mut conn: Transaction<'_, TestDriver>) -> anyhow::Result<()> {
+async fn update_returning_example(mut conn: PoolTransaction<TestDriver>) -> anyhow::Result<()> {
     let bool_value = false;
 
     let updated: Vec<ExprTestData> = query!(&mut conn,
@@ -208,7 +210,7 @@ async fn update_returning_example(mut conn: Transaction<'_, TestDriver>) -> anyh
     Ok(())
 })]
 #[docify::export_content]
-async fn delete_example(mut conn: Transaction<'_, TestDriver>) -> anyhow::Result<()> {
+async fn delete_example(mut conn: PoolTransaction<TestDriver>) -> anyhow::Result<()> {
     query!(&mut conn, DELETE FROM ExprTestTable WHERE ExprTestTable.id = 1).await?;
 }
 
@@ -219,7 +221,7 @@ async fn delete_example(mut conn: Transaction<'_, TestDriver>) -> anyhow::Result
     Ok(())
 })]
 #[docify::export_content]
-async fn delete_returning_example(mut conn: Transaction<'_, TestDriver>) -> anyhow::Result<()> {
+async fn delete_returning_example(mut conn: PoolTransaction<TestDriver>) -> anyhow::Result<()> {
     let removed: Option<ExprTestData> = query!(&mut conn,
         DELETE FROM ExprTestTable WHERE ExprTestTable.id = 1 RETURNING Option<ExprTestData>
     )
@@ -233,7 +235,7 @@ async fn delete_returning_example(mut conn: Transaction<'_, TestDriver>) -> anyh
     Ok(())
 })]
 #[docify::export_content]
-async fn exists_example(mut conn: Transaction<'_, TestDriver>) -> anyhow::Result<()> {
+async fn exists_example(mut conn: PoolTransaction<TestDriver>) -> anyhow::Result<()> {
     let exists: bool = query!(&mut conn,
         EXISTS ExprTestTable WHERE str_field IS NOT NULL And str_field = "exists"
     )
@@ -249,7 +251,7 @@ async fn exists_example(mut conn: Transaction<'_, TestDriver>) -> anyhow::Result
     Ok(())
 })]
 #[docify::export_content]
-async fn table_joins_example(mut conn: Transaction<'_, TestDriver>) -> anyhow::Result<()> {
+async fn table_joins_example(mut conn: PoolTransaction<TestDriver>) -> anyhow::Result<()> {
     table_join!(ExprWithRelated | ExprTestTable INNER JOIN RelatedTestTable ON ExprTestTable.id = RelatedTestTable.parent_id);
 
     #[derive(Output)]
@@ -276,7 +278,7 @@ async fn table_joins_example(mut conn: Transaction<'_, TestDriver>) -> anyhow::R
     Ok(())
 })]
 #[docify::export_content]
-async fn sql_function_builtin_example(mut conn: Transaction<'_, TestDriver>) -> anyhow::Result<()> {
+async fn sql_function_builtin_example(mut conn: PoolTransaction<TestDriver>) -> anyhow::Result<()> {
     let rows: Vec<ExprTestData> = query!(&mut conn,
         SELECT Vec<ExprTestData> FROM ExprTestTable WHERE LOWER(str_field) = "hello"
     )
@@ -291,7 +293,7 @@ async fn sql_function_builtin_example(mut conn: Transaction<'_, TestDriver>) -> 
 })]
 #[allow(non_local_definitions)]
 #[docify::export_content]
-async fn sql_function_custom_example(mut conn: Transaction<'_, TestDriver>) -> anyhow::Result<()> {
+async fn sql_function_custom_example(mut conn: PoolTransaction<TestDriver>) -> anyhow::Result<()> {
     custom_sql_function!(Len; "LENGTH"; 1);
     let rows: Vec<ExprTestData> = query!(&mut conn,
         SELECT Vec<ExprTestData> FROM ExprTestTable
@@ -307,7 +309,7 @@ async fn sql_function_custom_example(mut conn: Transaction<'_, TestDriver>) -> a
     Ok(())
 })]
 #[docify::export_content]
-async fn in_vec_example(mut conn: Transaction<'_, TestDriver>) -> anyhow::Result<()> {
+async fn in_vec_example(mut conn: PoolTransaction<TestDriver>) -> anyhow::Result<()> {
     let ids = vec![10, 30, 50];
     let results: Vec<ExprTestData> = query!(&mut conn,
         SELECT Vec<ExprTestData> FROM ExprTestTable
@@ -324,7 +326,7 @@ async fn in_vec_example(mut conn: Transaction<'_, TestDriver>) -> anyhow::Result
 })]
 #[docify::export_content]
 async fn generic_connection_example(
-    conn: &mut &mut Transaction<'_, TestDriver>,
+    conn: &mut &mut PoolTransaction<TestDriver>,
 ) -> anyhow::Result<()> {
     let rows: Vec<ExprTestData> =
         query!(*conn, SELECT Vec<ExprTestData> FROM ExprTestTable).await?;

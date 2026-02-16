@@ -5,7 +5,7 @@ use crate::drivers::postgres::{Database, Postgres as ExampleDriver};
 use crate::drivers::sqlite::{Database, Sqlite as ExampleDriver};
 
 use super::super::macros::{ExprTestData, ExprTestTable, RelatedTestData, RelatedTestTable};
-use crate::{DatabaseSetup, Output, Transaction, table_join};
+use crate::{DatabaseSetup, Output, PoolTransaction, table_join};
 use easy_macros::{add_code, always_context};
 use easy_sql_macros::query;
 
@@ -21,7 +21,7 @@ type RelatedTable = RelatedTestTable;
     Ok(())
 })]
 #[docify::export_content]
-async fn table_join_basic_example(mut conn: Transaction<'_, ExampleDriver>) -> anyhow::Result<()> {
+async fn table_join_basic_example(mut conn: PoolTransaction<ExampleDriver>) -> anyhow::Result<()> {
     table_join!(ExampleJoin | ExampleTable INNER JOIN RelatedTable ON ExampleTable.id = RelatedTable.parent_id);
 
     #[derive(Output)]
@@ -53,7 +53,7 @@ async fn table_join_basic_example(mut conn: Transaction<'_, ExampleDriver>) -> a
     Ok(())
 })]
 #[docify::export_content]
-async fn table_join_left_example(mut conn: Transaction<'_, ExampleDriver>) -> anyhow::Result<()> {
+async fn table_join_left_example(mut conn: PoolTransaction<ExampleDriver>) -> anyhow::Result<()> {
     table_join!(<ExampleDriver> ExampleLeftJoin | ExampleTable LEFT JOIN RelatedTable ON ExampleTable.id = RelatedTable.parent_id);
 
     #[derive(Output)]

@@ -4,7 +4,7 @@ use crate::drivers::postgres::{Database, Postgres as TestDriver};
 #[cfg(all(feature = "sqlite", not(feature = "postgres")))]
 use crate::drivers::sqlite::{Database, Sqlite as TestDriver};
 
-use crate::{Insert, Table, Transaction, Update};
+use crate::{Insert, PoolTransaction, Table, Update};
 use easy_macros::{add_code, always_context};
 use easy_sql_macros::query;
 
@@ -42,7 +42,7 @@ type ExampleTable = DocUpdateTable;
     Ok(())
 })]
 #[docify::export_content]
-async fn update_basic_example(mut conn: Transaction<'_, TestDriver>) -> anyhow::Result<()> {
+async fn update_basic_example(mut conn: PoolTransaction<TestDriver>) -> anyhow::Result<()> {
     #[derive(Update)]
     #[sql(table = ExampleTable)]
     struct UpdateData {
@@ -73,7 +73,7 @@ async fn update_basic_example(mut conn: Transaction<'_, TestDriver>) -> anyhow::
     Ok(())
 })]
 #[docify::export_content]
-async fn update_partial_example(mut conn: Transaction<'_, TestDriver>) -> anyhow::Result<()> {
+async fn update_partial_example(mut conn: PoolTransaction<TestDriver>) -> anyhow::Result<()> {
     #[derive(Update)]
     #[sql(table = ExampleTable)]
     struct UpdateNickname {
