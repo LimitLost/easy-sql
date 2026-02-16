@@ -111,9 +111,12 @@ impl Database {
             static ref CURRENT_NAME_N:Mutex<usize>=Default::default();
         }
         let current_path = std::env::current_dir()?;
-        let mut current_n = CURRENT_NAME_N.lock().await;
-        let test_db_path = current_path.join(format!("test_db_{}", *current_n));
-        *current_n += 1;
+        let test_db_path = {
+            let mut current_n = CURRENT_NAME_N.lock().await;
+            let path = current_path.join(format!("test_db_{}", *current_n));
+            *current_n += 1;
+            path
+        };
 
         let connection_pool = sqlx::Pool::<Db>::connect_with(
             SqliteConnectOptions::default()

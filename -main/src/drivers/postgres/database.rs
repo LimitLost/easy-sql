@@ -81,9 +81,12 @@ impl Database {
         let db_prefix = std::env::var("POSTGRES_TEST_DB_PREFIX")
             .context("POSTGRES_TEST_DB_PREFIX .env variable must be set for tests")?;
 
-        let mut current_n = CURRENT_NAME_N.lock().await;
-        let test_database = format!("{}_{}", db_prefix, *current_n);
-        *current_n += 1;
+        let test_database = {
+            let mut current_n = CURRENT_NAME_N.lock().await;
+            let name = format!("{}_{}", db_prefix, *current_n);
+            *current_n += 1;
+            name
+        };
 
         // Recreate test database
         let maintenance_pool = sqlx::Pool::<Db>::connect_with(
@@ -95,11 +98,16 @@ impl Database {
         )
         .await?;
 
-        sqlx::query(&format!("DROP DATABASE IF EXISTS {}", test_database))
-            .execute(&maintenance_pool)
-            .await?;
+        let safe_test_database = test_database.replace('"', "\"\"");
 
-        sqlx::query(&format!("CREATE DATABASE {}", test_database))
+        sqlx::query(&format!(
+            "DROP DATABASE IF EXISTS \"{}\"",
+            safe_test_database
+        ))
+        .execute(&maintenance_pool)
+        .await?;
+
+        sqlx::query(&format!("CREATE DATABASE \"{}\"", safe_test_database))
             .execute(&maintenance_pool)
             .await?;
 
