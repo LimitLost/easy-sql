@@ -97,7 +97,9 @@ pub mod macro_support;
 /// ```
 ///
 /// - `<Driver>` is optional, if omitted the driver is inferred from `conn`.
-/// - `conn` is generally a connection or transaction implementing [`EasyExecutor`], implemented for mutable versions of both, also implemented for Sqlx Executor types.
+/// - `conn` is generally a connection or transaction implementing [`EasyExecutor`], available for
+///   mutable easy-sql connections/transactions and compatible sqlx executor types. The macro generates
+///   a mutable borrow internally.
 ///
 ///  Example:
 #[doc = docify::embed!("src/tests/general/documentation/query_macro.rs", query_basic_example)]
@@ -196,7 +198,9 @@ pub use easy_sql_macros::query;
 /// ### Return value
 /// returns a `anyhow::Result<LazyQueryResult>` with the following method:
 /// - `fetch(impl EasyExecutorInto)`
-///     - when using a generic `&mut impl EasyExecutor` connection, use `fetch(&mut *conn)`
+///     - with a generic `conn: &mut impl EasyExecutor`, use `fetch(&mut *conn)` when you need to
+///       use `conn` again later in the same scope
+///         - on the final use in that scope, `fetch(conn)` is valid and shorter
 ///     - otherwise pass a connection or transaction directly (e.g., `fetch(conn)` or `fetch(&mut transaction)`)
 ///
 /// Both return `futures::Stream<Item = anyhow::Result<Output>>`. The stream borrows the
