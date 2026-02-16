@@ -13,6 +13,7 @@ use crate::{
 type Row = sqlx::sqlite::SqliteRow;
 
 #[always_context]
+#[async_trait::async_trait]
 impl ToConvert<CDriver> for Row {
     async fn get<'a>(
         exec: impl Executor<'_, Database = InternalDriver<CDriver>>,
@@ -27,9 +28,11 @@ impl ToConvert<CDriver> for Row {
     }
 }
 #[always_context]
+#[async_trait::async_trait]
 impl ToConvertSingle<CDriver> for Row {}
 
 #[always_context]
+#[async_trait::async_trait]
 impl ToConvert<CDriver> for Option<Row> {
     async fn get<'a>(
         exec: impl Executor<'_, Database = InternalDriver<CDriver>>,
@@ -45,6 +48,7 @@ impl ToConvert<CDriver> for Option<Row> {
 }
 
 #[always_context]
+#[async_trait::async_trait]
 impl ToConvert<CDriver> for () {
     async fn get<'a>(
         exec: impl Executor<'_, Database = InternalDriver<CDriver>>,
@@ -62,6 +66,7 @@ impl ToConvert<CDriver> for () {
 }
 
 #[always_context]
+#[async_trait::async_trait]
 impl ToConvert<CDriver> for Vec<Row> {
     async fn get<'a>(
         exec: impl Executor<'_, Database = InternalDriver<CDriver>>,

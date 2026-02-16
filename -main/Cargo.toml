@@ -39,8 +39,8 @@ serde = {version = "1", features = ["derive"]}
 # Used by generated code by query_lazy! macro
 futures-core = {version = "0.3.31"}
 
-easy-sql-compilation-data = { version = "1.0.1", default-features = false }
-easy-sql-macros = { version = "1.0.0" }
+# Fixes async not being Send in traits used by query macros
+async-trait = "0.1.89"
 
 [dev-dependencies]
 dotenvy = "0.15"

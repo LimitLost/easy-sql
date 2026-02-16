@@ -6,6 +6,7 @@ use crate::Driver;
 use super::DriverArguments;
 
 #[always_context]
+#[async_trait::async_trait]
 /// Conversion helper used by [`Output`].
 ///
 /// Driver integrations provide implementations for their row types.
