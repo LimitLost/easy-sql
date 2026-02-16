@@ -15,9 +15,6 @@ pub trait EasyExecutor<D: Driver> {
     type InternalExecutor<'b>: sqlx::Executor<'b, Database = D::InternalDriver>
     where
         Self: 'b;
-    type IntoInternalExecutor<'b>: sqlx::Executor<'b, Database = D::InternalDriver>
-    where
-        Self: 'b;
 
     async fn query_setup<O: SetupSql<D> + Send + Sync>(
         &mut self,
@@ -27,10 +24,52 @@ pub trait EasyExecutor<D: Driver> {
         DriverConnection<D>: Send + Sync;
 
     fn executor<'a>(&'a mut self) -> Self::InternalExecutor<'a>;
+}
+
+pub trait EasyExecutorInto<D: Driver>: EasyExecutor<D> {
+    type IntoInternalExecutor<'b>: sqlx::Executor<'b, Database = D::InternalDriver>
+    where
+        Self: 'b;
 
     fn into_executor<'a>(self) -> Self::IntoInternalExecutor<'a>
     where
         Self: 'a;
+}
+
+#[always_context(skip(!))]
+impl<D: Driver, E: EasyExecutor<D> + ?Sized> EasyExecutor<D> for &mut E {
+    type InternalExecutor<'b>
+        = E::InternalExecutor<'b>
+    where
+        Self: 'b;
+
+    async fn query_setup<O: SetupSql<D> + Send + Sync>(
+        &mut self,
+        sql: O,
+    ) -> anyhow::Result<O::Output>
+    where
+        DriverConnection<D>: Send + Sync,
+    {
+        (**self).query_setup(sql).await
+    }
+
+    fn executor<'a>(&'a mut self) -> Self::InternalExecutor<'a> {
+        (**self).executor()
+    }
+}
+
+impl<D: Driver, E: EasyExecutor<D> + ?Sized> EasyExecutorInto<D> for &mut E {
+    type IntoInternalExecutor<'b>
+        = E::InternalExecutor<'b>
+    where
+        Self: 'b;
+
+    fn into_executor<'a>(self) -> Self::IntoInternalExecutor<'a>
+    where
+        Self: 'a,
+    {
+        (*self).executor()
+    }
 }
 
 #[always_context]

@@ -3,21 +3,17 @@ use sqlx::{Pool, SqliteConnection};
 
 use super::Db;
 use crate::{
-    EasyExecutor,
+    EasyExecutor, EasyExecutorInto,
     traits::{DriverConnection, SetupSql},
 };
 
 type CDriver = super::Sqlite;
+
 /// For some reason Db::Connection overlaps with crate::Connection
 type Connection = SqliteConnection;
-
 #[always_context(skip(!))]
 impl EasyExecutor<CDriver> for &Pool<Db> {
     type InternalExecutor<'b>
-        = &'b Pool<Db>
-    where
-        Self: 'b;
-    type IntoInternalExecutor<'b>
         = &'b Pool<Db>
     where
         Self: 'b;
@@ -35,6 +31,13 @@ impl EasyExecutor<CDriver> for &Pool<Db> {
     fn executor<'a>(&'a mut self) -> Self::InternalExecutor<'a> {
         self
     }
+}
+
+impl EasyExecutorInto<CDriver> for &Pool<Db> {
+    type IntoInternalExecutor<'b>
+        = &'b Pool<Db>
+    where
+        Self: 'b;
 
     fn into_executor<'a>(self) -> Self::IntoInternalExecutor<'a>
     where
@@ -50,10 +53,6 @@ impl EasyExecutor<CDriver> for &mut Connection {
         = &'b mut Connection
     where
         Self: 'b;
-    type IntoInternalExecutor<'b>
-        = &'b mut Connection
-    where
-        Self: 'b;
 
     async fn query_setup<O: SetupSql<CDriver> + Send + Sync>(
         &mut self,
@@ -68,6 +67,13 @@ impl EasyExecutor<CDriver> for &mut Connection {
     fn executor<'a>(&'a mut self) -> Self::InternalExecutor<'a> {
         self
     }
+}
+
+impl EasyExecutorInto<CDriver> for &mut Connection {
+    type IntoInternalExecutor<'b>
+        = &'b mut Connection
+    where
+        Self: 'b;
 
     fn into_executor<'a>(self) -> Self::IntoInternalExecutor<'a>
     where

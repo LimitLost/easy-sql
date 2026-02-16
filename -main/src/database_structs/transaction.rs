@@ -35,15 +35,11 @@ impl<'a, D: Driver> Transaction<'a, D> {
 }
 
 #[always_context]
-impl<'c, D: Driver> EasyExecutor<D> for &mut Transaction<'c, D>
+impl<'c, D: Driver> EasyExecutor<D> for Transaction<'c, D>
 where
     for<'b> &'b mut DriverConnection<D>: sqlx::Executor<'b, Database = D::InternalDriver>,
 {
     type InternalExecutor<'b>
-        = &'b mut DriverConnection<D>
-    where
-        Self: 'b;
-    type IntoInternalExecutor<'b>
         = &'b mut DriverConnection<D>
     where
         Self: 'b;
@@ -58,12 +54,6 @@ where
     }
 
     fn executor<'a>(&'a mut self) -> Self::InternalExecutor<'a> {
-        &mut *self.internal
-    }
-    fn into_executor<'a>(self) -> Self::IntoInternalExecutor<'a>
-    where
-        Self: 'a,
-    {
         &mut *self.internal
     }
 }
