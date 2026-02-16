@@ -9,3 +9,5 @@ mod macros;
 mod documentation;
 #[cfg(feature = "migrations")]
 mod migrations;
+
+mod async_tokio;
