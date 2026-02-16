@@ -67,7 +67,7 @@ regex = "1"
 easy-sql-build = { version = "1.0.1", features = ["migrations"] }
 
 [features]
-default = ["check_duplicate_table_names","sqlite","use_output_columns"]
+default = ["check_duplicate_table_names"]
 postgres = ["sqlx/postgres", "dep:pg_escape"]
 sqlite = ["sqlx/sqlite"]
 sqlite_math = []
