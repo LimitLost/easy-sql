@@ -5,7 +5,7 @@ use std::path::Path;
 #[cfg(test)]
 use std::path::PathBuf;
 
-use crate::{Connection, DatabaseSetup, EasySqlTables, Transaction};
+use crate::{Connection, DatabaseSetup, EasySqlTables, PoolTransaction};
 
 use super::Db;
 

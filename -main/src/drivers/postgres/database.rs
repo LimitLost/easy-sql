@@ -1,7 +1,7 @@
 use anyhow::Context;
 use easy_macros::always_context;
 
-use crate::{Connection, DatabaseSetup, EasySqlTables, Transaction};
+use crate::{Connection, DatabaseSetup, EasySqlTables, PoolTransaction};
 
 use super::Db;
 
