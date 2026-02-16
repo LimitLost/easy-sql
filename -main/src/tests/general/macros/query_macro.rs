@@ -4,8 +4,8 @@
 use super::*;
 use anyhow::Context;
 use easy_macros::{always_context /* always_context_debug as always_context */};
-use serde::{Deserialize, Serialize};
 use easy_sql_macros::query;
+use serde::{Deserialize, Serialize};
 
 // ==============================================
 // 1. SELECT QUERIES
@@ -30,6 +30,27 @@ async fn test_query_select_single_row() -> anyhow::Result<()> {
     assert_eq!(result.str_field, "test");
 
     conn.rollback().await?;
+    Ok(())
+}
+
+/// Test query! using sqlx::Pool as connection
+#[always_context(skip(!))]
+#[tokio::test]
+async fn test_query_with_sqlx_pool_connection() -> anyhow::Result<()> {
+    let pool_resource = setup_sqlx_pool_for_testing::<ExprTestTable>().await?;
+    let mut pool = pool_resource.pool();
+
+    let data = default_expr_test_data();
+    query!(pool, INSERT INTO ExprTestTable VALUES {data}).await?;
+
+    let result: ExprTestData = query!(pool,
+        SELECT ExprTestData FROM ExprTestTable WHERE ExprTestTable.id = 1
+    )
+    .await?;
+
+    assert_eq!(result.int_field, 42);
+    assert_eq!(result.str_field, "test");
+
     Ok(())
 }
 

@@ -38,6 +38,31 @@ async fn test_query_lazy_select_basic() -> anyhow::Result<()> {
     Ok(())
 }
 
+/// Test query_lazy! using sqlx::Pool as connection
+#[always_context(skip(!))]
+#[tokio::test]
+async fn test_query_lazy_with_sqlx_pool_connection() -> anyhow::Result<()> {
+    let pool_resource = setup_sqlx_pool_for_testing::<ExprTestTable>().await?;
+    let mut pool = pool_resource.pool();
+
+    let data = default_expr_test_data();
+    query!(pool, INSERT INTO ExprTestTable VALUES {data}).await?;
+
+    let mut lazy_query =
+        query_lazy!(SELECT ExprTestData FROM ExprTestTable WHERE ExprTestTable.id = 1)?;
+
+    let mut result_stream = lazy_query.fetch(pool);
+
+    let result_option = result_stream.next().await;
+    let result_result = result_option.context("Expected at least one result")?;
+    let result = result_result.context("Failed to fetch result")?;
+
+    assert_eq!(result.int_field, 42);
+    assert_eq!(result.str_field, "test");
+
+    Ok(())
+}
+
 #[always_context(skip(!))]
 #[tokio::test]
 /// query.fetch() should not borrow connection forever
