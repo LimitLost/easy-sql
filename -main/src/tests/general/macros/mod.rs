@@ -138,6 +138,7 @@ mod query_macro;
 mod sql_expressions;
 
 mod custom_select_validation_test;
+mod generic_easy_executor_argument_test;
 mod sql_case_insensitive_functions;
 mod sql_functions;
 mod custom_sql_functions;
