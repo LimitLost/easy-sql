@@ -2,7 +2,7 @@
 edition = "2024"
 license = "Apache-2.0"
 name = "easy-sql"
-version = "0.100.2"
+version = "0.101.0"
 
 description = "Macro-first SQL toolkit with compile-time checked queries, optional migrations on top of sqlx."
 readme = "README.md"
@@ -42,6 +42,9 @@ futures-core = {version = "0.3.31"}
 # Fixes async not being Send in traits used by query macros
 async-trait = "0.1.89"
 
+easy-sql-compilation-data = { version = "1.0.1", default-features = false }
+easy-sql-macros = { version = "1.1.0" }
+
 [dev-dependencies]
 dotenvy = "0.15"
 tokio = {version = "1", features = ["full"]}
@@ -64,7 +67,7 @@ regex = "1"
 easy-sql-build = { version = "1.0.1", features = ["migrations"] }
 
 [features]
-default = ["check_duplicate_table_names"]
+default = ["check_duplicate_table_names","sqlite","use_output_columns"]
 postgres = ["sqlx/postgres", "dep:pg_escape"]
 sqlite = ["sqlx/sqlite"]
 sqlite_math = []

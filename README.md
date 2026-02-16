@@ -32,7 +32,7 @@ Pick the driver features you need. Checking for duplicate table names is enabled
 
 ```toml
 [dependencies]
-easy-sql = { version = "0.100", features = ["sqlite", "postgres"] }
+easy-sql = { version = "0.101", features = ["sqlite", "postgres"] }
 ```
 
 ### 2) Add `sqlx` with runtime + TLS + driver
