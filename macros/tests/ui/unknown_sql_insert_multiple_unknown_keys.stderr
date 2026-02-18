@@ -1,0 +1,11 @@
+error: Unknown sql struct attribute `drivres` Did you mean `drivers`? Supported struct attributes for Insert: table,default,drivers.
+ --> tests/ui/unknown_sql_insert_multiple_unknown_keys.rs:9:7
+  |
+9 | #[sql(drivres = Driver)]
+  |       ^^^^^^^
+
+error: Unknown sql field attribute `bytse` Did you mean `bytes`? Supported field attributes for Insert: bytes.
+  --> tests/ui/unknown_sql_insert_multiple_unknown_keys.rs:11:11
+   |
+11 |     #[sql(bytse)]
+   |           ^^^^^

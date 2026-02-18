@@ -1,0 +1,5 @@
+error: Unknown sql field attribute `bytes` Supported field attributes for DatabaseSetup: (none).
+ --> tests/ui/unknown_sql_database_setup_field_key.rs:5:11
+  |
+5 |     #[sql(bytes)]
+  |           ^^^^^

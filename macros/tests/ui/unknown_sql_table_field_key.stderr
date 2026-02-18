@@ -1,0 +1,5 @@
+error: Unknown sql field attribute `primray_key` Did you mean `primary_key`? Supported field attributes for Table: primary_key,auto_increment,foreign_key,unique,bytes,default,maybe_update,maybe,select.
+ --> tests/ui/unknown_sql_table_field_key.rs:5:11
+  |
+5 |     #[sql(primray_key)]
+  |           ^^^^^^^^^^^

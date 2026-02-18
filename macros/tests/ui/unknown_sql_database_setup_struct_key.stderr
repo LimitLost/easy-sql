@@ -1,0 +1,5 @@
+error: Unknown sql struct attribute `drivres` Did you mean `drivers`? Supported struct attributes for DatabaseSetup: drivers.
+ --> tests/ui/unknown_sql_database_setup_struct_key.rs:4:7
+  |
+4 | #[sql(drivres = Driver)]
+  |       ^^^^^^^

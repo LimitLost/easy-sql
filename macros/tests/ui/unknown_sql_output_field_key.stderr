@@ -1,0 +1,5 @@
+error: Unknown sql field attribute `fiedl` Did you mean `field`? Supported field attributes for Output: field,select,bytes.
+  --> tests/ui/unknown_sql_output_field_key.rs:10:11
+   |
+10 |     #[sql(fiedl = DummyTable.id)]
+   |           ^^^^^

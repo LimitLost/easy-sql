@@ -1,0 +1,5 @@
+error: Unknown sql struct attribute `drivres` Did you mean `drivers`? Supported struct attributes for Output: table,drivers.
+ --> tests/ui/unknown_sql_output_struct_key.rs:9:7
+  |
+9 | #[sql(drivres = Driver)]
+  |       ^^^^^^^

@@ -1,0 +1,5 @@
+error: Unknown sql field attribute `bytse` Did you mean `bytes`? Supported field attributes for Update: bytes,maybe_update,maybe.
+  --> tests/ui/unknown_sql_update_field_key.rs:10:11
+   |
+10 |     #[sql(bytse)]
+   |           ^^^^^
