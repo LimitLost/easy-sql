@@ -2,6 +2,7 @@ mod macros;
 mod macros_components;
 
 mod derive;
+mod derive_components;
 
 use ::{proc_macro2, quote::quote};
 use easy_macros::{always_context, anyhow_result, find_crate_list};

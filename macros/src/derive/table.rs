@@ -16,6 +16,7 @@ use {easy_macros::context, easy_sql_compilation_data::TableDataVersion, syn::Lit
 
 use crate::{
     derive::{sql_insert_base, sql_output_base, sql_update_base},
+    derive_components::{supported_drivers, validate_sql_attribute_keys},
     macros_components::joined_field::JoinedField,
     sql_crate,
 };
@@ -49,6 +50,33 @@ impl syn::parse::Parse for ForeignKeyParsed {
 #[always_context]
 pub fn table(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::TokenStream> {
     let item = parse_macro_input!(item as syn::ItemStruct);
+
+    if let Some(error_tokens) = validate_sql_attribute_keys(
+        &item,
+        "Table",
+        &[
+            "table_name",
+            "drivers",
+            "version",
+            "no_version",
+            "version_test",
+            "unique_id",
+        ],
+        &[
+            "primary_key",
+            "auto_increment",
+            "foreign_key",
+            "unique",
+            "bytes",
+            "default",
+            "maybe_update",
+            "maybe",
+            "select",
+        ],
+    ) {
+        return Ok(error_tokens.into());
+    }
+
     let item_name = &item.ident;
     let item_name_tokens = item.ident.to_token_stream();
 
@@ -147,7 +175,7 @@ Tip: Use `#[sql(table_name = ...)]` or rename one of the structs",
         }
     }
 
-    let supported_drivers = super::supported_drivers(&item, &compilation_data, false)?;
+    let supported_drivers = supported_drivers(&item, &compilation_data, false)?;
 
     #[cfg(feature = "migrations")]
     let mut table_version = None;

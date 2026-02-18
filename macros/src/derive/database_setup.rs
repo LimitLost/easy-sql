@@ -7,11 +7,20 @@ use ::{
 use easy_macros::{TokensBuilder, always_context, parse_macro_input};
 use easy_sql_compilation_data::CompilationData;
 
-use crate::sql_crate;
+use crate::{
+    derive_components::{supported_drivers, validate_sql_attribute_keys},
+    sql_crate,
+};
 
 #[always_context]
 pub fn database_setup(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::TokenStream> {
     let item = parse_macro_input!(item as syn::ItemStruct);
+
+    if let Some(error_tokens) =
+        validate_sql_attribute_keys(&item, "DatabaseSetup", &["drivers"], &[] as &[&str])
+    {
+        return Ok(error_tokens.into());
+    }
 
     let sql_crate = sql_crate();
     let macro_support = quote! { #sql_crate::macro_support };
@@ -24,7 +33,7 @@ pub fn database_setup(item: proc_macro::TokenStream) -> anyhow::Result<proc_macr
 
     let compilation_data = CompilationData::load_in_macro()?;
 
-    let supported_drivers = super::supported_drivers(&item, &compilation_data, false)?;
+    let supported_drivers = supported_drivers(&item, &compilation_data, false)?;
 
     let mut result = TokensBuilder::default();
 
