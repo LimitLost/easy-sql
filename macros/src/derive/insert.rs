@@ -8,7 +8,10 @@ use easy_macros::{always_context, context, get_attributes, has_attributes, parse
 use easy_sql_compilation_data::CompilationData;
 
 use crate::{
-    derive_components::{supported_drivers, ty_to_variant, validate_sql_attribute_keys},
+    derive_components::{
+        INSERT_FIELD_KEYS, INSERT_STRUCT_KEYS, supported_drivers, ty_to_variant,
+        validate_sql_attribute_keys,
+    },
     sql_crate,
 };
 
@@ -223,12 +226,9 @@ pub fn sql_insert_base(
 pub fn insert(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::TokenStream> {
     let item = parse_macro_input!(item as syn::ItemStruct);
 
-    if let Some(error_tokens) = validate_sql_attribute_keys(
-        &item,
-        "Insert",
-        &["table", "default", "drivers"],
-        &["bytes"],
-    ) {
+    if let Some(error_tokens) =
+        validate_sql_attribute_keys(&item, "Insert", INSERT_STRUCT_KEYS, INSERT_FIELD_KEYS)
+    {
         return Ok(error_tokens.into());
     }
 

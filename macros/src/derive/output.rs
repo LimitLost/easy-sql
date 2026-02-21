@@ -15,7 +15,9 @@ use quote::quote_spanned;
 
 use crate::{
     CUSTOM_SELECT_ALIAS_PREFIX,
-    derive_components::{supported_drivers, validate_sql_attribute_keys},
+    derive_components::{
+        OUTPUT_FIELD_KEYS, OUTPUT_STRUCT_KEYS, supported_drivers, validate_sql_attribute_keys,
+    },
     macros_components::{CollectedData, ProvidedDrivers, expr::Expr, joined_field::JoinedField},
     sql_crate,
 };
@@ -548,12 +550,9 @@ impl Parse for SelectAttribute {
 pub fn output(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::TokenStream> {
     let item = parse_macro_input!(item as syn::ItemStruct);
 
-    if let Some(error_tokens) = validate_sql_attribute_keys(
-        &item,
-        "Output",
-        &["table", "drivers"],
-        &["field", "select", "bytes"],
-    ) {
+    if let Some(error_tokens) =
+        validate_sql_attribute_keys(&item, "Output", OUTPUT_STRUCT_KEYS, OUTPUT_FIELD_KEYS)
+    {
         return Ok(error_tokens.into());
     }
 

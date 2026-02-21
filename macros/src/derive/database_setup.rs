@@ -8,7 +8,10 @@ use easy_macros::{TokensBuilder, always_context, parse_macro_input};
 use easy_sql_compilation_data::CompilationData;
 
 use crate::{
-    derive_components::{supported_drivers, validate_sql_attribute_keys},
+    derive_components::{
+        DATABASE_SETUP_FIELD_KEYS, DATABASE_SETUP_STRUCT_KEYS, supported_drivers,
+        validate_sql_attribute_keys,
+    },
     sql_crate,
 };
 
@@ -16,9 +19,12 @@ use crate::{
 pub fn database_setup(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::TokenStream> {
     let item = parse_macro_input!(item as syn::ItemStruct);
 
-    if let Some(error_tokens) =
-        validate_sql_attribute_keys(&item, "DatabaseSetup", &["drivers"], &[] as &[&str])
-    {
+    if let Some(error_tokens) = validate_sql_attribute_keys(
+        &item,
+        "DatabaseSetup",
+        DATABASE_SETUP_STRUCT_KEYS,
+        DATABASE_SETUP_FIELD_KEYS,
+    ) {
         return Ok(error_tokens.into());
     }
 

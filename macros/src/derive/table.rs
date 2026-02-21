@@ -16,7 +16,9 @@ use {easy_macros::context, easy_sql_compilation_data::TableDataVersion, syn::Lit
 
 use crate::{
     derive::{sql_insert_base, sql_output_base, sql_update_base},
-    derive_components::{supported_drivers, validate_sql_attribute_keys},
+    derive_components::{
+        TABLE_FIELD_KEYS, TABLE_STRUCT_KEYS, supported_drivers, validate_sql_attribute_keys,
+    },
     macros_components::joined_field::JoinedField,
     sql_crate,
 };
@@ -51,29 +53,9 @@ impl syn::parse::Parse for ForeignKeyParsed {
 pub fn table(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::TokenStream> {
     let item = parse_macro_input!(item as syn::ItemStruct);
 
-    if let Some(error_tokens) = validate_sql_attribute_keys(
-        &item,
-        "Table",
-        &[
-            "table_name",
-            "drivers",
-            "version",
-            "no_version",
-            "version_test",
-            "unique_id",
-        ],
-        &[
-            "primary_key",
-            "auto_increment",
-            "foreign_key",
-            "unique",
-            "bytes",
-            "default",
-            "maybe_update",
-            "maybe",
-            "select",
-        ],
-    ) {
+    if let Some(error_tokens) =
+        validate_sql_attribute_keys(&item, "Table", TABLE_STRUCT_KEYS, TABLE_FIELD_KEYS)
+    {
         return Ok(error_tokens.into());
     }
 
