@@ -10,6 +10,8 @@
 
 set +e
 
+HANG_TIMEOUT_SEC="${HANG_TIMEOUT_SEC:-5}"
+
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -169,9 +171,95 @@ run_test() {
         return 1
     fi
     
-    # Run tests (capture output)
-    local test_output=$(cargo test --no-default-features --features "$test_features" "$TEST_PATTERN" 2>&1)
-    local test_status=$?
+    # Run tests (stream output via FIFO while keeping full log text)
+    local test_output=""
+    local test_status=0
+    local live_passed=0
+    local live_failed=0
+    local saw_ok_result=false
+    local saw_failure_marker=false
+    local forced_success_kill=false
+    local tmp_dir
+    local fifo_path
+    tmp_dir=$(mktemp -d "/tmp/easy-sql-test-specific-${db}-XXXXXX")
+    if [ -z "$tmp_dir" ] || [ ! -d "$tmp_dir" ]; then
+        echo -e "${RED}✗ Failed to create temporary directory${NC}"
+        FAILED_CONFIGS+=("$db_name")
+        ((FAILED_TESTS++))
+        ((TOTAL_TESTS++))
+        return 1
+    fi
+    fifo_path="$tmp_dir/stream.fifo"
+    if ! mkfifo "$fifo_path"; then
+        echo -e "${RED}✗ Failed to create temporary FIFO${NC}"
+        rm -rf "$tmp_dir"
+        FAILED_CONFIGS+=("$db_name")
+        ((FAILED_TESTS++))
+        ((TOTAL_TESTS++))
+        return 1
+    fi
+
+    cargo test --color never --no-default-features --features "$test_features" "$TEST_PATTERN" > "$fifo_path" 2>&1 &
+    local cargo_pid=$!
+    local last_activity_ts
+    last_activity_ts=$(date +%s)
+
+    exec 3< "$fifo_path"
+    while true; do
+        if IFS= read -r -t 1 line <&3; then
+            test_output+="$line"$'\n'
+            last_activity_ts=$(date +%s)
+
+            if [[ "$line" =~ ^test[[:space:]].+\.\.\.[[:space:]]ok$ ]]; then
+                ((live_passed++))
+                printf "\r${BLUE}Live counter [%s]: passed=%d failed=%d${NC}" "$db_name" "$live_passed" "$live_failed"
+            elif [[ "$line" =~ ^test[[:space:]].+\.\.\.[[:space:]]FAILED$ ]]; then
+                ((live_failed++))
+                saw_failure_marker=true
+                printf "\r${BLUE}Live counter [%s]: passed=%d failed=%d${NC}" "$db_name" "$live_passed" "$live_failed"
+            fi
+
+            if [[ "$line" == *"test result: ok"* ]]; then
+                saw_ok_result=true
+            fi
+            if echo "$line" | grep -qE "test result: FAILED|failures:|error: test failed|could not compile"; then
+                saw_failure_marker=true
+            fi
+        else
+            if ! kill -0 "$cargo_pid" 2>/dev/null; then
+                break
+            fi
+
+            local now_ts
+            now_ts=$(date +%s)
+            local idle_sec=$((now_ts - last_activity_ts))
+
+            if [ "$idle_sec" -ge "$HANG_TIMEOUT_SEC" ] && \
+               [ "$saw_ok_result" = true ] && \
+               [ "$saw_failure_marker" = false ] && \
+               ! pgrep -P "$cargo_pid" >/dev/null 2>&1; then
+                echo ""
+                echo -e "${YELLOW}⚠ Cargo appears hung after success output; forcing safe exit (idle ${idle_sec}s)${NC}"
+                kill -TERM "$cargo_pid" 2>/dev/null
+                sleep 1
+                if kill -0 "$cargo_pid" 2>/dev/null; then
+                    kill -KILL "$cargo_pid" 2>/dev/null
+                fi
+                forced_success_kill=true
+                break
+            fi
+        fi
+    done
+    exec 3<&-
+
+    wait "$cargo_pid"
+    test_status=$?
+    rm -rf "$tmp_dir"
+    echo ""
+
+    if [ "$forced_success_kill" = true ] && [ "$saw_failure_marker" = false ]; then
+        test_status=0
+    fi
 
     local has_compile_error=false
     if echo "$test_output" | grep -qE "error\[E[0-9]+\]|^error:|could not compile"; then
