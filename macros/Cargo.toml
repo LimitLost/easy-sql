@@ -1,6 +1,6 @@
 [package]
 name = "easy-sql-macros"
-version = "1.1.1"
+version = "1.1.2"
 edition = "2024"
 
 description = "Easy SQL support library"
@@ -18,7 +18,7 @@ proc-macro = true
 [dependencies]
 easy-macros = { version = "1.1.1", features = ["full"] }
 convert_case = "0.8.0"
-easy-sql-compilation-data = { version = "1.0.0" }
+easy-sql-compilation-data = { version = "1.0.1" }
 
 syn = { version = "2.0", features = ["full","extra-traits"] }
 quote = { version = "1.0"}
