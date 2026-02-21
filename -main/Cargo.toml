@@ -2,7 +2,7 @@
 edition = "2024"
 license = "Apache-2.0"
 name = "easy-sql"
-version = "0.101.0"
+version = "0.101.1"
 
 description = "Macro-first SQL toolkit with compile-time checked queries, optional migrations on top of sqlx."
 readme = "README.md"
@@ -43,7 +43,7 @@ futures-core = {version = "0.3.31"}
 async-trait = "0.1.89"
 
 easy-sql-compilation-data = { version = "1.0.1", default-features = false }
-easy-sql-macros = { version = "1.1.0" }
+easy-sql-macros = { version = "1.1.1" }
 
 [dev-dependencies]
 dotenvy = "0.15"
