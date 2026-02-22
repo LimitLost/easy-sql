@@ -173,21 +173,19 @@ Version tracking is stored in [`EasySqlTables`](https://docs.rs/easy-sql/latest/
 
 ## Feature flags
 
-Each feature below is toggled on `easy-sql` (not on SQLx). Defaults are noted.
+Unless stated otherwise, feature is disabled by default.
 
-| Feature                       | Default | Description                                                                                                                                          |
-| ----------------------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `sqlite`                      | ❌      | Enable the SQLite driver.                                                                                                                            |
-| `postgres`                    | ❌      | Enable the Postgres driver.                                                                                                                          |
-| `sqlite_math`                 | ❌      | Enable extra SQLite math functions. Sqlite needs to be compiled with `LIBSQLITE3_FLAGS="-DSQLITE_ENABLE_MATH_FUNCTIONS"` for those functions to work |
-| `migrations`                  | ❌      | Enable migration generation and tracking.                                                                                                            |
-| `check_duplicate_table_names` | ✅      | Detect duplicate table names at build time.                                                                                                          |
-| `use_output_columns`          | ❌      | Bare columns refer to output the type, instead of the table type.                                                                                    |
-| `bigdecimal`                  | ❌      | Add `BigDecimal` `ToDefault` support (SQLx `bigdecimal`).                                                                                            |
-| `rust_decimal`                | ❌      | Add `Decimal` `ToDefault` support (SQLx `rust_decimal`).                                                                                             |
-| `uuid`                        | ❌      | Add `Uuid` `ToDefault` support via SQLx.                                                                                                             |
-| `chrono`                      | ❌      | Add `chrono` `ToDefault` support via SQLx.                                                                                                           |
-| `ipnet`                       | ❌      | Add `ipnet` `ToDefault` support via SQLx.                                                                                                            |
+- `sqlite`: Enable the SQLite driver.
+- `postgres`: Enable the Postgres driver.
+- `sqlite_math`: Enable extra SQLite math functions. Sqlite needs to be compiled with `LIBSQLITE3_FLAGS="-DSQLITE_ENABLE_MATH_FUNCTIONS"` for those functions to work.
+- `migrations`: Enable migration generation and tracking.
+- `check_duplicate_table_names` (default: ✅): Detect duplicate table names at build time.
+- `use_output_columns`: Bare columns refer to output the type, instead of the table type.
+- `bigdecimal`: Add `BigDecimal` `ToDefault` support (SQLx `bigdecimal`).
+- `rust_decimal`: Add `Decimal` `ToDefault` support (SQLx `rust_decimal`).
+- `uuid`: Add `Uuid` `ToDefault` support via SQLx.
+- `chrono`: Add `chrono` `ToDefault` support via SQLx.
+- `ipnet`: Add `ipnet` `ToDefault` support via SQLx.
 
 ## License
 
