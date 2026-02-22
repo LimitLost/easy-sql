@@ -1,11 +1,14 @@
 pub mod column;
 pub mod expr;
+mod expr_parse;
 pub mod joined_field;
 pub mod keyword;
 pub mod limit;
 pub mod next_clause;
+mod operator;
 pub mod order_by;
 pub mod set;
+mod value;
 
 pub use expr::*;
 pub use limit::*;
