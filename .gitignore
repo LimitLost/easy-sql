@@ -3,3 +3,4 @@ target/
 .env
 Cargo.lock
 README-CRATES-IO.md
+.github/agents/
