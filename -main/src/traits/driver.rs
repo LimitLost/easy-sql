@@ -1,3 +1,6 @@
+#![allow(async_fn_in_trait)]
+//! Database Setup shouldn't be split into multiple threads and we can't provide Send support for table creation
+
 use std::{collections::HashMap, fmt::Debug};
 
 use easy_macros::always_context;

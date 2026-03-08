@@ -16,6 +16,8 @@ pub trait EasyExecutor<D: Driver> {
     where
         Self: 'b;
 
+    // Database Setup shouldn't be split into multiple threads and we can't provide Send support for table creation + setup query execution
+    #[allow(async_fn_in_trait)]
     async fn query_setup<O: SetupSql<D> + Send + Sync>(
         &mut self,
         sql: O,
@@ -77,5 +79,7 @@ impl<D: Driver, E: EasyExecutor<D> + ?Sized> EasyExecutorInto<D> for &mut E {
 pub trait SetupSql<D: Driver> {
     type Output;
 
+    // Database Setup shouldn't be split into multiple threads and we can't provide Send support for table creation + setup query execution
+    #[allow(async_fn_in_trait)]
     async fn query(self, exec: &mut impl EasyExecutor<D>) -> anyhow::Result<Self::Output>;
 }
