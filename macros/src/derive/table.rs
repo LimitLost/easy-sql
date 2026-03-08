@@ -375,19 +375,20 @@ Tip: Use `#[sql(table_name = ...)]` or rename one of the structs",
                 let field_name = field.ident.as_ref()?;
 
                 if default_value_found {
-                    anyhow::bail!("Only one default value is allowed");
+                    anyhow::bail!("Only one #[sql(default = ...)] attribute is allowed per field");
                 }
                 //Every default value should be an expression
                 syn::parse2::<syn::Expr>(default_value.clone())
                     .context("Expected default value to be an expression")?;
 
+                let to_default_context = format!(
+                    "Converting default value for field `{}` in struct `{}` (table `{}`)",
+                    field_name, item_name, table_name
+                );
                 if binary_field {
-                    let error_context = format!(
-                        "Converting default value `{}` to bytes for field `{}`, struct name: `{}`, table name: `{}`",
-                        default_value.to_token_stream(),
-                        field_name,
-                        item_name,
-                        table_name
+                    let to_binary_context = format!(
+                        "Converting default value to bytes for field `{}` in struct `{}` (table `{}`)",
+                        field_name, item_name, table_name
                     );
 
                     //Convert provided default value to bytes
@@ -399,12 +400,15 @@ Tip: Use `#[sql(table_name = ...)]` or rename one of the structs",
                                 table_instance.#field_name = #default_value;
                             };
 
-                            let default_v = #macro_support::Context::context(
+                            let bytes_default = #macro_support::Context::context(
                                 #macro_support::to_binary(#default_value),
-                                #error_context,
+                                #to_binary_context,
                             )?;
 
-                            Some(#sql_crate::ToDefault::to_default(default_v))
+                            Some(#macro_support::Context::context(
+                                #sql_crate::ToDefault::to_default_failable(bytes_default),
+                                #to_default_context,
+                            )?)
                         }
                     });
                 } else {
@@ -416,7 +420,10 @@ Tip: Use `#[sql(table_name = ...)]` or rename one of the structs",
                                 table_instance.#field_name = #default_value;
                             };
 
-                            Some(#sql_crate::ToDefault::to_default(#default_value))
+                            Some(#macro_support::Context::context(
+                                #sql_crate::ToDefault::to_default_failable(#default_value),
+                                #to_default_context,
+                            )?)
                         }
                     });
                 }

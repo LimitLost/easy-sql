@@ -12,6 +12,8 @@ fn sql_unknown_attr_keys_compile_fail() {
     test_cases.compile_fail("tests/ui/unknown_sql_table_struct_key_table.rs");
     test_cases.compile_fail("tests/ui/unknown_sql_table_struct_key_name.rs");
     test_cases.compile_fail("tests/ui/unknown_sql_table_field_key.rs");
+    test_cases.compile_fail("tests/ui/unknown_sql_table_field_default_duplicate.rs");
+    test_cases.compile_fail("tests/ui/unknown_sql_table_field_default_invalid_expr.rs");
     test_cases.compile_fail("tests/ui/unknown_sql_database_setup_struct_key.rs");
     test_cases.compile_fail("tests/ui/unknown_sql_database_setup_field_key.rs");
 }

@@ -1,0 +1,82 @@
+error: $DIR/src/derive/table.rs:389␍
+       collect_sql_default_expressions_for_macro((field))␍
+       ␍
+       Arguments:␍
+       (field): Field { attrs: [Attribute { pound_token: Pound, style: AttrStyle::Outer, bracket_token: Bracket, meta: Meta::List { path: Path { leading_colon: None, segments: [PathSegment { ident: Ident { ident: "sql", span: #0 bytes(157..160) }, arguments: PathArguments::None }] }, delimiter: MacroDelimiter::Paren(Paren), tokens: TokenStream [Ident { ident: "default", span: #0 bytes(161..168) }, Punct { ch: '=', spacing: Alone, span: #0 bytes(169..170) }, Literal { kind: Integer, symbol: "1", suffix: None, span: #0 bytes(171..172) }, Punct { ch: '+', spacing: Alone, span: #0 bytes(173..174) }] } }], vis: Visibility::Inherited, mutability: FieldMutability::None, ident: Some(Ident { ident: "value", span: #0 bytes(181..186) }), colon_token: Some(Colon), ty: Type::Path { qself: None, path: Path { leading_colon: None, segments: [PathSegment { ident: Ident { ident: "i32", span: #0 bytes(188..191) }, arguments: PathArguments::None }] } } }␍
+       ␍
+
+       Caused by:
+           0: $DIR/src/derive/table.rs:42␍
+              syn:: parse2((default_value.clone()))␍
+              ␍
+              Arguments:␍
+              (default_value.clone()): TokenStream [Literal { kind: Integer, symbol: "1", suffix: None, span: #0 bytes(171..172) }, Punct { ch: '+', spacing: Alone, span: #0 bytes(173..174) }]␍
+              ␍
+
+           1: Expected #[sql(default = ...)] to contain a valid Rust expression
+           2: unexpected end of input, expected an expression
+
+       Stack backtrace:
+          0: <E as anyhow::context::ext::StdError>::ext_context
+                    at /home/jq/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/anyhow-1.0.101/src/backtrace.rs:27:14
+          1: anyhow::context::<impl anyhow::Context<T,E> for core::result::Result<T,E>>::context
+                    at /home/jq/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/anyhow-1.0.101/src/context.rs:54:37
+          2: easy_sql_macros::derive::table::collect_sql_default_expressions_for_macro
+                    at $DIR/src/derive/table.rs:42:14
+          3: easy_sql_macros::derive::table::table
+                    at $DIR/src/derive/table.rs:389:34
+          4: easy_sql_macros::table::table
+                    at $DIR/src/lib.rs:136:5
+          5: easy_sql_macros::table
+                    at $DIR/src/lib.rs:134:1
+          6: core::ops::function::Fn::call
+                    at /home/jq/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/function.rs:79:5
+          7: proc_macro::bridge::client::Client<proc_macro::TokenStream,proc_macro::TokenStream>::expand1::{{closure}}::{{closure}}
+                    at /home/jq/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/proc_macro/src/bridge/client.rs:336:44
+          8: proc_macro::bridge::client::run_client::{{closure}}::{{closure}}
+                    at /home/jq/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/proc_macro/src/bridge/client.rs:302:44
+          9: proc_macro::bridge::client::state::set
+                    at /home/jq/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/proc_macro/src/bridge/client.rs:201:9
+         10: proc_macro::bridge::client::run_client::{{closure}}
+                    at /home/jq/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/proc_macro/src/bridge/client.rs:302:22
+         11: <core::panic::unwind_safe::AssertUnwindSafe<F> as core::ops::function::FnOnce<()>>::call_once
+                    at /home/jq/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/panic/unwind_safe.rs:274:9
+         12: std::panicking::catch_unwind::do_call
+                    at /home/jq/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/panicking.rs:590:40
+         13: __rust_try
+         14: std::panicking::catch_unwind
+                    at /home/jq/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/panicking.rs:553:19
+         15: std::panic::catch_unwind
+                    at /home/jq/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/panic.rs:359:14
+         16: proc_macro::bridge::client::run_client
+                    at /home/jq/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/proc_macro/src/bridge/client.rs:290:5
+         17: proc_macro::bridge::client::Client<proc_macro::TokenStream,proc_macro::TokenStream>::expand1::{{closure}}
+                    at /home/jq/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/proc_macro/src/bridge/client.rs:336:17
+         18: proc_macro::bridge::selfless_reify::reify_to_extern_c_fn_hrt_bridge::wrapper
+                    at /home/jq/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/proc_macro/src/bridge/selfless_reify.rs:64:17
+         19: <rustc_proc_macro::bridge::server::MaybeCrossThread<rustc_expand::proc_macro::MessagePipe<rustc_proc_macro::bridge::buffer::Buffer>> as rustc_proc_macro::bridge::server::ExecutionStrategy>::run_bridge_and_client::<rustc_proc_macro::bridge::server::Dispatcher<rustc_proc_macro::bridge::server::MarkedTypes<rustc_expand::proc_macro_server::Rustc>>>
+         20: <rustc_proc_macro::bridge::client::Client<rustc_proc_macro::TokenStream, rustc_proc_macro::TokenStream>>::run::<rustc_expand::proc_macro_server::Rustc, rustc_proc_macro::bridge::server::MaybeCrossThread<rustc_expand::proc_macro::MessagePipe<rustc_proc_macro::bridge::buffer::Buffer>>>
+         21: <rustc_expand::proc_macro::DeriveProcMacro as rustc_expand::base::MultiItemModifier>::expand
+         22: <rustc_expand::expand::MacroExpander>::fully_expand_fragment
+         23: <rustc_expand::expand::MacroExpander>::expand_crate
+         24: rustc_interface::passes::configure_and_expand
+         25: rustc_interface::passes::resolver_for_lowering_raw
+         26: rustc_query_impl::plumbing::__rust_begin_short_backtrace::<rustc_query_impl::query_impl::resolver_for_lowering_raw::dynamic_query::{closure#2}::{closure#0}, rustc_middle::query::erase::Erased<[u8; 16]>>
+         27: <rustc_query_impl::query_impl::resolver_for_lowering_raw::dynamic_query::{closure#2} as core::ops::function::FnOnce<(rustc_middle::ty::context::TyCtxt, ())>>::call_once
+         28: rustc_query_system::query::plumbing::try_execute_query::<rustc_query_impl::DynamicConfig<rustc_query_system::query::caches::SingleCache<rustc_middle::query::erase::Erased<[u8; 16]>>, false, false, false>, rustc_query_impl::plumbing::QueryCtxt, false>
+         29: rustc_query_impl::query_impl::resolver_for_lowering_raw::get_query_non_incr::__rust_end_short_backtrace
+         30: rustc_interface::passes::create_and_enter_global_ctxt::<core::option::Option<rustc_interface::queries::Linker>, rustc_driver_impl::run_compiler::{closure#0}::{closure#2}>::{closure#2}::{closure#0}
+         31: rustc_interface::interface::run_compiler::<(), rustc_driver_impl::run_compiler::{closure#0}>::{closure#1}
+         32: std::sys::backtrace::__rust_begin_short_backtrace::<rustc_interface::util::run_in_thread_with_globals<rustc_interface::util::run_in_thread_pool_with_globals<rustc_interface::interface::run_compiler<(), rustc_driver_impl::run_compiler::{closure#0}>::{closure#1}, ()>::{closure#0}, ()>::{closure#0}::{closure#0}, ()>
+         33: <<std::thread::Builder>::spawn_unchecked_<rustc_interface::util::run_in_thread_with_globals<rustc_interface::util::run_in_thread_pool_with_globals<rustc_interface::interface::run_compiler<(), rustc_driver_impl::run_compiler::{closure#0}>::{closure#1}, ()>::{closure#0}, ()>::{closure#0}::{closure#0}, ()>::{closure#1} as core::ops::function::FnOnce<()>>::call_once::{shim:vtable#0}
+         34: std::sys::thread::unix::Thread::new::thread_start
+         35: start_thread
+                    at ./nptl/pthread_create.c:447:8
+         36: clone3
+                    at ./misc/../sysdeps/unix/sysv/linux/x86_64/clone3.S:78:0
+ --> tests/ui/unknown_sql_table_field_default_invalid_expr.rs:3:10
+  |
+3 | #[derive(Table)]
+  |          ^^^^^
+  |
+  = note: this error originates in the derive macro `Table` (in Nightly builds, run with -Z macro-backtrace for more info)
