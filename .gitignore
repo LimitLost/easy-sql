@@ -4,3 +4,4 @@ target/
 Cargo.lock
 README-CRATES-IO.md
 .github/agents/
+/.vscode/settings.json
