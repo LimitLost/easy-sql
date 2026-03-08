@@ -124,8 +124,13 @@ Unless stated otherwise, feature is disabled by default.
 - `bigdecimal`: Add `BigDecimal` `ToDefault` support (SQLx `bigdecimal`).
 - `rust_decimal`: Add `Decimal` `ToDefault` support (SQLx `rust_decimal`).
 - `uuid`: Add `Uuid` `ToDefault` support via SQLx.
-- `chrono`: Add `chrono` `ToDefault` support via SQLx.
+- `chrono`: Add `chrono` `ToDefault` support via SQLx (`NaiveDate`, `NaiveDateTime`, `NaiveTime`, `PgTimeTz`).
 - `ipnet`: Add `ipnet` `ToDefault` support via SQLx.
+- `ipnetwork`: Add `ipnetwork` `ToDefault` support via SQLx.
+- `mac_address`: Add `mac_address` `ToDefault` support via SQLx.
+- `bit_vec`: Add `BitVec` `ToDefault` support via SQLx.
+- `json`: Add `JsonValue` `ToDefault` support via SQLx.
+- `time`: Add SQLx `time` type `ToDefault` support (`Date`, `Time`, `PrimitiveDateTime`, `OffsetDateTime`, `PgTimeTz`).
 
 ## License
 

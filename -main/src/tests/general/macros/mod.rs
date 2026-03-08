@@ -355,3 +355,10 @@ mod sql_case_insensitive_functions;
 mod sql_functions;
 
 mod table_join;
+
+#[cfg(all(feature = "postgres", not(feature = "sqlite")))]
+mod to_default_postgres_extended;
+#[cfg(all(feature = "postgres", not(feature = "sqlite")))]
+mod to_default_postgres_integration;
+#[cfg(all(feature = "sqlite", not(feature = "postgres")))]
+mod to_default_sqlite_integration;
