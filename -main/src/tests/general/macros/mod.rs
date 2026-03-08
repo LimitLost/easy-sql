@@ -110,18 +110,6 @@ impl SqlxPoolTestResource {
         maintenance_pool.close().await;
         Ok(())
     }
-
-    pub async fn cleanup(&self) -> anyhow::Result<()> {
-        Self::cleanup_inner(
-            self.pool.clone(),
-            self.test_database.clone(),
-            self.host.clone(),
-            self.port,
-            self.username.clone(),
-            self.password.clone(),
-        )
-        .await
-    }
 }
 
 #[cfg(all(feature = "postgres", not(feature = "sqlite")))]
@@ -134,22 +122,41 @@ impl Drop for SqlxPoolTestResource {
         let username = self.username.clone();
         let password = self.password.clone();
 
-        let _ = std::thread::spawn(move || {
+        let cleanup_thread = std::thread::spawn(move || {
             let runtime = tokio::runtime::Builder::new_current_thread()
                 .enable_all()
                 .build();
-            if let Ok(runtime) = runtime {
-                let _ = runtime.block_on(SqlxPoolTestResource::cleanup_inner(
-                    pool,
-                    test_database,
-                    host,
-                    port,
-                    username,
-                    password,
-                ));
+
+            match runtime {
+                Ok(runtime) => {
+                    if let Err(error) = runtime.block_on(SqlxPoolTestResource::cleanup_inner(
+                        pool,
+                        test_database,
+                        host,
+                        port,
+                        username,
+                        password,
+                    )) {
+                        eprintln!("[easy-sql:test-cleanup] async cleanup failed: {error:#}");
+                    }
+                }
+                Err(error) => {
+                    eprintln!("[easy-sql:test-cleanup] failed to create tokio runtime: {error:#}");
+                }
             }
-        })
-        .join();
+        });
+
+        if let Err(panic_payload) = cleanup_thread.join() {
+            let panic_message = if let Some(message) = panic_payload.downcast_ref::<&str>() {
+                *message
+            } else if let Some(message) = panic_payload.downcast_ref::<String>() {
+                message.as_str()
+            } else {
+                "non-string panic payload"
+            };
+
+            eprintln!("[easy-sql:test-cleanup] cleanup thread panicked: {panic_message}");
+        }
     }
 }
 
@@ -157,17 +164,14 @@ impl Drop for SqlxPoolTestResource {
 #[always_context(skip(!))]
 pub async fn setup_sqlx_pool_for_testing<T: crate::DatabaseSetup<TestDriver>>()
 -> anyhow::Result<SqlxPoolTestResource> {
-    use tokio::sync::Mutex;
-
+    use crate::drivers::postgres::{
+        generate_postgres_test_database_name, recreate_postgres_test_database,
+    };
     use crate::tests::init_test_logger;
     use crate::{Connection, EasySqlTables};
     use sqlx::postgres::PgConnectOptions;
 
     init_test_logger();
-
-    lazy_static::lazy_static! {
-        static ref CURRENT_NAME_N:Mutex<usize>=Default::default();
-    }
 
     let _ = dotenvy::dotenv();
 
@@ -184,36 +188,8 @@ pub async fn setup_sqlx_pool_for_testing<T: crate::DatabaseSetup<TestDriver>>()
     let db_prefix = std::env::var("POSTGRES_TEST_DB_PREFIX")
         .context("POSTGRES_TEST_DB_PREFIX .env variable must be set for tests")?;
 
-    let test_database = {
-        let mut current_n = CURRENT_NAME_N.lock().await;
-        let name = format!("{}_pool_{}", db_prefix, *current_n);
-        *current_n += 1;
-        name
-    };
-
-    let maintenance_pool = sqlx::Pool::<sqlx::Postgres>::connect_with(
-        PgConnectOptions::new()
-            .host(&host)
-            .port(port)
-            .username(&username)
-            .password(&password),
-    )
-    .await?;
-
-    let safe_test_database = test_database.replace('"', "\"\"");
-
-    sqlx::query(&format!(
-        "DROP DATABASE IF EXISTS \"{}\"",
-        safe_test_database
-    ))
-        .execute(&maintenance_pool)
-        .await?;
-
-    sqlx::query(&format!("CREATE DATABASE \"{}\"", safe_test_database))
-        .execute(&maintenance_pool)
-        .await?;
-
-    maintenance_pool.close().await;
+    let test_database = generate_postgres_test_database_name(&db_prefix)?;
+    recreate_postgres_test_database(&host, port, &username, &password, &test_database).await?;
 
     let pool = sqlx::Pool::<sqlx::Postgres>::connect_with(
         PgConnectOptions::new()
