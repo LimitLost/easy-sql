@@ -81,10 +81,19 @@ impl TableDataVersion {
 
             let ty_to_bytes = has_attributes!(field, #[sql(bytes)]);
 
-            let default = get_attributes!(field, #[sql(default = __unknown__)])
-                .into_iter()
-                .next()
-                .map(token_stream_to_consistent_string);
+            let mut default = None;
+            for default_value in get_attributes!(field, #[sql(default = __unknown__)]) {
+                if default.is_some() {
+                    anyhow::bail!("Only one #[sql(default = ...)] attribute is allowed per field");
+                }
+
+                let default_expr: syn::Expr = syn::parse2(default_value.clone())
+                    .context("Expected #[sql(default = ...)] to contain a valid Rust expression")?;
+
+                default = Some(token_stream_to_consistent_string(
+                    default_expr.to_token_stream(),
+                ));
+            }
 
             for foreign_key in get_attributes!(field, #[sql(foreign_key = __unknown__)])
                 .into_iter()
@@ -410,6 +419,12 @@ impl CompilationData {
 
                     //For compatibility sake
                     let default_value = default_expr;
+                    let default_context = format!(
+                        "Converting default value for field `{}` in struct `{}` (table `{}`)",
+                        field_name,
+                        item_name,
+                        latest_version.table_name
+                    );
 
                     quote! {
                         {
@@ -419,7 +434,10 @@ impl CompilationData {
                                 table_instance.#field_ident = #default_value;
                             };
 
-                            Some(#sql_crate::ToDefault::to_default(#default_value))
+                            Some(#macro_support::Context::context(
+                                #sql_crate::ToDefault::to_default_failable(#default_value),
+                                #default_context,
+                            )?)
                         }
                     }
                 } else {
