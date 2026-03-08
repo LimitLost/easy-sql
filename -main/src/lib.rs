@@ -9,6 +9,7 @@ pub mod markers;
 mod traits;
 
 mod drivers;
+#[cfg(any(feature = "postgres", feature = "sqlite"))]
 pub use drivers::*;
 
 pub use {
