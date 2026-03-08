@@ -161,7 +161,7 @@ pub fn sql_insert_base(
 
                     #table {
                         #(
-                            #defaults: Default::default(),
+                            #defaults: #macro_support::never_any::<_>(),
                         )*
                         #(
                         #field_names: __easy_sql_insert_value(this_instance.#field_names),
