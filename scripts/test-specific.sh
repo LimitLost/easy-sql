@@ -1,40 +1,32 @@
 #!/bin/bash
 
 # test-specific.sh - Run specific test(s) for sqlite and postgres
-# Usage: ./test-specific.sh [--math] [--use-output-columns] [--migrations] [--check-duplicate-table-names] <test_name_pattern>
+# Usage: ./test-specific.sh [--math] [--use-output-columns] [--migrations] [--check-duplicate-table-names] [--extra-default-all|--eda] [--extra-default-time|--edt] [--extra-default-chrono|--edc] <test_name_pattern>
 # Example: ./test-specific.sh test_insert
 # Example: ./test-specific.sh --math test_function_sqrt
 # Example: ./test-specific.sh --use-output-columns test_custom_select
 # Example: ./test-specific.sh --migrations test_insert
 # Example: ./test-specific.sh --check-duplicate-table-names test_insert
+# Example: ./test-specific.sh --extra-default-all test_insert
+# Example: ./test-specific.sh --extra-default-time test_insert
+# Example: ./test-specific.sh --extra-default-chrono test_insert
 
 set +e
 
 HANG_TIMEOUT_SEC="${HANG_TIMEOUT_SEC:-5}"
 
-# Colors for output
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-NC='\033[0m' # No Color
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/test-common.sh"
 
-SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
-ROOT_DIR=$(dirname "$SCRIPT_DIR")
-MAIN_DIR="$ROOT_DIR/-main"
-
-if [ ! -d "$MAIN_DIR" ]; then
-    echo -e "${RED}Error: -main directory not found at $MAIN_DIR${NC}"
-    exit 1
-fi
-
-cd "$MAIN_DIR" || exit 1
+init_test_environment "${BASH_SOURCE[0]}" || exit 1
 
 # Parse arguments
 USE_MATH=false
 USE_OUTPUT_COLUMNS=false
 USE_MIGRATIONS=false
 USE_CHECK_DUPLICATE_TABLE_NAMES=false
+USE_EXTRA_DEFAULT_ALL=false
+USE_EXTRA_DEFAULT_TIME=false
+USE_EXTRA_DEFAULT_CHRONO=false
 TEST_PATTERN=""
 
 while [[ $# -gt 0 ]]; do
@@ -55,7 +47,42 @@ while [[ $# -gt 0 ]]; do
             USE_CHECK_DUPLICATE_TABLE_NAMES=true
             shift
             ;;
+        --extra-default-all|--eda)
+            USE_EXTRA_DEFAULT_ALL=true
+            shift
+            ;;
+        --extra-default-time|--edt)
+            USE_EXTRA_DEFAULT_TIME=true
+            shift
+            ;;
+        --extra-default-chrono|--edc)
+            USE_EXTRA_DEFAULT_CHRONO=true
+            shift
+            ;;
+        --*)
+            echo -e "${RED}Error: Unknown option $1${NC}"
+            echo "Usage: $0 [--math] [--use-output-columns] [--migrations] [--check-duplicate-table-names] [--extra-default-all|--eda] [--extra-default-time|--edt] [--extra-default-chrono|--edc] <test_name_pattern>"
+            echo ""
+            echo "Examples:"
+            echo "  $0 test_insert"
+            echo "  $0 --math test_function_sqrt"
+            echo "  $0 --use-output-columns test_custom_select"
+            echo "  $0 --migrations test_insert"
+            echo "  $0 --check-duplicate-table-names test_insert"
+            echo "  $0 --extra-default-all test_insert"
+            echo "  $0 --extra-default-time test_insert"
+            echo "  $0 --extra-default-chrono test_insert"
+            exit 1
+            ;;
         *)
+            if [[ "$1" == --* ]]; then
+                echo -e "${RED}Error: Unknown option $1${NC}"
+                exit 1
+            fi
+            if [ -n "$TEST_PATTERN" ]; then
+                echo -e "${RED}Error: Multiple test patterns provided: '$TEST_PATTERN' and '$1'${NC}"
+                exit 1
+            fi
             TEST_PATTERN="$1"
             shift
             ;;
@@ -65,7 +92,7 @@ done
 # Check if test pattern is provided
 if [ -z "$TEST_PATTERN" ]; then
     echo -e "${RED}Error: No test pattern provided${NC}"
-    echo "Usage: $0 [--math] [--use-output-columns] [--migrations] [--check-duplicate-table-names] <test_name_pattern>"
+    echo "Usage: $0 [--math] [--use-output-columns] [--migrations] [--check-duplicate-table-names] [--extra-default-all|--eda] [--extra-default-time|--edt] [--extra-default-chrono|--edc] <test_name_pattern>"
     echo ""
     echo "Examples:"
     echo "  $0 test_insert"
@@ -73,73 +100,35 @@ if [ -z "$TEST_PATTERN" ]; then
     echo "  $0 --use-output-columns test_custom_select"
     echo "  $0 --migrations test_insert"
     echo "  $0 --check-duplicate-table-names test_insert"
+    echo "  $0 --extra-default-all test_insert"
+    echo "  $0 --extra-default-time test_insert"
+    echo "  $0 --extra-default-chrono test_insert"
     echo "  $0 --math --use-output-columns --migrations test_query"
     exit 1
 fi
+
+validate_extra_default_flag_conflicts || exit 1
+
+build_features_string
+setup_math_environment
 
 
 # Counters
 TOTAL_TESTS=0
 PASSED_TESTS=0
 FAILED_TESTS=0
+SKIPPED_TESTS=0
 
 # Arrays to store results
 declare -a FAILED_CONFIGS
-
-print_error_context() {
-    local output="$1"
-    echo "$output" | awk '
-        /error\[E[0-9]+\]|^error:/{
-            print;
-            lines=10;
-            next;
-        }
-        lines > 0 {
-            print;
-            lines--;
-        }
-    '
-}
-
-# Build features string
-FEATURES=""
-if [ "$USE_OUTPUT_COLUMNS" = true ]; then
-    FEATURES="use_output_columns"
-fi
-if [ "$USE_MIGRATIONS" = true ]; then
-    if [ -n "$FEATURES" ]; then
-        FEATURES="$FEATURES,migrations"
-    else
-        FEATURES="migrations"
-    fi
-fi
-if [ "$USE_MATH" = true ]; then
-    if [ -n "$FEATURES" ]; then
-        FEATURES="$FEATURES,sqlite_math,rust_decimal"
-    else
-        FEATURES="sqlite_math,rust_decimal"
-    fi
-fi
-if [ "$USE_CHECK_DUPLICATE_TABLE_NAMES" = true ]; then
-    if [ -n "$FEATURES" ]; then
-        FEATURES="$FEATURES,check_duplicate_table_names"
-    else
-        FEATURES="check_duplicate_table_names"
-    fi
-fi
-
-# Setup environment
-if [ "$USE_MATH" = true ]; then
-    export LIBSQLITE3_FLAGS="-DSQLITE_ENABLE_MATH_FUNCTIONS"
-else
-    unset LIBSQLITE3_FLAGS
-fi
+declare -a SKIPPED_CONFIGS
 
 # Print header
 echo -e "${BLUE}╔════════════════════════════════════════════════════════════════╗${NC}"
 echo -e "${BLUE}║         Testing: ${TEST_PATTERN}${NC}"
 echo -e "${BLUE}║         Math: ${USE_MATH} | use_output_columns: ${USE_OUTPUT_COLUMNS}${NC}"
 echo -e "${BLUE}║         migrations: ${USE_MIGRATIONS} | check_duplicate_table_names: ${USE_CHECK_DUPLICATE_TABLE_NAMES}${NC}"
+echo -e "${BLUE}║         extra_default: all=${USE_EXTRA_DEFAULT_ALL}, time=${USE_EXTRA_DEFAULT_TIME}, chrono=${USE_EXTRA_DEFAULT_CHRONO}${NC}"
 echo -e "${BLUE}╚════════════════════════════════════════════════════════════════╝${NC}"
 echo ""
 
@@ -295,6 +284,8 @@ run_test() {
         fi
         echo -e "${YELLOW}⚠ No tests matched pattern${NC}"
         echo "$test_output" | tail -200
+        SKIPPED_CONFIGS+=("$db_name")
+        ((SKIPPED_TESTS++))
         ((TOTAL_TESTS++))
         return 0
     fi
@@ -326,7 +317,7 @@ run_test "sqlite" "SQLite"
 run_test "postgres" "PostgreSQL"
 
 # Cleanup environment
-unset LIBSQLITE3_FLAGS
+cleanup_math_environment
 
 # Print summary
 echo -e "${BLUE}╔════════════════════════════════════════════════════════════════╗${NC}"
@@ -336,8 +327,14 @@ echo -e "${BLUE}╚════════════════════�
 if [ $FAILED_TESTS -gt 0 ]; then
     echo -e "${RED}✗ Failed: $FAILED_TESTS / $TOTAL_TESTS${NC}"
     echo -e "${RED}Failed configurations: ${FAILED_CONFIGS[*]}${NC}"
+    if [ $SKIPPED_TESTS -gt 0 ]; then
+        echo -e "${YELLOW}⚠ Skipped: $SKIPPED_TESTS / $TOTAL_TESTS (${SKIPPED_CONFIGS[*]})${NC}"
+    fi
     exit 1
 else
-    echo -e "${GREEN}✓ All tests passed ($PASSED_TESTS / $TOTAL_TESTS)${NC}"
+    echo -e "${GREEN}✓ Passed configurations: $PASSED_TESTS / $TOTAL_TESTS${NC}"
+    if [ $SKIPPED_TESTS -gt 0 ]; then
+        echo -e "${YELLOW}⚠ Skipped: $SKIPPED_TESTS / $TOTAL_TESTS (${SKIPPED_CONFIGS[*]})${NC}"
+    fi
     exit 0
 fi

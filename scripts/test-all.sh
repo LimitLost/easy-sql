@@ -1,41 +1,33 @@
 #!/bin/bash
 
 # test-all.sh - Run ALL tests for sqlite and postgres
-# Usage: ./test-all.sh [--math] [--use-output-columns] [--migrations] [--check-duplicate-table-names]
+# Usage: ./test-all.sh [--math] [--use-output-columns] [--migrations] [--check-duplicate-table-names] [--extra-default-all|--eda] [--extra-default-time|--edt] [--extra-default-chrono|--edc]
 # Example: ./test-all.sh
 # Example: ./test-all.sh --math
 # Example: ./test-all.sh --use-output-columns
 # Example: ./test-all.sh --migrations
 # Example: ./test-all.sh --check-duplicate-table-names
+# Example: ./test-all.sh --extra-default-all
+# Example: ./test-all.sh --extra-default-time
+# Example: ./test-all.sh --extra-default-chrono
 # Example: ./test-all.sh --math --use-output-columns --migrations
 
 set +e
 
 HANG_TIMEOUT_SEC="${HANG_TIMEOUT_SEC:-5}"
 
-# Colors for output
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-NC='\033[0m' # No Color
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/test-common.sh"
 
-SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
-ROOT_DIR=$(dirname "$SCRIPT_DIR")
-MAIN_DIR="$ROOT_DIR/-main"
-
-if [ ! -d "$MAIN_DIR" ]; then
-    echo -e "${RED}Error: -main directory not found at $MAIN_DIR${NC}"
-    exit 1
-fi
-
-cd "$MAIN_DIR" || exit 1
+init_test_environment "${BASH_SOURCE[0]}" || exit 1
 
 # Parse arguments
 USE_MATH=false
 USE_OUTPUT_COLUMNS=false
 USE_MIGRATIONS=false
 USE_CHECK_DUPLICATE_TABLE_NAMES=false
+USE_EXTRA_DEFAULT_ALL=false
+USE_EXTRA_DEFAULT_TIME=false
+USE_EXTRA_DEFAULT_CHRONO=false
 
 while [[ $# -gt 0 ]]; do
     case $1 in
@@ -55,9 +47,21 @@ while [[ $# -gt 0 ]]; do
             USE_CHECK_DUPLICATE_TABLE_NAMES=true
             shift
             ;;
-        *)
+        --extra-default-all|--eda)
+            USE_EXTRA_DEFAULT_ALL=true
+            shift
+            ;;
+        --extra-default-time|--edt)
+            USE_EXTRA_DEFAULT_TIME=true
+            shift
+            ;;
+        --extra-default-chrono|--edc)
+            USE_EXTRA_DEFAULT_CHRONO=true
+            shift
+            ;;
+        --*)
             echo -e "${RED}Error: Unknown option $1${NC}"
-            echo "Usage: $0 [--math] [--use-output-columns] [--migrations] [--check-duplicate-table-names]"
+            echo "Usage: $0 [--math] [--use-output-columns] [--migrations] [--check-duplicate-table-names] [--extra-default-all|--eda] [--extra-default-time|--edt] [--extra-default-chrono|--edc]"
             echo ""
             echo "Examples:"
             echo "  $0"
@@ -65,74 +69,41 @@ while [[ $# -gt 0 ]]; do
             echo "  $0 --use-output-columns"
             echo "  $0 --migrations"
             echo "  $0 --check-duplicate-table-names"
+            echo "  $0 --extra-default-all"
+            echo "  $0 --extra-default-time"
+            echo "  $0 --extra-default-chrono"
             echo "  $0 --math --use-output-columns --migrations"
+            exit 1
+            ;;
+        *)
+            echo -e "${RED}Error: This script does not accept positional arguments: '$1'${NC}"
+            echo "Usage: $0 [--math] [--use-output-columns] [--migrations] [--check-duplicate-table-names] [--extra-default-all|--eda] [--extra-default-time|--edt] [--extra-default-chrono|--edc]"
             exit 1
             ;;
     esac
 done
 
+validate_extra_default_flag_conflicts || exit 1
+
+build_features_string
+setup_math_environment
+
 # Counters
 TOTAL_TESTS=0
 PASSED_TESTS=0
 FAILED_TESTS=0
+SKIPPED_TESTS=0
 
 # Arrays to store results
 declare -a FAILED_CONFIGS
-
-print_error_context() {
-    local output="$1"
-    echo "$output" | awk '
-        /error\[E[0-9]+\]|^error:/{
-            print;
-            lines=10;
-            next;
-        }
-        lines > 0 {
-            print;
-            lines--;
-        }
-    '
-}
-
-# Build features string
-FEATURES=""
-if [ "$USE_OUTPUT_COLUMNS" = true ]; then
-    FEATURES="use_output_columns"
-fi
-if [ "$USE_MIGRATIONS" = true ]; then
-    if [ -n "$FEATURES" ]; then
-        FEATURES="$FEATURES,migrations"
-    else
-        FEATURES="migrations"
-    fi
-fi
-if [ "$USE_MATH" = true ]; then
-    if [ -n "$FEATURES" ]; then
-        FEATURES="$FEATURES,sqlite_math,rust_decimal"
-    else
-        FEATURES="sqlite_math,rust_decimal"
-    fi
-fi
-if [ "$USE_CHECK_DUPLICATE_TABLE_NAMES" = true ]; then
-    if [ -n "$FEATURES" ]; then
-        FEATURES="$FEATURES,check_duplicate_table_names"
-    else
-        FEATURES="check_duplicate_table_names"
-    fi
-fi
-
-# Setup environment
-if [ "$USE_MATH" = true ]; then
-    export LIBSQLITE3_FLAGS="-DSQLITE_ENABLE_MATH_FUNCTIONS"
-else
-    unset LIBSQLITE3_FLAGS
-fi
+declare -a SKIPPED_CONFIGS
 
 # Print header
 echo -e "${BLUE}╔════════════════════════════════════════════════════════════════╗${NC}"
 echo -e "${BLUE}║         Running ALL Tests${NC}"
 echo -e "${BLUE}║         Math: ${USE_MATH} | use_output_columns: ${USE_OUTPUT_COLUMNS}${NC}"
 echo -e "${BLUE}║         migrations: ${USE_MIGRATIONS} | check_duplicate_table_names: ${USE_CHECK_DUPLICATE_TABLE_NAMES}${NC}"
+echo -e "${BLUE}║         extra_default: all=${USE_EXTRA_DEFAULT_ALL}, time=${USE_EXTRA_DEFAULT_TIME}, chrono=${USE_EXTRA_DEFAULT_CHRONO}${NC}"
 echo -e "${BLUE}╚════════════════════════════════════════════════════════════════╝${NC}"
 echo ""
 
@@ -270,22 +241,28 @@ run_all_tests() {
         failed=0
     fi
     
-    # Check if no tests ran (likely compilation failure)
+    # Check if tests ran for this backend
     if [ "$passed" -eq 0 ] && [ "$failed" -eq 0 ]; then
-        echo -e "${YELLOW}⚠ No tests ran - likely compilation failure${NC}"
         if [ $test_status -ne 0 ]; then
+            echo -e "${YELLOW}⚠ No tests ran - likely compilation failure${NC}"
             if [ "$has_compile_error" = true ]; then
                 echo -e "${RED}Compilation errors detected:${NC}"
                 print_error_context "$test_output"
             else
                 echo -e "${RED}Tests failed before execution${NC}"
             fi
+            echo "$test_output" | tail -200
+            FAILED_CONFIGS+=("$db_name (no tests ran)")
+            ((FAILED_TESTS++))
+            ((TOTAL_TESTS++))
+            return 1
         fi
-        echo "$test_output" | tail -200
-        FAILED_CONFIGS+=("$db_name (no tests ran)")
-        ((FAILED_TESTS++))
+
+        echo -e "${YELLOW}⚠ Skipped: no tests discovered for backend${NC}"
+        SKIPPED_CONFIGS+=("$db_name")
+        ((SKIPPED_TESTS++))
         ((TOTAL_TESTS++))
-        return 1
+        return 0
     fi
     
     # Show results
@@ -315,7 +292,7 @@ run_all_tests "sqlite" "SQLite"
 run_all_tests "postgres" "PostgreSQL"
 
 # Cleanup environment
-unset LIBSQLITE3_FLAGS
+cleanup_math_environment
 
 # Print summary
 echo -e "${BLUE}╔════════════════════════════════════════════════════════════════╗${NC}"
@@ -325,8 +302,14 @@ echo -e "${BLUE}╚════════════════════�
 if [ $FAILED_TESTS -gt 0 ]; then
     echo -e "${RED}✗ Failed: $FAILED_TESTS / $TOTAL_TESTS${NC}"
     echo -e "${RED}Failed configurations: ${FAILED_CONFIGS[*]}${NC}"
+    if [ $SKIPPED_TESTS -gt 0 ]; then
+        echo -e "${YELLOW}⚠ Skipped: $SKIPPED_TESTS / $TOTAL_TESTS (${SKIPPED_CONFIGS[*]})${NC}"
+    fi
     exit 1
 else
-    echo -e "${GREEN}✓ All tests passed ($PASSED_TESTS / $TOTAL_TESTS)${NC}"
+    echo -e "${GREEN}✓ Passed configurations: $PASSED_TESTS / $TOTAL_TESTS${NC}"
+    if [ $SKIPPED_TESTS -gt 0 ]; then
+        echo -e "${YELLOW}⚠ Skipped: $SKIPPED_TESTS / $TOTAL_TESTS (${SKIPPED_CONFIGS[*]})${NC}"
+    fi
     exit 0
 fi
