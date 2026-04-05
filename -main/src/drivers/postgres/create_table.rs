@@ -26,7 +26,7 @@ impl SetupSql<Postgres> for CreateTable {
 
     async fn query(self, exec: &mut impl EasyExecutor<Postgres>) -> anyhow::Result<Self::Output> {
         let mut table_fields = String::new();
-        let mut table_constrains = String::new();
+        let mut table_constraints = String::new();
 
         for field in self.fields.into_iter() {
             table_fields.push_str(&table_field_definition(field));
@@ -39,7 +39,7 @@ impl SetupSql<Postgres> for CreateTable {
             .iter()
             .map(|key| format!("\"{}\"", key))
             .collect();
-        table_constrains.push_str(&format!("PRIMARY KEY ({}),", formatted_keys.join(", ")));
+        table_constraints.push_str(&format!("PRIMARY KEY ({}),", formatted_keys.join(", ")));
 
         //Foreign key constraints
         for (foreign_table, (referenced_fields, foreign_fields, cascade)) in self.foreign_keys {
@@ -55,24 +55,24 @@ impl SetupSql<Postgres> for CreateTable {
             let foreign_fields = foreign_fields.join(", ");
             let on_delete = if cascade { "ON DELETE CASCADE" } else { "" };
             let on_update = if cascade { "ON UPDATE CASCADE" } else { "" };
-            table_constrains.push_str(&format!(
+            table_constraints.push_str(&format!(
                 "FOREIGN KEY ({referenced_fields}) REFERENCES \"{foreign_table}\"({foreign_fields}) {on_delete} {on_update},"
             ));
         }
 
-        if table_constrains.is_empty() && !table_fields.is_empty() {
+        if table_constraints.is_empty() && !table_fields.is_empty() {
             //Removes last ,
             table_fields.pop();
         }
 
-        if !table_constrains.is_empty() {
+        if !table_constraints.is_empty() {
             //Removes last ,
-            table_constrains.pop();
+            table_constraints.pop();
         }
 
         let query = format!(
-            "CREATE TABLE \"{}\" (\r\n{}\r\n{})",
-            self.table_name, table_fields, table_constrains
+            "CREATE TABLE IF NOT EXISTS \"{}\" (\r\n{}\r\n{})",
+            self.table_name, table_fields, table_constraints
         );
 
         let sqlx_query = sqlx::query(&query);
