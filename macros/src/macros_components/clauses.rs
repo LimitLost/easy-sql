@@ -1,7 +1,10 @@
 use proc_macro2::TokenStream;
 use quote::quote;
+use easy_macros::always_context;
 
-use crate::macros_components::{Expr, Limit, OrderBy, column::Column};
+use crate::macros_components::{
+    Expr, Limit, Offset, OrderBy, SelectLockMode, column::Column,
+};
 
 use super::{CollectedData, SetClause};
 
@@ -49,14 +52,27 @@ pub fn limit_clause(limit: Limit, data: &mut CollectedData) {
     data.format_str.push_str(&format!(" LIMIT {}", clause_args));
 }
 
-pub fn set_clause(clause: SetClause, data: &mut CollectedData) -> TokenStream {
+pub fn offset_clause(offset: Offset, data: &mut CollectedData) {
+    let clause_args = offset.into_query_string(data);
+
+    data.format_str.push_str(&format!(" OFFSET {}", clause_args));
+}
+
+pub fn select_lock_clause(lock_mode: SelectLockMode, data: &mut CollectedData) {
+    data.format_str.push_str(lock_mode.sql_clause());
+}
+
+#[always_context]
+pub fn set_clause(clause: SetClause, data: &mut CollectedData) -> anyhow::Result<TokenStream> {
     match clause {
         SetClause::FromType(type_expr) => {
+            let Some(main_table_type) = data.main_table_type else {
+                anyhow::bail!("UPDATE table missing in SET clause")
+            };
             data.format_str.push_str(" SET ");
             let query_update_data = data.driver.query_update_data(
                 data.sql_crate,
-                data.main_table_type
-                    .expect("Update Table missing in SET Clause"),
+                main_table_type,
                 *type_expr,
             );
             let current_param_n = &data.current_param_n;
@@ -68,7 +84,7 @@ pub fn set_clause(clause: SetClause, data: &mut CollectedData) -> TokenStream {
             };
             *data.before_param_n = quote! { current_arg_n + #before_param_n};
             *data.current_param_n = 0;
-            result
+            Ok(result)
         }
         SetClause::Expr(set_expr) => {
             // Generate SET clause with compile-time SQL generation
@@ -91,7 +107,7 @@ pub fn set_clause(clause: SetClause, data: &mut CollectedData) -> TokenStream {
             data.format_str
                 .push_str(&format!(" SET {}", set_sql_template));
 
-            quote! {}
+            Ok(quote! {})
         }
     }
 }

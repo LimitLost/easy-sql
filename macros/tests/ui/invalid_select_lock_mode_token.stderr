@@ -1,0 +1,5 @@
+error: Invalid lock mode after FOR. Expected one of: UPDATE | NO KEY UPDATE | SHARE | KEY SHARE.
+  --> tests/ui/invalid_select_lock_mode_token.rs:24:68
+   |
+24 |         SELECT UiLockModeTokenOutput FROM UiLockModeTokenTable FOR INVALID
+   |                                                                    ^^^^^^^

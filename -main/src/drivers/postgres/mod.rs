@@ -19,7 +19,9 @@ use crate::{
     Driver, EasyExecutor,
     driver::TableField,
     markers::{
-        AllowsNoPrimaryKey, SupportsAutoIncrementCompositePrimaryKey,
+        AllowsNoPrimaryKey, SupportsAutoIncrementCompositePrimaryKey, SupportsOffset,
+        SupportsSelectForKeyShare, SupportsSelectForNoKeyUpdate, SupportsSelectForShare,
+        SupportsSelectForUpdate,
         operators::{
             SupportsAdd, SupportsAnd, SupportsBetween, SupportsBitAnd, SupportsBitOr,
             SupportsBitShiftLeft, SupportsBitShiftRight, SupportsConcatOperator, SupportsDiv,
@@ -151,6 +153,12 @@ impl SupportsIsNull for Postgres {}
 impl SupportsIsNotNull for Postgres {}
 impl SupportsIn for Postgres {}
 impl SupportsBetween for Postgres {}
+
+impl SupportsOffset for Postgres {}
+impl SupportsSelectForUpdate for Postgres {}
+impl SupportsSelectForNoKeyUpdate for Postgres {}
+impl SupportsSelectForShare for Postgres {}
+impl SupportsSelectForKeyShare for Postgres {}
 
 fn table_field_definition(field: TableField) -> String {
     let TableField {

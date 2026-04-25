@@ -1,0 +1,5 @@
+error: OFFSET requires LIMIT
+  --> tests/ui/invalid_select_offset_without_limit.rs:24:50
+   |
+24 |         SELECT UiOffsetOutput FROM UiOffsetTable OFFSET 1
+   |                                                  ^^^^^^

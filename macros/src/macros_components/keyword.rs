@@ -264,6 +264,7 @@ sql_keyword!(group);
 sql_keyword!(by);
 sql_keyword!(having);
 sql_keyword!(limit);
+sql_keyword!(offset);
 sql_keyword!(set);
 
 sql_keyword!(and);
@@ -295,3 +296,7 @@ sql_keyword!(update);
 sql_keyword!(delete);
 sql_keyword!(returning);
 sql_keyword!(exists);
+sql_keyword!(for, for_);
+sql_keyword!(no);
+sql_keyword!(key);
+sql_keyword!(share);

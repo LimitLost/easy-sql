@@ -31,3 +31,38 @@ pub trait AllowsNoPrimaryKey: Driver {}
     message = "Driver `{Self}` does not support multiple auto-increment columns in the same table. Remove #[sql(auto_increment)] from all but one column."
 )]
 pub trait SupportsMultipleAutoIncrementColumns: Driver {}
+
+#[always_context]
+/// Marker for drivers that support OFFSET in SELECT/EXISTS queries.
+#[diagnostic::on_unimplemented(
+    message = "Driver `{Self}` does not support OFFSET in SELECT/EXISTS queries."
+)]
+pub trait SupportsOffset: Driver {}
+
+#[always_context]
+/// Marker for drivers that support SELECT ... FOR UPDATE.
+#[diagnostic::on_unimplemented(
+    message = "Driver `{Self}` does not support SELECT ... FOR UPDATE."
+)]
+pub trait SupportsSelectForUpdate: Driver {}
+
+#[always_context]
+/// Marker for drivers that support SELECT ... FOR NO KEY UPDATE.
+#[diagnostic::on_unimplemented(
+    message = "Driver `{Self}` does not support SELECT ... FOR NO KEY UPDATE."
+)]
+pub trait SupportsSelectForNoKeyUpdate: Driver {}
+
+#[always_context]
+/// Marker for drivers that support SELECT ... FOR SHARE.
+#[diagnostic::on_unimplemented(
+    message = "Driver `{Self}` does not support SELECT ... FOR SHARE."
+)]
+pub trait SupportsSelectForShare: Driver {}
+
+#[always_context]
+/// Marker for drivers that support SELECT ... FOR KEY SHARE.
+#[diagnostic::on_unimplemented(
+    message = "Driver `{Self}` does not support SELECT ... FOR KEY SHARE."
+)]
+pub trait SupportsSelectForKeyShare: Driver {}

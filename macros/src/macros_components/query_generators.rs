@@ -4,13 +4,75 @@ use quote::{ToTokens, format_ident, quote};
 
 use super::{
     CollectedData, DeleteQuery, ExistsQuery, InsertQuery, ProvidedDrivers, ReturningData,
-    SelectQuery, UpdateQuery, group_by_clause, having_clause, limit_clause, order_by_clause,
-    set_clause, where_clause,
+    SelectLockMode, SelectQuery, UpdateQuery, group_by_clause, having_clause, limit_clause,
+    offset_clause, order_by_clause, select_lock_clause, set_clause, where_clause,
 };
 
 struct ReturningArgData {
     arg_defs: Vec<TokenStream>,
     arg_tokens: Vec<TokenStream>,
+}
+
+fn push_offset_capability_asserts(
+    checks: &mut Vec<TokenStream>,
+    driver: &ProvidedDrivers,
+    sql_crate: &TokenStream,
+) {
+    for driver_ty in driver.iter_for_checks() {
+        checks.push(quote! {
+            {
+                fn __easy_sql_assert_supports_offset<T: #sql_crate::markers::SupportsOffset>() {}
+                __easy_sql_assert_supports_offset::<#driver_ty>();
+            }
+        });
+    }
+}
+
+fn push_select_lock_capability_asserts(
+    checks: &mut Vec<TokenStream>,
+    driver: &ProvidedDrivers,
+    sql_crate: &TokenStream,
+    lock_mode: &SelectLockMode,
+) {
+    let (marker_trait, assert_fn_name) = select_lock_codegen_mapping(sql_crate, lock_mode);
+    let assert_fn = format_ident!("{}", assert_fn_name);
+
+    for driver_ty in driver.iter_for_checks() {
+        checks.push(quote! {
+            {
+                fn #assert_fn<T: #marker_trait>() {}
+                #assert_fn::<#driver_ty>();
+            }
+        });
+    }
+}
+/// Select marker to check for specific lock used
+///
+/// # Returns
+/// - TokenStream: The marker trait to check for
+/// - &'static str: The name of the assertion function for error messages
+fn select_lock_codegen_mapping(
+    sql_crate: &TokenStream,
+    lock_mode: &SelectLockMode,
+) -> (TokenStream, &'static str) {
+    match lock_mode {
+        SelectLockMode::Update => (
+            quote! { #sql_crate::markers::SupportsSelectForUpdate },
+            "__easy_sql_assert_supports_select_for_update",
+        ),
+        SelectLockMode::NoKeyUpdate => (
+            quote! { #sql_crate::markers::SupportsSelectForNoKeyUpdate },
+            "__easy_sql_assert_supports_select_for_no_key_update",
+        ),
+        SelectLockMode::Share => (
+            quote! { #sql_crate::markers::SupportsSelectForShare },
+            "__easy_sql_assert_supports_select_for_share",
+        ),
+        SelectLockMode::KeyShare => (
+            quote! { #sql_crate::markers::SupportsSelectForKeyShare },
+            "__easy_sql_assert_supports_select_for_key_share",
+        ),
+    }
 }
 
 impl ReturningData {
@@ -76,6 +138,8 @@ pub fn generate_select(
     let table_type = select.table_type;
     let table_type_tokens = table_type.to_token_stream();
     let distinct = select.distinct;
+    let offset = select.offset;
+    let lock_mode = select.lock_mode;
 
     let macro_support = quote! {#sql_crate::macro_support};
 
@@ -142,6 +206,18 @@ pub fn generate_select(
     // Build LIMIT clause code if present
     if let Some(limit) = select.limit {
         limit_clause(limit, &mut data)
+    }
+
+    // Build OFFSET clause code if present
+    if let Some(offset) = offset {
+        push_offset_capability_asserts(data.checks, &driver, sql_crate);
+        offset_clause(offset, &mut data)
+    }
+
+    // Handle lock clause if present
+    if let Some(lock_mode) = lock_mode {
+        push_select_lock_capability_asserts(data.checks, &driver, sql_crate, &lock_mode);
+        select_lock_clause(lock_mode, &mut data)
     }
 
     let lazy_mode_driver = if connection.is_none() {
@@ -1111,6 +1187,12 @@ pub fn generate_exists(
     // Build LIMIT clause code if present
     if let Some(limit) = exists.limit {
         limit_clause(limit, &mut data)
+    }
+
+    // Build OFFSET clause code if present
+    if let Some(offset) = exists.offset {
+        push_offset_capability_asserts(data.checks, &driver, sql_crate);
+        offset_clause(offset, &mut data)
     }
 
     format_str.push(')');

@@ -1,0 +1,5 @@
+error: Lock clause must be final. No clauses may follow FOR <lock mode> (UPDATE | NO KEY UPDATE | SHARE | KEY SHARE).
+  --> tests/ui/invalid_select_lock_placement.rs:24:75
+   |
+24 |         SELECT UiLockPlacementOutput FROM UiLockPlacementTable FOR UPDATE WHERE UiLockPlacementTable.id = 1
+   |                                                                           ^^^^^

@@ -120,7 +120,7 @@ pub mod macro_support;
 /// `use_output_columns` feature, bare column names are validated against the output type instead of the Table type.
 #[doc = docify::embed!("src/tests/general/documentation/query_macro.rs", select_output_columns_example)]
 ///
-/// Accepted Clauses: `WHERE`, `GROUP BY`, `HAVING`, `ORDER BY`, `LIMIT`, `DISTINCT`
+/// Accepted Clauses: `WHERE`, `GROUP BY`, `HAVING`, `ORDER BY`, `LIMIT`, `OFFSET`, `DISTINCT`, `FOR UPDATE`, `FOR NO KEY UPDATE`, `FOR SHARE`, `FOR KEY SHARE`
 ///
 /// ### INSERT
 /// `INSERT INTO TableType VALUES {data}` inserts one value or a collection. `{data}` must implement [`Insert`].
@@ -154,7 +154,7 @@ pub mod macro_support;
 /// `EXISTS TableType WHERE ...` returns `bool`.
 #[doc = docify::embed!("src/tests/general/documentation/query_macro.rs", exists_example)]
 ///
-/// Accepted Clauses: `WHERE`, `GROUP BY`, `HAVING`, `ORDER BY`, `LIMIT`
+/// Accepted Clauses: `WHERE`, `GROUP BY`, `HAVING`, `ORDER BY`, `LIMIT`, `OFFSET`
 ///
 /// ### Table joins
 /// Use [`table_join!`](crate::table_join) to define joins, then reference joined columns with

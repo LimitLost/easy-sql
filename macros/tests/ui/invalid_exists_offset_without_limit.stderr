@@ -1,0 +1,5 @@
+error: OFFSET requires LIMIT
+  --> tests/ui/invalid_exists_offset_without_limit.rs:18:36
+   |
+18 |         EXISTS UiExistsOffsetTable OFFSET 1
+   |                                    ^^^^^^

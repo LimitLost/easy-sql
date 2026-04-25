@@ -10,6 +10,8 @@ pub fn next_clause_token(lookahead: &Lookahead1) -> bool {
         || lookahead.peek(keyword::group)
         || lookahead.peek(keyword::order)
         || lookahead.peek(keyword::limit)
+        || lookahead.peek(keyword::offset)
+        || lookahead.peek(keyword::for_)
         || lookahead.peek(keyword::join)
         || lookahead.peek(keyword::inner)
         || lookahead.peek(keyword::left)

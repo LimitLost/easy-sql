@@ -1,0 +1,63 @@
+error[E0277]: Driver `Sqlite` does not support SELECT ... FOR UPDATE.
+  --> tests/ui/unsupported_select_lock_sqlite.rs:24:21
+   |
+24 |     let _ = query!(<easy_sql::Sqlite> dummy_conn,
+   |                     ^^^^^^^^^^^^^^^^ the trait `SupportsSelectForUpdate` is not implemented for `Sqlite`
+   |
+note: required by a bound in `__easy_sql_assert_supports_select_for_update`
+  --> tests/ui/unsupported_select_lock_sqlite.rs:24:13
+   |
+24 |       let _ = query!(<easy_sql::Sqlite> dummy_conn,
+   |  _____________^
+25 | |         SELECT UiLockOutput FROM UiLockTable FOR UPDATE
+26 | |     );
+   | |_____^ required by this bound in `__easy_sql_assert_supports_select_for_update`
+   = note: this error originates in the macro `query` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0277]: Driver `Sqlite` does not support SELECT ... FOR NO KEY UPDATE.
+  --> tests/ui/unsupported_select_lock_sqlite.rs:28:21
+   |
+28 |     let _ = query!(<easy_sql::Sqlite> dummy_conn,
+   |                     ^^^^^^^^^^^^^^^^ the trait `SupportsSelectForNoKeyUpdate` is not implemented for `Sqlite`
+   |
+note: required by a bound in `__easy_sql_assert_supports_select_for_no_key_update`
+  --> tests/ui/unsupported_select_lock_sqlite.rs:28:13
+   |
+28 |       let _ = query!(<easy_sql::Sqlite> dummy_conn,
+   |  _____________^
+29 | |         SELECT UiLockOutput FROM UiLockTable FOR NO KEY UPDATE
+30 | |     );
+   | |_____^ required by this bound in `__easy_sql_assert_supports_select_for_no_key_update`
+   = note: this error originates in the macro `query` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0277]: Driver `Sqlite` does not support SELECT ... FOR SHARE.
+  --> tests/ui/unsupported_select_lock_sqlite.rs:32:21
+   |
+32 |     let _ = query!(<easy_sql::Sqlite> dummy_conn,
+   |                     ^^^^^^^^^^^^^^^^ the trait `SupportsSelectForShare` is not implemented for `Sqlite`
+   |
+note: required by a bound in `__easy_sql_assert_supports_select_for_share`
+  --> tests/ui/unsupported_select_lock_sqlite.rs:32:13
+   |
+32 |       let _ = query!(<easy_sql::Sqlite> dummy_conn,
+   |  _____________^
+33 | |         SELECT UiLockOutput FROM UiLockTable FOR SHARE
+34 | |     );
+   | |_____^ required by this bound in `__easy_sql_assert_supports_select_for_share`
+   = note: this error originates in the macro `query` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0277]: Driver `Sqlite` does not support SELECT ... FOR KEY SHARE.
+  --> tests/ui/unsupported_select_lock_sqlite.rs:36:21
+   |
+36 |     let _ = query!(<easy_sql::Sqlite> dummy_conn,
+   |                     ^^^^^^^^^^^^^^^^ the trait `SupportsSelectForKeyShare` is not implemented for `Sqlite`
+   |
+note: required by a bound in `__easy_sql_assert_supports_select_for_key_share`
+  --> tests/ui/unsupported_select_lock_sqlite.rs:36:13
+   |
+36 |       let _ = query!(<easy_sql::Sqlite> dummy_conn,
+   |  _____________^
+37 | |         SELECT UiLockOutput FROM UiLockTable FOR KEY SHARE
+38 | |     );
+   | |_____^ required by this bound in `__easy_sql_assert_supports_select_for_key_share`
+   = note: this error originates in the macro `query` (in Nightly builds, run with -Z macro-backtrace for more info)

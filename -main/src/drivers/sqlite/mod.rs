@@ -20,7 +20,7 @@ use crate::{
     Driver, EasyExecutor,
     driver::TableField,
     markers::{
-        AllowsNoPrimaryKey,
+        AllowsNoPrimaryKey, SupportsOffset,
         operators::{
             SupportsAdd, SupportsAnd, SupportsBetween, SupportsBitAnd, SupportsBitOr,
             SupportsBitShiftLeft, SupportsBitShiftRight, SupportsConcatOperator, SupportsDiv,
@@ -157,6 +157,7 @@ impl SupportsIsNull for Sqlite {}
 impl SupportsIsNotNull for Sqlite {}
 impl SupportsIn for Sqlite {}
 impl SupportsBetween for Sqlite {}
+impl SupportsOffset for Sqlite {}
 
 #[always_context]
 fn table_field_definition(field: TableField) -> String {

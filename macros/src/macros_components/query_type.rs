@@ -1,8 +1,17 @@
 use crate::macros_components::{
-    column::Column, expr::Expr, keyword, limit::Limit, order_by::OrderBy, set::SetExpr,
+    column::Column,
+    expr::Expr,
+    keyword,
+    limit::{Limit, Offset},
+    order_by::OrderBy,
+    set::SetExpr,
 };
 use easy_macros::always_context;
 use syn::{self, parse::Parse};
+
+const SELECT_LOCK_MODES_EXPECTED: &str = "UPDATE | NO KEY UPDATE | SHARE | KEY SHARE";
+const OFFSET_REQUIRES_LIMIT_ERROR: &str = "OFFSET requires LIMIT";
+const SELECT_LOCK_FINAL_ERROR: &str = "Lock clause must be final. No clauses may follow FOR <lock mode> (UPDATE | NO KEY UPDATE | SHARE | KEY SHARE).";
 
 /// Represents the different query types supported by query! macro
 #[derive(Debug, Clone)]
@@ -24,7 +33,28 @@ pub struct SelectQuery {
     pub group_by: Option<Vec<Column>>,
     pub having: Option<Expr>,
     pub limit: Option<Limit>,
+    pub offset: Option<Offset>,
+    pub lock_mode: Option<SelectLockMode>,
     pub distinct: bool,
+}
+
+#[derive(Debug, Clone)]
+pub enum SelectLockMode {
+    Update,
+    NoKeyUpdate,
+    Share,
+    KeyShare,
+}
+
+impl SelectLockMode {
+    pub fn sql_clause(&self) -> &'static str {
+        match self {
+            SelectLockMode::Update => " FOR UPDATE",
+            SelectLockMode::NoKeyUpdate => " FOR NO KEY UPDATE",
+            SelectLockMode::Share => " FOR SHARE",
+            SelectLockMode::KeyShare => " FOR KEY SHARE",
+        }
+    }
 }
 
 /// INSERT INTO TableType VALUES {data} [RETURNING OutputType]
@@ -102,6 +132,37 @@ pub struct ExistsQuery {
     pub having: Option<Expr>,
     pub order_by: Option<Vec<OrderBy>>,
     pub limit: Option<Limit>,
+    pub offset: Option<Offset>,
+}
+
+#[always_context]
+impl Parse for SelectLockMode {
+    fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
+        input.parse::<keyword::for_>()?;
+
+        let lookahead = input.lookahead1();
+        if lookahead.peek(keyword::update) {
+            input.parse::<keyword::update>()?;
+            Ok(SelectLockMode::Update)
+        } else if lookahead.peek(keyword::share) {
+            input.parse::<keyword::share>()?;
+            Ok(SelectLockMode::Share)
+        } else if lookahead.peek(keyword::no) {
+            input.parse::<keyword::no>()?;
+            input.parse::<keyword::key>()?;
+            input.parse::<keyword::update>()?;
+            Ok(SelectLockMode::NoKeyUpdate)
+        } else if lookahead.peek(keyword::key) {
+            input.parse::<keyword::key>()?;
+            input.parse::<keyword::share>()?;
+            Ok(SelectLockMode::KeyShare)
+        } else {
+            Err(input.error(format!(
+                "Invalid lock mode after FOR. Expected one of: {}.",
+                SELECT_LOCK_MODES_EXPECTED
+            )))
+        }
+    }
 }
 
 #[always_context]
@@ -151,27 +212,20 @@ impl Parse for SelectQuery {
         let mut group_by = None;
         let mut having = None;
         let mut limit = None;
+        let mut offset = None;
+        let mut lock_mode = None;
+        let mut offset_clause_span = None;
 
         while !input.is_empty() {
             let lookahead = input.lookahead1();
 
+            if lock_mode.is_some() {
+                return Err(input.error(SELECT_LOCK_FINAL_ERROR));
+            }
+
             if where_clause.is_none() && lookahead.peek(keyword::where_) {
                 input.parse::<keyword::where_>()?;
                 where_clause = Some(input.parse()?);
-            } else if order_by.is_none() && lookahead.peek(keyword::order) {
-                input.parse::<keyword::order>()?;
-                input.parse::<keyword::by>()?;
-                let mut order_by_list = Vec::new();
-                loop {
-                    let order_by_item: OrderBy = input.parse()?;
-                    order_by_list.push(order_by_item);
-                    if input.peek(syn::Token![,]) {
-                        input.parse::<syn::Token![,]>()?;
-                    } else {
-                        break;
-                    }
-                }
-                order_by = Some(order_by_list);
             } else if group_by.is_none() && lookahead.peek(keyword::group) {
                 input.parse::<keyword::group>()?;
                 input.parse::<keyword::by>()?;
@@ -189,12 +243,42 @@ impl Parse for SelectQuery {
             } else if having.is_none() && lookahead.peek(keyword::having) {
                 input.parse::<keyword::having>()?;
                 having = Some(input.parse()?);
+            } else if order_by.is_none() && lookahead.peek(keyword::order) {
+                input.parse::<keyword::order>()?;
+                input.parse::<keyword::by>()?;
+                let mut order_by_list = Vec::new();
+                loop {
+                    let order_by_item: OrderBy = input.parse()?;
+                    order_by_list.push(order_by_item);
+                    if input.peek(syn::Token![,]) {
+                        input.parse::<syn::Token![,]>()?;
+                    } else {
+                        break;
+                    }
+                }
+                order_by = Some(order_by_list);
             } else if limit.is_none() && lookahead.peek(keyword::limit) {
                 input.parse::<keyword::limit>()?;
                 limit = Some(input.parse()?);
+            } else if offset.is_none() && lookahead.peek(keyword::offset) {
+                // OFFSET can appear before LIMIT in the macro input, so validate the LIMIT
+                // dependency only after the full query has been parsed.
+                let offset_keyword = input.parse::<keyword::offset>()?;
+                offset_clause_span = Some(offset_keyword.span);
+                offset = Some(input.parse()?);
+            } else if lock_mode.is_none() && lookahead.peek(keyword::for_) {
+                lock_mode = Some(input.parse::<SelectLockMode>()?);
             } else {
                 return Err(lookahead.error());
             }
+        }
+
+        if offset.is_some() && limit.is_none() {
+            if let Some(span) = offset_clause_span {
+                return Err(syn::Error::new(span, OFFSET_REQUIRES_LIMIT_ERROR));
+            }
+
+            return Err(input.error(OFFSET_REQUIRES_LIMIT_ERROR));
         }
 
         Ok(SelectQuery {
@@ -205,6 +289,8 @@ impl Parse for SelectQuery {
             group_by,
             having,
             limit,
+            offset,
+            lock_mode,
             distinct,
         })
     }
@@ -330,6 +416,8 @@ impl Parse for ExistsQuery {
         let mut having = None;
         let mut order_by = None;
         let mut limit = None;
+        let mut offset = None;
+        let mut offset_clause_span = None;
 
         while !input.is_empty() {
             let lookahead = input.lookahead1();
@@ -371,9 +459,21 @@ impl Parse for ExistsQuery {
             } else if limit.is_none() && lookahead.peek(keyword::limit) {
                 input.parse::<keyword::limit>()?;
                 limit = Some(input.parse()?);
+            } else if offset.is_none() && lookahead.peek(keyword::offset) {
+                let offset_keyword = input.parse::<keyword::offset>()?;
+                offset_clause_span = Some(offset_keyword.span);
+                offset = Some(input.parse()?);
             } else {
                 return Err(lookahead.error());
             }
+        }
+
+        if offset.is_some() && limit.is_none() {
+            if let Some(span) = offset_clause_span {
+                return Err(syn::Error::new(span, OFFSET_REQUIRES_LIMIT_ERROR));
+            }
+
+            return Err(input.error(OFFSET_REQUIRES_LIMIT_ERROR));
         }
 
         Ok(ExistsQuery {
@@ -383,6 +483,7 @@ impl Parse for ExistsQuery {
             having,
             order_by,
             limit,
+            offset,
         })
     }
 }
