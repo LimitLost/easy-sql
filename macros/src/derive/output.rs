@@ -22,6 +22,9 @@ use crate::{
     sql_crate,
 };
 
+type FieldQuoteGenerator<'a> = Box<dyn Fn(&syn::Path) -> TokenStream + 'a>;
+type FieldQuoteGenerators<'a> = Vec<FieldQuoteGenerator<'a>>;
+
 #[always_context]
 pub fn sql_output_base(
     item_name: &syn::Ident,
@@ -98,7 +101,7 @@ pub fn sql_output_base(
         })
         .collect::<Vec<_>>();
 
-    let mut fields_quotes: Vec<Box<dyn Fn(&syn::Path) -> TokenStream>> = Vec::new();
+    let mut fields_quotes: FieldQuoteGenerators<'_> = Vec::new();
 
     //Handle regular fields (without custom select)
     for field in regular_fields.iter() {
@@ -121,12 +124,53 @@ pub fn sql_output_base(
                 item_name
             );
 
-            fields_quotes.push(Box::new(move |driver|quote! {
-                #field_name: #macro_support::from_binary_vec( <#macro_support::DriverRow<#driver> as #macro_support::SqlxRow>::try_get(&data, #field_name_str).with_context(
-                    #macro_support::context!(#context_str),
-                )?).with_context(
-                    #macro_support::context!(#context_str2),
-                )?,
+            let is_option = match &field.ty {
+                syn::Type::Path(type_path) => type_path
+                    .path
+                    .segments
+                    .first()
+                    .map(|segment| segment.ident == "Option")
+                    .unwrap_or(false),
+                _ => false,
+            };
+
+            let binary_type = if is_option {
+                quote! { Option<::std::vec::Vec<u8>> }
+            } else {
+                quote! { ::std::vec::Vec<u8> }
+            };
+
+            // Handles empty vec as None for Option<T>
+            let conversion = if is_option {
+                quote! {
+                    match binary_data {
+                        None => None,
+                         Some(ref data) if data.is_empty() => None,
+                        Some(binary_data) => #macro_support::from_binary_vec( binary_data ).with_context(
+                            #macro_support::context!(#context_str2),
+                        )?,
+                    }
+                }
+            } else {
+                quote! {
+                    #macro_support::from_binary_vec( binary_data ).with_context(
+                        #macro_support::context!(#context_str2),
+                    )?
+                }
+            };
+
+            fields_quotes.push(Box::new(move |driver| {
+                quote! {
+                    #field_name: {
+                        let binary_data: #binary_type =
+                            <#macro_support::DriverRow<#driver> as #macro_support::SqlxRow>
+                            ::try_get(&data, #field_name_str).with_context(
+                                #macro_support::context!(#context_str)
+                            )?;
+
+                        #conversion
+                    },
+                }
             }));
         } else {
             fields_quotes.push(Box::new(move |driver|quote! {
