@@ -22,6 +22,30 @@ use crate::traits::{Driver, EasyExecutor, Insert, Output, Table, Update};
 
 pub use sqlx::Row as SqlxRow;
 
+pub const UPDATE_NO_ASSIGNMENTS_MARKER: &str = "__easy_sql_no_assignments__";
+
+#[always_context(skip(!))]
+#[inline(always)]
+fn finish_update_query_args<'a, D: Driver>(
+    update_result: anyhow::Result<DriverArguments<'a, D>>,
+    current_query: &mut String,
+) -> anyhow::Result<DriverArguments<'a, D>> {
+    match update_result {
+        Ok(updated_args) => {
+            if current_query.ends_with(UPDATE_NO_ASSIGNMENTS_MARKER) {
+                let marker_start = current_query.len() - UPDATE_NO_ASSIGNMENTS_MARKER.len();
+                current_query.truncate(marker_start);
+                anyhow::bail!(
+                    "UPDATE ... SET {{data}} produced no assignments. Ensure at least one update field generates a SET assignment (for example, maybe-update fields must contain Some(...))."
+                );
+            }
+
+            Ok(updated_args)
+        }
+        Err(err) => Err(err).context("Update::updates failed"),
+    }
+}
+
 /// Used for compiler checks, quickly creates a value of any type
 ///
 /// Panics if called
@@ -112,9 +136,10 @@ pub fn query_update_data<'a, Table, D: Driver, T: Update<'a, Table, D>>(
     parameter_n: &mut usize,
     _exec: &impl crate::EasyExecutor<D>,
 ) -> anyhow::Result<DriverArguments<'a, D>> {
-    update_data
-        .updates(args, current_query, parameter_n)
-        .context("Update::updates failed")
+    finish_update_query_args::<D>(
+        update_data.updates(args, current_query, parameter_n),
+        current_query,
+    )
 }
 #[always_context(skip(!))]
 #[inline(always)]
@@ -127,9 +152,10 @@ pub fn query_update_data_selected_driver<'a, Table, D: Driver, T: Update<'a, Tab
     current_query: &mut String,
     parameter_n: &mut usize,
 ) -> anyhow::Result<DriverArguments<'a, D>> {
-    update_data
-        .updates(args, current_query, parameter_n)
-        .context("Update::updates failed")
+    finish_update_query_args::<D>(
+        update_data.updates(args, current_query, parameter_n),
+        current_query,
+    )
 }
 
 ///This function extracts Driver from connection (that's the only reason why it exists instead of direct call)

@@ -9,7 +9,7 @@ use super::super::macros::{
     expr_test_data, insert_multiple_test_data, insert_test_data,
 };
 use crate::{
-    DatabaseSetup, Insert, Output, PoolTransaction, Table, custom_sql_function, table_join,
+    DatabaseSetup, Insert, Output, PoolTransaction, Table, Update, custom_sql_function, table_join,
 };
 use easy_macros::{add_code, always_context};
 use easy_sql_macros::query;
@@ -195,6 +195,45 @@ async fn update_returning_example(mut conn: PoolTransaction<TestDriver>) -> anyh
         UPDATE ExprTestTable SET bool_field = {bool_value}
         WHERE ExprTestTable.id > 1
         RETURNING Vec<ExprTestData>
+    )
+    .await?;
+}
+
+#[always_context(skip(!))]
+#[no_context]
+#[add_code(after = {
+    let updated: ExprTestData = query!(&mut conn,
+        SELECT ExprTestData FROM ExprTestTable WHERE ExprTestTable.id = 1
+    )
+    .await?;
+    assert_eq!(updated.str_field, "from-slice");
+    Ok(())
+})]
+#[docify::export_content]
+async fn update_collection_payload_forms_example(
+    mut conn: PoolTransaction<TestDriver>,
+) -> anyhow::Result<()> {
+    #[derive(Update)]
+    #[sql(table = ExprTestTable)]
+    struct DocCollectionUpdate {
+        int_field: i32,
+        str_field: String,
+    }
+
+    let updates_vec = vec![DocCollectionUpdate {
+        int_field: 101,
+        str_field: "from-vec".to_string(),
+    }];
+    query!(&mut conn,
+        UPDATE ExprTestTable SET {&updates_vec[..]} WHERE ExprTestTable.id = 1
+    )
+    .await?;
+    query!(&mut conn,
+        UPDATE ExprTestTable SET {&updates_vec} WHERE ExprTestTable.id = 1
+    )
+    .await?;
+    query!(&mut conn,
+        UPDATE ExprTestTable SET {updates_vec} WHERE ExprTestTable.id = 1
     )
     .await?;
 }

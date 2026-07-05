@@ -139,6 +139,10 @@ pub mod macro_support;
 /// Use `RETURNING OutputType` to return rows, OutputType needs to implement [`Output`].
 #[doc = docify::embed!("src/tests/general/documentation/query_macro.rs", update_returning_example)]
 ///
+/// `SET {update}` also accepts collections (`Vec<T>`, `&Vec<T>`, `&[T]`) where each item implements [`Update`].
+#[doc = docify::embed!("src/tests/general/documentation/query_macro.rs", update_collection_payload_forms_example)]
+/// Runtime errors are returned when the collection is empty or when merged collection updates produce no assignments.
+///
 /// Accepted Clauses: `WHERE`, `RETURNING`
 ///
 /// ### DELETE

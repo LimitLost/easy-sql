@@ -2,6 +2,7 @@ use proc_macro2::TokenStream;
 
 use super::ProvidedDrivers;
 
+#[derive(Debug)]
 pub struct CollectedData<'a> {
     pub format_str: &'a mut String,
     pub format_params: &'a mut Vec<TokenStream>,

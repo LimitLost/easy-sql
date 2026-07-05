@@ -7,6 +7,7 @@ mod insert;
 pub use insert::*;
 mod update;
 pub use update::*;
+mod update_collection;
 
 mod table;
 pub use table::*;

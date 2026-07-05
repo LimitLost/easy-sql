@@ -1,3 +1,4 @@
+use anyhow::Context;
 use easy_macros::always_context;
 use proc_macro2::{Span, TokenStream};
 use quote::{ToTokens, format_ident, quote};
@@ -662,7 +663,7 @@ pub fn generate_update(
     );
 
     // Process SET clause first
-    let set_code = set_clause(set_clause_data, &mut data);
+    let set_code = set_clause(set_clause_data.clone(), &mut data)?;
 
     // Process WHERE clause with compile-time SQL generation
     let where_code = if let Some(where_expr) = update.where_clause {

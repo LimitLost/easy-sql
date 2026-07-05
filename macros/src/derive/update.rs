@@ -57,7 +57,7 @@ pub fn sql_update_base(
     for field in fields.iter() {
         let field_name = field.ident.as_ref().unwrap();
         let field_name_str = field_name.to_string();
-        let query_format = format!("{{delimeter}}{}{{delimeter}} = {{}}, ", field_name_str);
+        let query_format = format!("{{delimiter}}{}{{delimiter}} = {{}}, ", field_name_str);
         let field_ty = &field.ty;
         let bytes = has_attributes!(field, #[sql(bytes)]);
         if bytes {
@@ -328,10 +328,14 @@ pub fn sql_update_base(
 
                 #(#driver_tests)*
 
-                let delimeter = <D as #sql_crate::Driver>::identifier_delimiter();
+                let delimiter = <D as #sql_crate::Driver>::identifier_delimiter();
                 let current_query_start_len = current_query.len();
 
                 #(#update_statements)*
+                if current_query.len() == current_query_start_len {
+                    current_query.push_str(#macro_support::UPDATE_NO_ASSIGNMENTS_MARKER);
+                    return Ok(args_list);
+                }
                 if current_query.len() >= current_query_start_len + 2 {
                     current_query.pop();
                     current_query.pop();
@@ -352,13 +356,21 @@ pub fn sql_update_base(
                 use #macro_support::{Arguments, Context as _};
                 // Validity check needs to be done only once
 
-                let delimeter = <D as #sql_crate::Driver>::identifier_delimiter();
+                let delimiter = <D as #sql_crate::Driver>::identifier_delimiter();
+                let current_query_start_len = current_query.len();
 
 
                 #(#update_statements_ref)*
 
-                current_query.pop();
-                current_query.pop();
+                if current_query.len() == current_query_start_len {
+                    current_query.push_str(#macro_support::UPDATE_NO_ASSIGNMENTS_MARKER);
+                    return Ok(args_list);
+                }
+
+                if current_query.len() >= current_query_start_len + 2 {
+                    current_query.pop();
+                    current_query.pop();
+                }
 
                 Ok(args_list)
             }

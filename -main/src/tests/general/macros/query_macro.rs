@@ -7,6 +7,15 @@ use easy_macros::{always_context /* always_context_debug as always_context */};
 use easy_sql_macros::query;
 use serde::{Deserialize, Serialize};
 
+fn assert_update_set_error<T>(result: anyhow::Result<T>, expected_substring: &str) {
+    assert!(result.is_err());
+    let error_message = format!("{:#}", result.err().unwrap());
+    assert!(
+        error_message.contains(expected_substring),
+        "Unexpected error: {error_message}"
+    );
+}
+
 // ==============================================
 // 1. SELECT QUERIES
 // ==============================================
@@ -476,6 +485,242 @@ async fn test_query_update_single() -> anyhow::Result<()> {
 
     conn.rollback().await?;
     Ok(())
+}
+
+#[derive(Update)]
+#[sql(table = ExprTestTable)]
+struct CollectionPayloadUpdate {
+    int_field: i32,
+    str_field: String,
+}
+
+#[derive(Update)]
+#[sql(table = ExprTestTable)]
+struct CollectionNoAssignmentsUpdate {
+    #[sql(maybe_update)]
+    nullable_field: Option<Option<String>>,
+}
+
+macro_rules! run_update_collection_success_case {
+    ($payload_expr:expr, $expected_int:expr, $expected_str:expr) => {{
+        let db = Database::setup_for_testing::<ExprTestTable>().await?;
+        let mut conn = db.transaction().await?;
+
+        insert_test_data(&mut conn, default_expr_test_data()).await?;
+
+        query!(&mut conn,
+            UPDATE ExprTestTable SET {$payload_expr} WHERE ExprTestTable.id = 1
+        )
+        .await?;
+
+        let result: ExprTestData = query!(&mut conn,
+            SELECT ExprTestData FROM ExprTestTable WHERE ExprTestTable.id = 1
+        )
+        .await?;
+
+        assert_eq!(result.int_field, $expected_int);
+        assert_eq!(result.str_field, $expected_str);
+
+        conn.rollback().await?;
+        Ok(())
+    }};
+}
+
+macro_rules! run_update_collection_error_case {
+    ($payload_expr:expr, $expected_error:expr) => {{
+        let db = Database::setup_for_testing::<ExprTestTable>().await?;
+        let mut conn = db.transaction().await?;
+
+        insert_test_data(&mut conn, default_expr_test_data()).await?;
+
+        let result = query!(&mut conn,
+            UPDATE ExprTestTable SET {$payload_expr} WHERE ExprTestTable.id = 1
+        )
+        .await;
+
+        assert_update_set_error(result, $expected_error);
+
+        conn.rollback().await?;
+        Ok(())
+    }};
+}
+
+/// Test UPDATE with vector payload support
+#[always_context(skip(!))]
+#[tokio::test]
+async fn test_query_update_vector_payload() -> anyhow::Result<()> {
+    let updates = vec![CollectionPayloadUpdate {
+        int_field: 123,
+        str_field: "vector-updated".to_string(),
+    }];
+    run_update_collection_success_case!(updates, 123, "vector-updated")
+}
+
+/// Test UPDATE with &Vec<T> payload support
+#[always_context(skip(!))]
+#[tokio::test]
+async fn test_query_update_vec_ref_payload() -> anyhow::Result<()> {
+    let updates = vec![CollectionPayloadUpdate {
+        int_field: 124,
+        str_field: "ref-vec-updated".to_string(),
+    }];
+    run_update_collection_success_case!(&updates, 124, "ref-vec-updated")
+}
+
+/// Test UPDATE with &[T] payload support
+#[always_context(skip(!))]
+#[tokio::test]
+async fn test_query_update_slice_payload() -> anyhow::Result<()> {
+    let updates = [CollectionPayloadUpdate {
+        int_field: 125,
+        str_field: "slice-updated".to_string(),
+    }];
+    run_update_collection_success_case!(&updates[..], 125, "slice-updated")
+}
+
+/// Test UPDATE with multi-item vector merge behavior
+#[always_context(skip(!))]
+#[tokio::test]
+async fn test_query_update_vector_payload_multi_item_merge() -> anyhow::Result<()> {
+    let db = Database::setup_for_testing::<MaybeUpdateTable>().await?;
+    let mut conn = db.transaction().await?;
+
+    let data = MaybeUpdateInsert {
+        name: "original".to_string(),
+        optional_text: Some("keep".to_string()),
+        optional_number: Some(10),
+    };
+    query!(&mut conn, INSERT INTO MaybeUpdateTable VALUES {data}).await?;
+
+    #[derive(Update)]
+    #[sql(table = MaybeUpdateTable)]
+    struct MergeVectorUpdate {
+        #[sql(maybe_update)]
+        optional_text: Option<String>,
+        #[sql(maybe_update)]
+        optional_number: Option<i32>,
+    }
+
+    let updates = vec![
+        MergeVectorUpdate {
+            optional_text: Some("merged-text".to_string()),
+            optional_number: None,
+        },
+        MergeVectorUpdate {
+            optional_text: None,
+            optional_number: Some(77),
+        },
+    ];
+
+    query!(&mut conn,
+        UPDATE MaybeUpdateTable SET {updates} WHERE MaybeUpdateTable.id = 1
+    )
+    .await?;
+
+    let result: MaybeUpdateTable = query!(&mut conn,
+        SELECT MaybeUpdateTable FROM MaybeUpdateTable WHERE MaybeUpdateTable.id = 1
+    )
+    .await?;
+
+    assert_eq!(result.optional_text, Some("merged-text".to_string()));
+    assert_eq!(result.optional_number, Some(77));
+
+    conn.rollback().await?;
+    Ok(())
+}
+
+/// Test UPDATE rejects empty vector payload
+#[always_context(skip(!))]
+#[tokio::test]
+async fn test_query_update_vector_payload_empty_rejected() -> anyhow::Result<()> {
+    let updates: Vec<CollectionNoAssignmentsUpdate> = Vec::new();
+    run_update_collection_error_case!(updates, "UPDATE ... SET {collection} cannot be empty")
+}
+
+/// Test UPDATE rejects vectors that produce no assignments
+#[always_context(skip(!))]
+#[tokio::test]
+async fn test_query_update_vector_payload_no_assignments_rejected() -> anyhow::Result<()> {
+    let updates = vec![CollectionNoAssignmentsUpdate {
+        nullable_field: None,
+    }];
+    run_update_collection_error_case!(
+        updates,
+        "UPDATE ... SET {collection} produced no assignments"
+    )
+}
+
+/// Test UPDATE rejects single-item payloads that produce no assignments
+#[always_context(skip(!))]
+#[tokio::test]
+async fn test_query_update_single_payload_no_assignments_rejected() -> anyhow::Result<()> {
+    let db = Database::setup_for_testing::<ExprTestTable>().await?;
+    let mut conn = db.transaction().await?;
+
+    insert_test_data(&mut conn, default_expr_test_data()).await?;
+
+    #[derive(Update)]
+    #[sql(table = ExprTestTable)]
+    struct EmptyAssignmentsSingleUpdate {
+        #[sql(maybe_update)]
+        nullable_field: Option<Option<String>>,
+    }
+
+    let update = EmptyAssignmentsSingleUpdate {
+        nullable_field: None,
+    };
+
+    let result = query!(&mut conn,
+        UPDATE ExprTestTable SET {update} WHERE ExprTestTable.id = 1
+    )
+    .await;
+
+    assert_update_set_error(result, "UPDATE ... SET {data} produced no assignments");
+
+    conn.rollback().await?;
+    Ok(())
+}
+
+/// Test UPDATE rejects empty &Vec<T> payload
+#[always_context(skip(!))]
+#[tokio::test]
+async fn test_query_update_vec_ref_payload_empty_rejected() -> anyhow::Result<()> {
+    let updates: Vec<CollectionNoAssignmentsUpdate> = Vec::new();
+    run_update_collection_error_case!(&updates, "UPDATE ... SET {collection} cannot be empty")
+}
+
+/// Test UPDATE rejects vectors by reference that produce no assignments
+#[always_context(skip(!))]
+#[tokio::test]
+async fn test_query_update_vec_ref_payload_no_assignments_rejected() -> anyhow::Result<()> {
+    let updates = vec![CollectionNoAssignmentsUpdate {
+        nullable_field: None,
+    }];
+    run_update_collection_error_case!(
+        &updates,
+        "UPDATE ... SET {collection} produced no assignments"
+    )
+}
+
+/// Test UPDATE rejects empty &[T] payload
+#[always_context(skip(!))]
+#[tokio::test]
+async fn test_query_update_slice_payload_empty_rejected() -> anyhow::Result<()> {
+    let updates: [CollectionNoAssignmentsUpdate; 0] = [];
+    run_update_collection_error_case!(&updates[..], "UPDATE ... SET {collection} cannot be empty")
+}
+
+/// Test UPDATE rejects slices that produce no assignments
+#[always_context(skip(!))]
+#[tokio::test]
+async fn test_query_update_slice_payload_no_assignments_rejected() -> anyhow::Result<()> {
+    let updates = [CollectionNoAssignmentsUpdate {
+        nullable_field: None,
+    }];
+    run_update_collection_error_case!(
+        &updates[..],
+        "UPDATE ... SET {collection} produced no assignments"
+    )
 }
 
 /// Test updating Option<T> columns with T values
