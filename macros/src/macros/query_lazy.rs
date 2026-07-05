@@ -57,9 +57,13 @@ pub fn query_lazy(input_raw: proc_macro::TokenStream) -> anyhow::Result<proc_mac
             ));
         }
 
-        if let Some(driver_str) = compilation_data.default_drivers.first() {
-            let driver_path: syn::Path = syn::parse_str(driver_str)
-                .with_context(|| format!("Failed to parse driver path: {}", driver_str))?;
+        if !compilation_data.default_drivers.is_empty() {
+            // reuse shared parsing so invalid defaults identify their real source.
+            let driver_path = compilation_data
+                .default_driver_paths()?
+                .into_iter()
+                .next()
+                .context("No default driver found despite length being 1 (unreachable)")?;
             ProvidedDrivers::Single(quote! {#driver_path})
         } else {
             return Err(anyhow::anyhow!(

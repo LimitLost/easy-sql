@@ -82,33 +82,17 @@ pub fn query(input_raw: proc_macro::TokenStream) -> anyhow::Result<proc_macro::T
             "Failed to load compilation data for query! macro. Make sure easy_sql_build::build is called in the build script"
         })?;
 
-        match compilation_data.default_drivers.len() {
-            1 => {
-                let driver = compilation_data
-                    .default_drivers
-                    .first()
-                    .context("No default driver found despite length being 1 (Unreachable)")?;
-                let driver_parsed: TokenStream = syn::parse_str(driver)
-                    .with_context(|| format!("Failed to parse driver path: {}", driver))?;
-                ProvidedDrivers::MultipleWithConn {
-                    drivers: vec![driver_parsed],
-                    conn: connection_shared.clone(),
-                }
-            }
-            _ => {
-                let mut parsed_drivers = Vec::new();
+        // parse defaults once so every invalid-path diagnostic includes the real source.
+        let parsed_drivers = compilation_data
+            .default_driver_paths()?
+            .into_iter()
+            .map(|driver_path| quote! {#driver_path})
+            .collect::<Vec<_>>();
 
-                for driver_str in compilation_data.default_drivers.iter() {
-                    let driver_path: TokenStream = syn::parse_str(driver_str)
-                        .with_context(|| format!("Failed to parse driver path: {}", driver_str))?;
-                    parsed_drivers.push(driver_path);
-                }
-
-                ProvidedDrivers::MultipleWithConn {
-                    drivers: parsed_drivers,
-                    conn: connection_shared.clone(),
-                }
-            }
+        // keep query! on the connection-driven path when no explicit <Driver> was supplied.
+        ProvidedDrivers::MultipleWithConn {
+            drivers: parsed_drivers,
+            conn: connection_shared.clone(),
         }
     };
 

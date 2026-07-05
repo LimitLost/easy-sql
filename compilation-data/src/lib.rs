@@ -199,6 +199,21 @@ impl CompilationData {
         Ok(data)
     }
 
+    /// Parses the current default-driver strings into Rust paths.
+    pub fn default_driver_paths(&self) -> anyhow::Result<Vec<syn::Path>> {
+        self.default_drivers
+            .iter()
+            .map(|driver_str| {
+                syn::parse_str(driver_str).with_context(|| {
+                    format!(
+                        "Failed to parse default driver `{}`. Expected a valid Rust path. (easy_sql.ron is corrupted)",
+                        driver_str
+                    )
+                })
+            })
+            .collect()
+    }
+
     pub fn load_in_macro() -> anyhow::Result<CompilationData> {
         let data_path = Self::data_location()?;
 

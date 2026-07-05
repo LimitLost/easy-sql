@@ -33,15 +33,7 @@ pub fn supported_drivers(
         }
         Ok(drivers.into_iter().collect())
     } else if !compilation_data.default_drivers.is_empty() {
-        let mut drivers = Vec::new();
-        for driver_str in compilation_data.default_drivers.iter() {
-            let driver_ident: syn::Path = syn::parse_str(driver_str).with_context(||{
-                format!("easy_sql.ron is corrupted: Invalid driver name `{}`, expected valid Rust identifier",driver_str)
-            })?;
-            drivers.push(driver_ident);
-        }
-
-        Ok(drivers)
+        Ok(compilation_data.default_driver_paths()?)
     } else if !optional {
         anyhow::bail!(
             "No default drivers provided in the build script, please provide supported drivers using #[sql(drivers = ExampleDriver1,ExampleDriver2])] attribute"
