@@ -38,6 +38,7 @@ serde = {version = "1", features = ["derive"]}
 
 # Used by generated code by query_lazy! macro
 futures-core = {version = "0.3.31"}
+futures-util = {version = "0.3.31", default-features = false, features = ["std"]}
 
 # Fixes async not being Send in traits used by query macros
 async-trait = "0.1.89"
@@ -51,7 +52,6 @@ tokio = {version = "1", features = ["full"]}
 tracing = "0.1"
 tracing-subscriber = {version = "0.3", features = ["fmt", "env-filter"]}
 lazy_static = {version = "1"}
-futures = {version = "0.3.31"}
 serde_json = {version = "1"}
 
 sqlx = {version = "0.8", features = [

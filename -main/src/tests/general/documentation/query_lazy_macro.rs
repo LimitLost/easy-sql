@@ -12,7 +12,7 @@ use crate::{EasyExecutor, Insert, Output, PoolTransaction, Table};
 use anyhow::Context;
 use easy_macros::{add_code, always_context};
 use easy_sql_macros::query_lazy;
-use futures::StreamExt;
+use futures_util::StreamExt;
 
 #[derive(Table, Debug, Clone)]
 #[sql(no_version)]

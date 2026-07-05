@@ -2,7 +2,7 @@ use super::*;
 use anyhow::Context;
 use easy_macros::always_context;
 use easy_sql_macros::{query, query_lazy};
-use futures::StreamExt;
+use futures_util::StreamExt;
 
 type SqlxPool = sqlx::Pool<<TestDriver as crate::Driver>::InternalDriver>;
 

@@ -261,7 +261,7 @@ pub fn generate_select(
         let fetch_internals = |executor: TokenStream| {
             quote! {
                     use #sql_crate::EasyExecutor as _;
-                self.builder.build().fetch(conn.#executor()).map(|r| {
+                #macro_support::StreamExt::map(self.builder.build().fetch(conn.#executor()), |r| {
                                 match r {
                                     Ok(r) => {
                                         let converted =
@@ -430,7 +430,7 @@ pub fn generate_insert(
             let fetch_internals = |executor: TokenStream| {
                 quote! {
                         use #sql_crate::EasyExecutor as _;
-                    self.builder.build().fetch(conn.#executor()).map(|r| {
+                    #macro_support::StreamExt::map(self.builder.build().fetch(conn.#executor()), |r| {
                                     match r {
                                         Ok(r) => {
                                             let converted =
@@ -737,7 +737,7 @@ pub fn generate_update(
             let fetch_internals = |executor: TokenStream| {
                 quote! {
                         use #sql_crate::EasyExecutor as _;
-                    self.builder.build().fetch(conn.#executor()).map(|r| {
+                    #macro_support::StreamExt::map(self.builder.build().fetch(conn.#executor()), |r| {
                                     match r {
                                         Ok(r) => {
                                             let converted =
@@ -980,7 +980,7 @@ pub fn generate_delete(
             let fetch_internals = |executor: TokenStream| {
                 quote! {
                         use #sql_crate::EasyExecutor as _;
-                    self.builder.build().fetch(conn.#executor()).map(|r| {
+                    #macro_support::StreamExt::map(self.builder.build().fetch(conn.#executor()), |r| {
                                     match r {
                                         Ok(r) => {
                                             let converted =

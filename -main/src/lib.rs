@@ -208,7 +208,7 @@ pub use easy_sql_macros::query;
 ///         - on the final use in that scope, `fetch(conn)` is valid and shorter
 ///     - otherwise pass a connection or transaction directly (e.g., `fetch(conn)` or `fetch(&mut transaction)`)
 ///
-/// Both return `futures::Stream<Item = anyhow::Result<Output>>`. The stream borrows the
+/// Both return `futures_core::Stream<Item = anyhow::Result<Output>>`. The stream borrows the
 /// connection; drop or fully consume it before reusing the connection.
 ///
 /// ### Output and query forms

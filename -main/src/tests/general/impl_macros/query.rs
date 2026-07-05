@@ -257,7 +257,7 @@ async fn _test_delete() -> anyhow::Result<()> {
         async {
             //TODO Security checks
             // Imports
-            use futures::FutureExt;
+            use futures_util::FutureExt;
             use sqlx::Arguments;
             let mut args = DriverArguments::<TestDriver>::default();
             let mut query = "DELETE FROM ".to_string();

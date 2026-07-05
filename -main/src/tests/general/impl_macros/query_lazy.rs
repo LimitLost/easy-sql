@@ -2,7 +2,7 @@
 
 use anyhow::Context;
 use easy_macros::always_context;
-use futures::StreamExt;
+use futures_util::StreamExt;
 
 use crate::{
     Connection, Driver, Output, Table,
@@ -84,7 +84,7 @@ async fn _test_select() -> anyhow::Result<Vec<ExampleOutput>> {
             fn fetch<'_easy_sql_e, E>(
                 &'_easy_sql_e mut self,
                 conn: E,
-            ) -> impl futures::Stream<Item = anyhow::Result<ExampleOutput>> + '_easy_sql_e
+            ) -> impl futures_core::Stream<Item = anyhow::Result<ExampleOutput>> + '_easy_sql_e
             where
                 E: sqlx::Executor<
                         '_easy_sql_e,
