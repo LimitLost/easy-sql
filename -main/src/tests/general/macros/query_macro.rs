@@ -217,6 +217,80 @@ async fn test_query_select_order_by_limit() -> anyhow::Result<()> {
     Ok(())
 }
 
+/// Test SELECT with LIMIT and OFFSET combined
+#[always_context(skip(!))]
+#[tokio::test]
+async fn test_query_select_limit_offset() -> anyhow::Result<()> {
+    let db = Database::setup_for_testing::<ExprTestTable>().await?;
+    let mut conn = db.transaction().await?;
+
+    insert_multiple_test_data(
+        &mut conn,
+        vec![
+            expr_test_data(10, "a", true, None),
+            expr_test_data(20, "b", false, None),
+            expr_test_data(30, "c", true, None),
+            expr_test_data(40, "d", true, None),
+        ],
+    )
+    .await?;
+
+    let limit_rows = 2;
+    let offset_rows = 1;
+    let results: Vec<ExprTestData> = query!(&mut conn,
+        SELECT Vec<ExprTestData> FROM ExprTestTable
+        WHERE true
+        ORDER BY int_field ASC
+        LIMIT {limit_rows}
+        OFFSET {offset_rows}
+    )
+    .await?;
+
+    assert_eq!(results.len(), 2);
+    assert_eq!(results[0].int_field, 20);
+    assert_eq!(results[1].int_field, 30);
+
+    conn.rollback().await?;
+    Ok(())
+}
+
+/// Test SELECT accepts OFFSET before LIMIT in macro input
+#[always_context(skip(!))]
+#[tokio::test]
+async fn test_query_select_offset_before_limit() -> anyhow::Result<()> {
+    let db = Database::setup_for_testing::<ExprTestTable>().await?;
+    let mut conn = db.transaction().await?;
+
+    insert_multiple_test_data(
+        &mut conn,
+        vec![
+            expr_test_data(10, "a", true, None),
+            expr_test_data(20, "b", false, None),
+            expr_test_data(30, "c", true, None),
+            expr_test_data(40, "d", true, None),
+        ],
+    )
+    .await?;
+
+    let limit_rows = 2;
+    let offset_rows = 1;
+    let results: Vec<ExprTestData> = query!(&mut conn,
+        SELECT Vec<ExprTestData> FROM ExprTestTable
+        WHERE true
+        ORDER BY int_field ASC
+        OFFSET {offset_rows}
+        LIMIT {limit_rows}
+    )
+    .await?;
+
+    assert_eq!(results.len(), 2);
+    assert_eq!(results[0].int_field, 20);
+    assert_eq!(results[1].int_field, 30);
+
+    conn.rollback().await?;
+    Ok(())
+}
+
 /// Test SELECT DISTINCT
 #[always_context(skip(!))]
 #[tokio::test]
@@ -2291,6 +2365,92 @@ async fn test_query_exists_with_limit_variable() -> anyhow::Result<()> {
     .await?;
 
     assert!(exists);
+
+    conn.rollback().await?;
+    Ok(())
+}
+
+/// Test EXISTS with OFFSET clause
+#[always_context(skip(!))]
+#[tokio::test]
+async fn test_query_exists_with_offset() -> anyhow::Result<()> {
+    let db = Database::setup_for_testing::<ExprTestTable>().await?;
+    let mut conn = db.transaction().await?;
+
+    insert_multiple_test_data(
+        &mut conn,
+        vec![
+            expr_test_data(10, "a", true, None),
+            expr_test_data(20, "b", true, None),
+            expr_test_data(30, "c", true, None),
+        ],
+    )
+    .await?;
+
+    let offset_with_remaining_rows = 2;
+    let exists_with_offset: bool = query!(&mut conn,
+        EXISTS ExprTestTable
+        WHERE int_field > 5
+        ORDER BY int_field ASC
+        LIMIT 10
+        OFFSET {offset_with_remaining_rows}
+    )
+    .await?;
+    assert!(exists_with_offset);
+
+    let offset_without_remaining_rows = 3;
+    let exists_without_rows_after_offset: bool = query!(&mut conn,
+        EXISTS ExprTestTable
+        WHERE int_field > 5
+        ORDER BY int_field ASC
+        LIMIT 10
+        OFFSET {offset_without_remaining_rows}
+    )
+    .await?;
+    assert!(!exists_without_rows_after_offset);
+
+    conn.rollback().await?;
+    Ok(())
+}
+
+/// Test EXISTS accepts OFFSET before LIMIT in macro input
+#[always_context(skip(!))]
+#[tokio::test]
+async fn test_query_exists_with_offset_before_limit() -> anyhow::Result<()> {
+    let db = Database::setup_for_testing::<ExprTestTable>().await?;
+    let mut conn = db.transaction().await?;
+
+    insert_multiple_test_data(
+        &mut conn,
+        vec![
+            expr_test_data(10, "a", true, None),
+            expr_test_data(20, "b", true, None),
+            expr_test_data(30, "c", true, None),
+        ],
+    )
+    .await?;
+
+    let offset_with_remaining_rows = 2;
+    let exists_with_offset: bool = query!(&mut conn,
+        EXISTS ExprTestTable
+        WHERE int_field > 5
+        ORDER BY int_field ASC
+        OFFSET {offset_with_remaining_rows}
+        LIMIT 10
+    )
+    .await?;
+    assert!(exists_with_offset);
+
+    let offset_without_remaining_rows = 3;
+    let exists_without_rows_after_offset: bool = query!(&mut conn,
+        EXISTS ExprTestTable
+        WHERE int_field > 5
+        ORDER BY int_field ASC
+        OFFSET {offset_without_remaining_rows}
+        LIMIT 10
+    )
+    .await?;
+    assert!(!exists_without_rows_after_offset);
 
     conn.rollback().await?;
     Ok(())

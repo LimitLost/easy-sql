@@ -1,6 +1,6 @@
 use super::CollectedData;
 use ::{
-    quote::{format_ident, quote, quote_spanned},
+    quote::{quote, quote_spanned},
     syn::{self, parse::Parse, spanned::Spanned},
 };
 use easy_macros::always_context;
@@ -91,27 +91,21 @@ fn push_bounded_i64_expr(
     expr: Box<syn::Expr>,
     data: &mut CollectedData,
 ) -> String {
-    let temp_ident = format_ident!(
-        "__easy_sql_{}_value_{}",
-        clause_name.to_lowercase(),
-        *data.current_param_n,
-        span = expr.span()
-    );
+    // Check if the expression can be converted to i64
+    data.checks.push(quote_spanned! {expr.span()=>
+        let _test:i64 = {#expr} as i64;
+    });
 
-    let debug_convert = format!(
-        "{} clause conversion failed while converting `{}` to i64",
-        clause_name,
-        quote! {#expr},
+    let debug_format = format!(
+        "Failed to bind validated {} parameter value = {{}}",
+        clause_name
     );
-    let debug_bind = format!("Failed to bind validated {} parameter value", clause_name);
 
     data.binds.push(quote_spanned! {expr.span()=>
-        let #temp_ident: i64 = ::core::convert::TryInto::<i64>::try_into(#expr)
-            .with_context(|| #debug_convert)?;
         _easy_sql_args
-            .add(#temp_ident)
+            .add({#expr})
             .map_err(anyhow::Error::from_boxed)
-            .with_context(|| format!("{}: {} = {}", #debug_bind, #clause_name, #temp_ident))?;
+            .with_context(|| format!(#debug_format, {#expr}))?;
     });
 
     data.format_params.push(data.driver.parameter_placeholder(
