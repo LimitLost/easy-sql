@@ -797,6 +797,99 @@ async fn test_query_update_slice_payload_no_assignments_rejected() -> anyhow::Re
     )
 }
 
+#[cfg(all(feature = "postgres", not(feature = "sqlite")))]
+#[always_context(skip(!))]
+#[tokio::test]
+async fn test_query_select_lock_modes_postgres() -> anyhow::Result<()> {
+    let db = Database::setup_for_testing::<ExprTestTable>().await?;
+    let mut conn = db.transaction().await?;
+
+    insert_test_data(&mut conn, default_expr_test_data()).await?;
+
+    let row_for_update: ExprTestData = query!(&mut conn,
+        SELECT ExprTestData FROM ExprTestTable WHERE ExprTestTable.id = 1 FOR UPDATE
+    )
+    .await?;
+    assert_eq!(row_for_update.int_field, 42);
+
+    let row_for_no_key_update: ExprTestData = query!(&mut conn,
+        SELECT ExprTestData FROM ExprTestTable WHERE ExprTestTable.id = 1 FOR NO KEY UPDATE
+    )
+    .await?;
+    assert_eq!(row_for_no_key_update.int_field, 42);
+
+    let row_for_share: ExprTestData = query!(&mut conn,
+        SELECT ExprTestData FROM ExprTestTable WHERE ExprTestTable.id = 1 FOR SHARE
+    )
+    .await?;
+    assert_eq!(row_for_share.int_field, 42);
+
+    let row_for_key_share: ExprTestData = query!(&mut conn,
+        SELECT ExprTestData FROM ExprTestTable WHERE ExprTestTable.id = 1 FOR KEY SHARE
+    )
+    .await?;
+    assert_eq!(row_for_key_share.int_field, 42);
+
+    conn.rollback().await?;
+    Ok(())
+}
+
+/// `FOR UPDATE` actually takes a row lock: while one transaction holds it, a concurrent writer targeting the
+/// same row must block until the lock is released, then apply its write.
+#[cfg(all(feature = "postgres", not(feature = "sqlite")))]
+#[always_context(skip(!))]
+#[tokio::test]
+async fn test_query_select_for_update_blocks_concurrent_writer() -> anyhow::Result<()> {
+    let db = std::sync::Arc::new(Database::setup_for_testing::<ExprTestTable>().await?);
+
+    // Seed one row (id = 1, int_field = 42).
+    {
+        let mut conn = db.conn().await?;
+        insert_test_data(&mut conn, default_expr_test_data()).await?;
+    }
+
+    // Transaction A: lock row 1 with FOR UPDATE and keep the transaction open (lock held).
+    let mut tx_a = db.transaction().await?;
+    let _locked: ExprTestData = query!(&mut tx_a,
+        SELECT ExprTestData FROM ExprTestTable WHERE ExprTestTable.id = 1 FOR UPDATE
+    )
+    .await?;
+
+    // Transaction B on its own connection: UPDATE row 1. Postgres must block it on A's row lock.
+    let db_b = db.clone();
+    let writer = tokio::spawn(async move {
+        let mut tx_b = db_b.transaction().await?;
+        query!(&mut tx_b,
+            UPDATE ExprTestTable SET int_field = 99 WHERE ExprTestTable.id = 1
+        )
+        .await?;
+        tx_b.commit().await?;
+        anyhow::Ok(())
+    });
+
+    // Give B time to reach the lock. It cannot finish while A holds it, so it must still be pending.
+    tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+    assert!(
+        !writer.is_finished(),
+        "FOR UPDATE must block the concurrent writer while the lock is held"
+    );
+
+    // Release the lock; B unblocks, applies its update, and commits.
+    tx_a.rollback().await?;
+    let writer_result = writer.await.context("blocked writer task panicked")?;
+    writer_result.context("blocked writer failed to update after unblocking")?;
+
+    // The write landed only after the lock was released.
+    let mut conn = db.conn().await?;
+    let row: ExprTestData = query!(&mut conn,
+        SELECT ExprTestData FROM ExprTestTable WHERE ExprTestTable.id = 1
+    )
+    .await?;
+    assert_eq!(row.int_field, 99, "the blocked writer applied its update once unblocked");
+
+    Ok(())
+}
+
 /// Test updating Option<T> columns with T values
 #[always_context(skip(!))]
 #[tokio::test]
