@@ -7,7 +7,7 @@ use crate::{Driver, traits::ToConvert};
 ///
 /// Implemented by the table macros; avoid manual implementations.
 #[diagnostic::on_unimplemented(
-    message = "Type `{T}` is not a part of requested tables clause in this query, nor it is not an Output type (or using columns from Output type might not be supported in this position)"
+    message = "Type `{T}` is not available in this query context. Use a table from FROM/JOIN, or an Output type supported in this position."
 )]
 pub trait HasTable<T> {}
 

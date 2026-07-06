@@ -179,7 +179,7 @@ impl Column {
                                 })*
                             });
 
-                        return format!("{{_easy_sql_d}}{}{{_easy_sql_d}}", ident.to_string());
+                        return format!("{{_easy_sql_d}}{}{{_easy_sql_d}}", ident);
                     }
                 }
 

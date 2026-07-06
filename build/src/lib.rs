@@ -266,7 +266,7 @@ fn struct_table_handle(
                 .compilation_data
                 .used_table_names
                 .entry(table_name.clone())
-                .or_insert_with(Vec::new)
+                .or_default()
                 .push(TableNameData {
                     filename: file_name,
                     struct_name: item.ident.to_string(),
