@@ -11,3 +11,7 @@ mod documentation;
 mod migrations;
 
 mod async_tokio;
+
+// The change-watcher is sqlite-only and opt-in; its test compiles only under that exact configuration.
+#[cfg(all(feature = "watcher", feature = "sqlite", not(feature = "postgres")))]
+mod watcher;

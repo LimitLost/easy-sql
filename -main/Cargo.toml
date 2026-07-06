@@ -72,6 +72,11 @@ postgres = ["sqlx/postgres", "dep:pg_escape"]
 sqlite = ["sqlx/sqlite"]
 sqlite_math = []
 
+# Opt-in committed-row-mutation feed (the `watcher` module). SQLite-only today: implemented via sqlite's
+# native update/commit/rollback hooks installed per pooled connection, so it needs no codegen changes and
+# observes every write (including raw sqlx). Zero cost when disabled.
+watcher = []
+
 use_output_columns = ["easy-sql-macros/use_output_columns"]
 migrations = [
   "easy-sql-macros/migrations",

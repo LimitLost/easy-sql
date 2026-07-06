@@ -12,6 +12,11 @@ mod drivers;
 #[cfg(any(feature = "postgres", feature = "sqlite"))]
 pub use drivers::*;
 
+#[cfg(feature = "watcher")]
+pub mod watcher;
+#[cfg(feature = "watcher")]
+pub use watcher::{ChangeOp, ChangeWatcher, RowChange};
+
 pub use {
     database_structs::{Connection, EasySqlTables, PoolTransaction, Transaction},
     traits::{

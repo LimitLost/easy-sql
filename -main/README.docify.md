@@ -121,6 +121,7 @@ Unless stated otherwise, feature is disabled by default.
 - `migrations`: Enable migration generation and tracking.
 - `check_duplicate_table_names` (default: ✅): Detect duplicate table names at build time.
 - `use_output_columns`: Bare columns refer to output the type, instead of the table type.
+- `watcher`: SQLite-only. Feed of committed row changes (table, op, rowid) via sqlite's native hooks, for building sync layers without touching `query!` call sites.
 - `bigdecimal`: Add `BigDecimal` `ToDefault` support (SQLx `bigdecimal`).
 - `rust_decimal`: Add `Decimal` `ToDefault` support (SQLx `rust_decimal`).
 - `uuid`: Add `Uuid` `ToDefault` support via SQLx.
