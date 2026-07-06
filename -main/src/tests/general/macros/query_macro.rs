@@ -1476,6 +1476,820 @@ async fn test_query_bytes_maybe_update_optional_payload() -> anyhow::Result<()> 
     Ok(())
 }
 
+// ==============================================
+// 3.2 ADVANCED BYTES TESTS - Basic Serde Types
+// ==============================================
+
+/// Test bytes with HashMap<String, String>
+#[always_context(skip(!))]
+#[tokio::test]
+async fn test_query_bytes_hashmap_string_string() -> anyhow::Result<()> {
+    let db = Database::setup_for_testing::<BytesTestTable>().await?;
+    let mut conn = db.transaction().await?;
+
+    let mut map = std::collections::HashMap::new();
+    map.insert("key1".to_string(), "value1".to_string());
+    map.insert("key2".to_string(), "value2".to_string());
+    map.insert("key3".to_string(), "value3".to_string());
+
+    let data = BytesTestData {
+        payload: BytesPayload {
+            label: "hashmap_test".to_string(),
+            data: vec![],
+        },
+        optional_payload: Some(BytesPayload {
+            label: format!("{:?}", map),
+            data: vec![],
+        }),
+    };
+
+    query!(&mut conn, INSERT INTO BytesTestTable VALUES {data}).await?;
+
+    let row: BytesTestData = query!(&mut conn,
+        SELECT BytesTestData FROM BytesTestTable WHERE BytesTestTable.id = 1
+    )
+    .await?;
+
+    // Verify the payload was stored and retrieved correctly
+    assert_eq!(row.payload.label, "hashmap_test");
+    assert!(row.optional_payload.is_some());
+    assert!(row.optional_payload.unwrap().label.contains("key1"));
+
+    conn.rollback().await?;
+    Ok(())
+}
+
+/// Test bytes with BTreeMap for ordered key storage
+#[always_context(skip(!))]
+#[tokio::test]
+async fn test_query_bytes_btreemap_ordered() -> anyhow::Result<()> {
+    use std::collections::BTreeMap;
+
+    #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+    struct BTreePayload {
+        ordered_data: BTreeMap<String, i64>,
+    }
+
+    #[derive(Table, Debug, Clone)]
+    #[sql(no_version)]
+    struct BTreeTestTable {
+        #[sql(primary_key)]
+        #[sql(auto_increment)]
+        id: i32,
+        #[sql(bytes)]
+        payload: BTreePayload,
+    }
+
+    #[derive(Insert, Output, Debug, Clone, PartialEq)]
+    #[sql(table = BTreeTestTable)]
+    #[sql(default = id)]
+    struct BTreeTestData {
+        #[sql(bytes)]
+        payload: BTreePayload,
+    }
+
+    let db = Database::setup_for_testing::<BTreeTestTable>().await?;
+    let mut conn = db.transaction().await?;
+
+    let mut map = BTreeMap::new();
+    map.insert("zebra".to_string(), 3);
+    map.insert("apple".to_string(), 1);
+    map.insert("mango".to_string(), 2);
+
+    let data = BTreeTestData {
+        payload: BTreePayload {
+            ordered_data: map.clone(),
+        },
+    };
+
+    query!(&mut conn, INSERT INTO BTreeTestTable VALUES {data}).await?;
+
+    let row: BTreeTestData = query!(&mut conn,
+        SELECT BTreeTestData FROM BTreeTestTable WHERE BTreeTestTable.id = 1
+    )
+    .await?;
+
+    // BTreeMap maintains sorted order
+    let keys: Vec<_> = row.payload.ordered_data.keys().collect();
+    assert_eq!(keys, vec!["apple", "mango", "zebra"]);
+    assert_eq!(row.payload.ordered_data.get("apple"), Some(&1));
+
+    conn.rollback().await?;
+    Ok(())
+}
+
+/// Test bytes with Vec of custom structs
+#[always_context(skip(!))]
+#[tokio::test]
+async fn test_query_bytes_vec_custom_struct() -> anyhow::Result<()> {
+    #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+    struct Point {
+        x: i32,
+        y: i32,
+    }
+
+    #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+    struct PathPayload {
+        points: Vec<Point>,
+    }
+
+    #[derive(Table, Debug, Clone)]
+    #[sql(no_version)]
+    struct PathTestTable {
+        #[sql(primary_key)]
+        #[sql(auto_increment)]
+        id: i32,
+        #[sql(bytes)]
+        path: PathPayload,
+    }
+
+    #[derive(Insert, Output, Debug, Clone, PartialEq)]
+    #[sql(table = PathTestTable)]
+    #[sql(default = id)]
+    struct PathTestData {
+        #[sql(bytes)]
+        path: PathPayload,
+    }
+
+    let db = Database::setup_for_testing::<PathTestTable>().await?;
+    let mut conn = db.transaction().await?;
+
+    let data = PathTestData {
+        path: PathPayload {
+            points: vec![
+                Point { x: 0, y: 0 },
+                Point { x: 10, y: 20 },
+                Point { x: 30, y: 40 },
+                Point { x: 50, y: 60 },
+            ],
+        },
+    };
+
+    query!(&mut conn, INSERT INTO PathTestTable VALUES {data}).await?;
+
+    let row: PathTestData = query!(&mut conn,
+        SELECT PathTestData FROM PathTestTable WHERE PathTestTable.id = 1
+    )
+    .await?;
+
+    assert_eq!(row.path.points.len(), 4);
+    assert_eq!(row.path.points[0], Point { x: 0, y: 0 });
+    assert_eq!(row.path.points[3], Point { x: 50, y: 60 });
+
+    conn.rollback().await?;
+    Ok(())
+}
+
+/// Test bytes with nested collections: Vec<HashMap<String, i32>>
+#[always_context(skip(!))]
+#[tokio::test]
+async fn test_query_bytes_nested_vec_hashmap() -> anyhow::Result<()> {
+    use std::collections::HashMap;
+
+    #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+    struct NestedPayload {
+        maps: Vec<HashMap<String, i32>>,
+    }
+
+    #[derive(Table, Debug, Clone)]
+    #[sql(no_version)]
+    struct NestedTestTable {
+        #[sql(primary_key)]
+        #[sql(auto_increment)]
+        id: i32,
+        #[sql(bytes)]
+        data: NestedPayload,
+    }
+
+    #[derive(Insert, Output, Debug, Clone, PartialEq)]
+    #[sql(table = NestedTestTable)]
+    #[sql(default = id)]
+    struct NestedTestData {
+        #[sql(bytes)]
+        data: NestedPayload,
+    }
+
+    let db = Database::setup_for_testing::<NestedTestTable>().await?;
+    let mut conn = db.transaction().await?;
+
+    let mut map1 = HashMap::new();
+    map1.insert("a".to_string(), 1);
+    map1.insert("b".to_string(), 2);
+
+    let mut map2 = HashMap::new();
+    map2.insert("c".to_string(), 3);
+    map2.insert("d".to_string(), 4);
+
+    let data = NestedTestData {
+        data: NestedPayload {
+            maps: vec![map1, map2],
+        },
+    };
+
+    query!(&mut conn, INSERT INTO NestedTestTable VALUES {data}).await?;
+
+    let row: NestedTestData = query!(&mut conn,
+        SELECT NestedTestData FROM NestedTestTable WHERE NestedTestTable.id = 1
+    )
+    .await?;
+
+    assert_eq!(row.data.maps.len(), 2);
+    assert_eq!(row.data.maps[0].get("a"), Some(&1));
+    assert_eq!(row.data.maps[1].get("d"), Some(&4));
+
+    conn.rollback().await?;
+    Ok(())
+}
+
+/// Test bytes with HashMap containing Vec<u8> values
+#[always_context(skip(!))]
+#[tokio::test]
+async fn test_query_bytes_hashmap_vec_u8_values() -> anyhow::Result<()> {
+    use std::collections::HashMap;
+
+    #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+    struct BlobMapPayload {
+        blobs: HashMap<String, Vec<u8>>,
+    }
+
+    #[derive(Table, Debug, Clone)]
+    #[sql(no_version)]
+    struct BlobMapTestTable {
+        #[sql(primary_key)]
+        #[sql(auto_increment)]
+        id: i32,
+        #[sql(bytes)]
+        data: BlobMapPayload,
+    }
+
+    #[derive(Insert, Output, Debug, Clone, PartialEq)]
+    #[sql(table = BlobMapTestTable)]
+    #[sql(default = id)]
+    struct BlobMapTestData {
+        #[sql(bytes)]
+        data: BlobMapPayload,
+    }
+
+    let db = Database::setup_for_testing::<BlobMapTestTable>().await?;
+    let mut conn = db.transaction().await?;
+
+    let mut blobs = HashMap::new();
+    blobs.insert("image".to_string(), vec![0xFF, 0xD8, 0xFF, 0xE0]);
+    blobs.insert("text".to_string(), b"hello".to_vec());
+    blobs.insert("empty".to_string(), vec![]);
+
+    let data = BlobMapTestData {
+        data: BlobMapPayload {
+            blobs: blobs.clone(),
+        },
+    };
+
+    query!(&mut conn, INSERT INTO BlobMapTestTable VALUES {data}).await?;
+
+    let row: BlobMapTestData = query!(&mut conn,
+        SELECT BlobMapTestData FROM BlobMapTestTable WHERE BlobMapTestTable.id = 1
+    )
+    .await?;
+
+    assert_eq!(row.data.blobs.get("image"), Some(&vec![0xFF, 0xD8, 0xFF, 0xE0]));
+    assert_eq!(row.data.blobs.get("text"), Some(&b"hello".to_vec()));
+    assert_eq!(row.data.blobs.get("empty"), Some(&vec![]));
+
+    conn.rollback().await?;
+    Ok(())
+}
+
+// ==============================================
+// 3.3 ADVANCED BYTES TESTS - Edge Cases
+// ==============================================
+
+/// Test bytes with deeply nested structures (4 levels)
+#[always_context(skip(!))]
+#[tokio::test]
+async fn test_query_bytes_deeply_nested() -> anyhow::Result<()> {
+    use std::collections::HashMap;
+
+    #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+    struct Level4 {
+        value: String,
+    }
+
+    #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+    struct Level3 {
+        items: Vec<Level4>,
+    }
+
+    #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+    struct Level2 {
+        map: HashMap<String, Level3>,
+    }
+
+    #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+    struct DeepPayload {
+        level1: Level2,
+    }
+
+    #[derive(Table, Debug, Clone)]
+    #[sql(no_version)]
+    struct DeepTestTable {
+        #[sql(primary_key)]
+        #[sql(auto_increment)]
+        id: i32,
+        #[sql(bytes)]
+        data: DeepPayload,
+    }
+
+    #[derive(Insert, Output, Debug, Clone, PartialEq)]
+    #[sql(table = DeepTestTable)]
+    #[sql(default = id)]
+    struct DeepTestData {
+        #[sql(bytes)]
+        data: DeepPayload,
+    }
+
+    let db = Database::setup_for_testing::<DeepTestTable>().await?;
+    let mut conn = db.transaction().await?;
+
+    let mut inner_map = HashMap::new();
+    inner_map.insert(
+        "key1".to_string(),
+        Level3 {
+            items: vec![
+                Level4 {
+                    value: "deep1".to_string(),
+                },
+                Level4 {
+                    value: "deep2".to_string(),
+                },
+            ],
+        },
+    );
+
+    let data = DeepTestData {
+        data: DeepPayload {
+            level1: Level2 {
+                map: inner_map,
+            },
+        },
+    };
+
+    query!(&mut conn, INSERT INTO DeepTestTable VALUES {data}).await?;
+
+    let row: DeepTestData = query!(&mut conn,
+        SELECT DeepTestData FROM DeepTestTable WHERE DeepTestTable.id = 1
+    )
+    .await?;
+
+    let retrieved_value = &row.data.level1.map.get("key1").unwrap().items[0].value;
+    assert_eq!(retrieved_value, "deep1");
+
+    conn.rollback().await?;
+    Ok(())
+}
+
+/// Test bytes with very large payload (1MB)
+#[always_context(skip(!))]
+#[tokio::test]
+async fn test_query_bytes_very_large_payload() -> anyhow::Result<()> {
+    #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+    struct LargePayload {
+        data: Vec<u8>,
+    }
+
+    #[derive(Table, Debug, Clone)]
+    #[sql(no_version)]
+    struct LargeTestTable {
+        #[sql(primary_key)]
+        #[sql(auto_increment)]
+        id: i32,
+        #[sql(bytes)]
+        blob: LargePayload,
+    }
+
+    #[derive(Insert, Output, Debug, Clone, PartialEq)]
+    #[sql(table = LargeTestTable)]
+    #[sql(default = id)]
+    struct LargeTestData {
+        #[sql(bytes)]
+        blob: LargePayload,
+    }
+
+    let db = Database::setup_for_testing::<LargeTestTable>().await?;
+    let mut conn = db.transaction().await?;
+
+    // Create 1MB of data
+    let large_data = vec![0xABu8; 1024 * 1024];
+
+    let data = LargeTestData {
+        blob: LargePayload {
+            data: large_data.clone(),
+        },
+    };
+
+    query!(&mut conn, INSERT INTO LargeTestTable VALUES {data}).await?;
+
+    let row: LargeTestData = query!(&mut conn,
+        SELECT LargeTestData FROM LargeTestTable WHERE LargeTestTable.id = 1
+    )
+    .await?;
+
+    assert_eq!(row.blob.data.len(), 1024 * 1024);
+    assert_eq!(row.blob.data[0], 0xAB);
+    assert_eq!(row.blob.data[1024 * 1024 - 1], 0xAB);
+
+    conn.rollback().await?;
+    Ok(())
+}
+
+/// Test bytes with unicode content including emojis
+#[always_context(skip(!))]
+#[tokio::test]
+async fn test_query_bytes_unicode_emojis() -> anyhow::Result<()> {
+    use std::collections::HashMap;
+
+    #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+    struct UnicodePayload {
+        labels: HashMap<String, String>,
+    }
+
+    #[derive(Table, Debug, Clone)]
+    #[sql(no_version)]
+    struct UnicodeTestTable {
+        #[sql(primary_key)]
+        #[sql(auto_increment)]
+        id: i32,
+        #[sql(bytes)]
+        data: UnicodePayload,
+    }
+
+    #[derive(Insert, Output, Debug, Clone, PartialEq)]
+    #[sql(table = UnicodeTestTable)]
+    #[sql(default = id)]
+    struct UnicodeTestData {
+        #[sql(bytes)]
+        data: UnicodePayload,
+    }
+
+    let db = Database::setup_for_testing::<UnicodeTestTable>().await?;
+    let mut conn = db.transaction().await?;
+
+    let mut labels = HashMap::new();
+    labels.insert("emoji_1".to_string(), "🚀🎉🔥".to_string());
+    labels.insert("chinese".to_string(), "你好世界".to_string());
+    labels.insert("arabic".to_string(), "مرحبا بالعالم".to_string());
+    labels.insert("russian".to_string(), "Привет мир".to_string());
+    labels.insert("mixed".to_string(), "Hello🌍世界".to_string());
+
+    let data = UnicodeTestData {
+        data: UnicodePayload {
+            labels: labels.clone(),
+        },
+    };
+
+    query!(&mut conn, INSERT INTO UnicodeTestTable VALUES {data}).await?;
+
+    let row: UnicodeTestData = query!(&mut conn,
+        SELECT UnicodeTestData FROM UnicodeTestTable WHERE UnicodeTestTable.id = 1
+    )
+    .await?;
+
+    assert_eq!(row.data.labels.get("emoji_1"), Some(&"🚀🎉🔥".to_string()));
+    assert_eq!(row.data.labels.get("chinese"), Some(&"你好世界".to_string()));
+
+    conn.rollback().await?;
+    Ok(())
+}
+
+/// Test bytes with numeric extremes
+#[always_context(skip(!))]
+#[tokio::test]
+async fn test_query_bytes_numeric_extremes() -> anyhow::Result<()> {
+    #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+    struct NumericPayload {
+        i64_min: i64,
+        i64_max: i64,
+        u64_max: u64,
+        f64_zero: f64,
+    }
+
+    // Distinct struct name: the shared test suite already defines a `NumericTestTable` (macros/mod.rs), and table
+    // names (derived from the struct name) are globally unique across the crate, so this local table is renamed.
+    #[derive(Table, Debug, Clone)]
+    #[sql(no_version)]
+    struct NumericExtremesTable {
+        #[sql(primary_key)]
+        #[sql(auto_increment)]
+        id: i32,
+        #[sql(bytes)]
+        data: NumericPayload,
+    }
+
+    #[derive(Insert, Output, Debug, Clone, PartialEq)]
+    #[sql(table = NumericExtremesTable)]
+    #[sql(default = id)]
+    struct NumericTestData {
+        #[sql(bytes)]
+        data: NumericPayload,
+    }
+
+    let db = Database::setup_for_testing::<NumericExtremesTable>().await?;
+    let mut conn = db.transaction().await?;
+
+    let data = NumericTestData {
+        data: NumericPayload {
+            i64_min: i64::MIN,
+            i64_max: i64::MAX,
+            u64_max: u64::MAX,
+            f64_zero: 0.0,
+        },
+    };
+
+    query!(&mut conn, INSERT INTO NumericExtremesTable VALUES {data}).await?;
+
+    let row: NumericTestData = query!(&mut conn,
+        SELECT NumericTestData FROM NumericExtremesTable WHERE NumericExtremesTable.id = 1
+    )
+    .await?;
+
+    assert_eq!(row.data.i64_min, i64::MIN);
+    assert_eq!(row.data.i64_max, i64::MAX);
+    assert_eq!(row.data.u64_max, u64::MAX);
+    assert_eq!(row.data.f64_zero, 0.0);
+
+    conn.rollback().await?;
+    Ok(())
+}
+
+/// Test bytes with empty collections
+#[always_context(skip(!))]
+#[tokio::test]
+async fn test_query_bytes_empty_collections() -> anyhow::Result<()> {
+    use std::collections::{HashMap, BTreeMap};
+
+    #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+    struct EmptyCollectionsPayload {
+        empty_vec: Vec<String>,
+        empty_hashmap: HashMap<String, i32>,
+        empty_btreemap: BTreeMap<String, i32>,
+    }
+
+    #[derive(Table, Debug, Clone)]
+    #[sql(no_version)]
+    struct EmptyCollectionsTestTable {
+        #[sql(primary_key)]
+        #[sql(auto_increment)]
+        id: i32,
+        #[sql(bytes)]
+        data: EmptyCollectionsPayload,
+    }
+
+    #[derive(Insert, Output, Debug, Clone, PartialEq)]
+    #[sql(table = EmptyCollectionsTestTable)]
+    #[sql(default = id)]
+    struct EmptyCollectionsTestData {
+        #[sql(bytes)]
+        data: EmptyCollectionsPayload,
+    }
+
+    let db = Database::setup_for_testing::<EmptyCollectionsTestTable>().await?;
+    let mut conn = db.transaction().await?;
+
+    let data = EmptyCollectionsTestData {
+        data: EmptyCollectionsPayload {
+            empty_vec: vec![],
+            empty_hashmap: HashMap::new(),
+            empty_btreemap: BTreeMap::new(),
+        },
+    };
+
+    query!(&mut conn, INSERT INTO EmptyCollectionsTestTable VALUES {data}).await?;
+
+    let row: EmptyCollectionsTestData = query!(&mut conn,
+        SELECT EmptyCollectionsTestData FROM EmptyCollectionsTestTable WHERE EmptyCollectionsTestTable.id = 1
+    )
+    .await?;
+
+    assert!(row.data.empty_vec.is_empty());
+    assert!(row.data.empty_hashmap.is_empty());
+    assert!(row.data.empty_btreemap.is_empty());
+
+    conn.rollback().await?;
+    Ok(())
+}
+
+// ==============================================
+// 3.4 ADVANCED BYTES TESTS - Option Combinations
+// ==============================================
+
+/// Test bytes with Option<HashMap>
+#[always_context(skip(!))]
+#[tokio::test]
+async fn test_query_bytes_option_hashmap() -> anyhow::Result<()> {
+    use std::collections::HashMap;
+
+    #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+    struct OptionMapPayload {
+        data: HashMap<String, String>,
+    }
+
+    #[derive(Table, Debug, Clone)]
+    #[sql(no_version)]
+    struct OptionMapTestTable {
+        #[sql(primary_key)]
+        #[sql(auto_increment)]
+        id: i32,
+        #[sql(bytes)]
+        required: OptionMapPayload,
+        #[sql(bytes)]
+        optional: Option<OptionMapPayload>,
+    }
+
+    #[derive(Insert, Output, Debug, Clone, PartialEq)]
+    #[sql(table = OptionMapTestTable)]
+    #[sql(default = id)]
+    struct OptionMapTestData {
+        #[sql(bytes)]
+        required: OptionMapPayload,
+        #[sql(bytes)]
+        optional: Option<OptionMapPayload>,
+    }
+
+    let db = Database::setup_for_testing::<OptionMapTestTable>().await?;
+    let mut conn = db.transaction().await?;
+
+    // Test with Some value
+    let mut map = HashMap::new();
+    map.insert("key".to_string(), "value".to_string());
+
+    let data_some = OptionMapTestData {
+        required: OptionMapPayload {
+            data: map.clone(),
+        },
+        optional: Some(OptionMapPayload {
+            data: map.clone(),
+        }),
+    };
+
+    query!(&mut conn, INSERT INTO OptionMapTestTable VALUES {data_some}).await?;
+
+    let row: OptionMapTestData = query!(&mut conn,
+        SELECT OptionMapTestData FROM OptionMapTestTable WHERE OptionMapTestTable.id = 1
+    )
+    .await?;
+
+    assert!(row.optional.is_some());
+    assert_eq!(row.optional.unwrap().data.get("key"), Some(&"value".to_string()));
+
+    conn.rollback().await?;
+    Ok(())
+}
+
+/// Test bytes with Option<Vec> - Some(empty) vs None distinction
+#[always_context(skip(!))]
+#[tokio::test]
+async fn test_query_bytes_option_vec_empty_vs_none() -> anyhow::Result<()> {
+    #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+    struct OptionVecPayload {
+        items: Vec<i32>,
+    }
+
+    #[derive(Table, Debug, Clone)]
+    #[sql(no_version)]
+    struct OptionVecTestTable {
+        #[sql(primary_key)]
+        #[sql(auto_increment)]
+        id: i32,
+        #[sql(bytes)]
+        optional_vec: Option<OptionVecPayload>,
+    }
+
+    #[derive(Insert, Output, Debug, Clone, PartialEq)]
+    #[sql(table = OptionVecTestTable)]
+    #[sql(default = id)]
+    struct OptionVecTestData {
+        #[sql(bytes)]
+        optional_vec: Option<OptionVecPayload>,
+    }
+
+    let db = Database::setup_for_testing::<OptionVecTestTable>().await?;
+    let mut conn = db.transaction().await?;
+
+    // Insert with Some(empty_vec)
+    let data_empty = OptionVecTestData {
+        optional_vec: Some(OptionVecPayload { items: vec![] }),
+    };
+
+    query!(&mut conn, INSERT INTO OptionVecTestTable VALUES {data_empty}).await?;
+
+    let row_empty: OptionVecTestData = query!(&mut conn,
+        SELECT OptionVecTestData FROM OptionVecTestTable WHERE OptionVecTestTable.id = 1
+    )
+    .await?;
+
+    assert!(row_empty.optional_vec.is_some());
+    assert!(row_empty.optional_vec.unwrap().items.is_empty());
+
+    // Insert with None
+    let data_none = OptionVecTestData {
+        optional_vec: None,
+    };
+
+    query!(&mut conn, INSERT INTO OptionVecTestTable VALUES {data_none}).await?;
+
+    let row_none: OptionVecTestData = query!(&mut conn,
+        SELECT OptionVecTestData FROM OptionVecTestTable WHERE OptionVecTestTable.id = 2
+    )
+    .await?;
+
+    assert!(row_none.optional_vec.is_none());
+
+    conn.rollback().await?;
+    Ok(())
+}
+
+// ==============================================
+// 3.5 ADVANCED BYTES TESTS - Multiple Bytes Fields
+// ==============================================
+
+/// Test struct with multiple different bytes fields
+#[always_context(skip(!))]
+#[tokio::test]
+async fn test_query_bytes_multiple_different_types() -> anyhow::Result<()> {
+    use std::collections::HashMap;
+
+    #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+    struct MultiBytesPayload {
+        map_field: HashMap<String, i32>,
+        vec_field: Vec<String>,
+        nested_field: Vec<u8>,
+    }
+
+    #[derive(Table, Debug, Clone)]
+    #[sql(no_version)]
+    struct MultiBytesTestTable {
+        #[sql(primary_key)]
+        #[sql(auto_increment)]
+        id: i32,
+        #[sql(bytes)]
+        payload1: MultiBytesPayload,
+        #[sql(bytes)]
+        payload2: MultiBytesPayload,
+        #[sql(bytes)]
+        payload3: MultiBytesPayload,
+    }
+
+    #[derive(Insert, Output, Debug, Clone, PartialEq)]
+    #[sql(table = MultiBytesTestTable)]
+    #[sql(default = id)]
+    struct MultiBytesTestData {
+        #[sql(bytes)]
+        payload1: MultiBytesPayload,
+        #[sql(bytes)]
+        payload2: MultiBytesPayload,
+        #[sql(bytes)]
+        payload3: MultiBytesPayload,
+    }
+
+    let db = Database::setup_for_testing::<MultiBytesTestTable>().await?;
+    let mut conn = db.transaction().await?;
+
+    let mut map = HashMap::new();
+    map.insert("a".to_string(), 1);
+
+    let data = MultiBytesTestData {
+        payload1: MultiBytesPayload {
+            map_field: map.clone(),
+            vec_field: vec!["one".to_string()],
+            nested_field: vec![1, 2, 3],
+        },
+        payload2: MultiBytesPayload {
+            map_field: map.clone(),
+            vec_field: vec!["two".to_string()],
+            nested_field: vec![4, 5, 6],
+        },
+        payload3: MultiBytesPayload {
+            map_field: map.clone(),
+            vec_field: vec!["three".to_string()],
+            nested_field: vec![7, 8, 9],
+        },
+    };
+
+    query!(&mut conn, INSERT INTO MultiBytesTestTable VALUES {data}).await?;
+
+    let row: MultiBytesTestData = query!(&mut conn,
+        SELECT MultiBytesTestData FROM MultiBytesTestTable WHERE MultiBytesTestTable.id = 1
+    )
+    .await?;
+
+    assert_eq!(row.payload1.vec_field[0], "one");
+    assert_eq!(row.payload2.vec_field[0], "two");
+    assert_eq!(row.payload3.vec_field[0], "three");
+    assert_eq!(row.payload1.nested_field, vec![1, 2, 3]);
+
+    conn.rollback().await?;
+    Ok(())
+}
+
 /// Test UPDATE with RETURNING clause
 #[always_context(skip(!))]
 #[tokio::test]
@@ -1553,6 +2367,456 @@ async fn test_query_update_complex_where() -> anyhow::Result<()> {
     .await?;
 
     assert_eq!(results.len(), 1);
+
+    conn.rollback().await?;
+    Ok(())
+}
+
+// ==============================================
+// 3.6 ADVANCED BYTES TESTS - Maybe Update Patterns
+// ==============================================
+
+/// Test maybe_update with bytes HashMap field
+#[always_context(skip(!))]
+#[tokio::test]
+async fn test_query_bytes_maybe_update_hashmap() -> anyhow::Result<()> {
+    use std::collections::HashMap;
+
+    #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+    struct ConfigPayload {
+        settings: HashMap<String, String>,
+    }
+
+    #[derive(Table, Debug, Clone)]
+    #[sql(no_version)]
+    struct ConfigTestTable {
+        #[sql(primary_key)]
+        #[sql(auto_increment)]
+        id: i32,
+        #[sql(bytes)]
+        config: ConfigPayload,
+        #[sql(bytes)]
+        metadata: Option<ConfigPayload>,
+    }
+
+    #[derive(Insert, Output, Debug, Clone, PartialEq)]
+    #[sql(table = ConfigTestTable)]
+    #[sql(default = id)]
+    struct ConfigTestData {
+        #[sql(bytes)]
+        config: ConfigPayload,
+        #[sql(bytes)]
+        metadata: Option<ConfigPayload>,
+    }
+
+    let db = Database::setup_for_testing::<ConfigTestTable>().await?;
+    let mut conn = db.transaction().await?;
+
+    let mut initial_settings = HashMap::new();
+    initial_settings.insert("theme".to_string(), "dark".to_string());
+    initial_settings.insert("language".to_string(), "en".to_string());
+
+    let data = ConfigTestData {
+        config: ConfigPayload {
+            settings: initial_settings,
+        },
+        metadata: Some(ConfigPayload {
+            settings: HashMap::new(),
+        }),
+    };
+
+    query!(&mut conn, INSERT INTO ConfigTestTable VALUES {data}).await?;
+
+    // Update with maybe_update on metadata
+    #[derive(Update)]
+    #[sql(table = ConfigTestTable)]
+    struct ConfigUpdate {
+        #[sql(bytes)]
+        config: ConfigPayload,
+        #[sql(bytes)]
+        #[sql(maybe_update)]
+        metadata: Option<Option<ConfigPayload>>,
+    }
+
+    let mut new_metadata = HashMap::new();
+    new_metadata.insert("version".to_string(), "1.0".to_string());
+
+    let update_data = ConfigUpdate {
+        config: ConfigPayload {
+            settings: HashMap::new(),
+        },
+        metadata: Some(Some(ConfigPayload {
+            settings: new_metadata,
+        })),
+    };
+
+    query!(&mut conn,
+        UPDATE ConfigTestTable SET {update_data} WHERE ConfigTestTable.id = 1
+    )
+    .await?;
+
+    let row: ConfigTestData = query!(&mut conn,
+        SELECT ConfigTestData FROM ConfigTestTable WHERE ConfigTestTable.id = 1
+    )
+    .await?;
+
+    assert!(row.metadata.is_some());
+
+    conn.rollback().await?;
+    Ok(())
+}
+
+/// Test maybe_update changing Some to None
+#[always_context(skip(!))]
+#[tokio::test]
+async fn test_query_bytes_maybe_update_some_to_none() -> anyhow::Result<()> {
+    #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+    struct DataPayload {
+        value: String,
+    }
+
+    #[derive(Table, Debug, Clone)]
+    #[sql(no_version)]
+    struct MaybeUpdateTestTable {
+        #[sql(primary_key)]
+        #[sql(auto_increment)]
+        id: i32,
+        #[sql(bytes)]
+        required: DataPayload,
+        #[sql(bytes)]
+        optional: Option<DataPayload>,
+    }
+
+    #[derive(Insert, Output, Debug, Clone, PartialEq)]
+    #[sql(table = MaybeUpdateTestTable)]
+    #[sql(default = id)]
+    struct MaybeUpdateTestData {
+        #[sql(bytes)]
+        required: DataPayload,
+        #[sql(bytes)]
+        optional: Option<DataPayload>,
+    }
+
+    let db = Database::setup_for_testing::<MaybeUpdateTestTable>().await?;
+    let mut conn = db.transaction().await?;
+
+    let data = MaybeUpdateTestData {
+        required: DataPayload {
+            value: "initial".to_string(),
+        },
+        optional: Some(DataPayload {
+            value: "to_be_removed".to_string(),
+        }),
+    };
+
+    query!(&mut conn, INSERT INTO MaybeUpdateTestTable VALUES {data}).await?;
+
+    #[derive(Update)]
+    #[sql(table = MaybeUpdateTestTable)]
+    struct MaybeUpdateData {
+        #[sql(bytes)]
+        required: DataPayload,
+        #[sql(bytes)]
+        #[sql(maybe_update)]
+        optional: Option<Option<DataPayload>>,
+    }
+
+    let update_data = MaybeUpdateData {
+        required: DataPayload {
+            value: "updated".to_string(),
+        },
+        optional: Some(None), // Change Some to None
+    };
+
+    query!(&mut conn,
+        UPDATE MaybeUpdateTestTable SET {update_data} WHERE MaybeUpdateTestTable.id = 1
+    )
+    .await?;
+
+    let row: MaybeUpdateTestData = query!(&mut conn,
+        SELECT MaybeUpdateTestData FROM MaybeUpdateTestTable WHERE MaybeUpdateTestTable.id = 1
+    )
+    .await?;
+
+    assert_eq!(row.required.value, "updated");
+    assert!(row.optional.is_none());
+
+    conn.rollback().await?;
+    Ok(())
+}
+
+/// Test maybe_update changing to empty collection
+#[always_context(skip(!))]
+#[tokio::test]
+async fn test_query_bytes_maybe_update_to_empty() -> anyhow::Result<()> {
+    use std::collections::HashMap;
+
+    #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+    struct EmptyTestPayload {
+        data: HashMap<String, i32>,
+    }
+
+    #[derive(Table, Debug, Clone)]
+    #[sql(no_version)]
+    struct EmptyMaybeTestTable {
+        #[sql(primary_key)]
+        #[sql(auto_increment)]
+        id: i32,
+        #[sql(bytes)]
+        payload: Option<EmptyTestPayload>,
+    }
+
+    #[derive(Insert, Output, Debug, Clone, PartialEq)]
+    #[sql(table = EmptyMaybeTestTable)]
+    #[sql(default = id)]
+    struct EmptyMaybeTestData {
+        #[sql(bytes)]
+        payload: Option<EmptyTestPayload>,
+    }
+
+    let db = Database::setup_for_testing::<EmptyMaybeTestTable>().await?;
+    let mut conn = db.transaction().await?;
+
+    let mut initial_data = HashMap::new();
+    initial_data.insert("key1".to_string(), 1);
+    initial_data.insert("key2".to_string(), 2);
+
+    let data = EmptyMaybeTestData {
+        payload: Some(EmptyTestPayload {
+            data: initial_data,
+        }),
+    };
+
+    query!(&mut conn, INSERT INTO EmptyMaybeTestTable VALUES {data}).await?;
+
+    #[derive(Update)]
+    #[sql(table = EmptyMaybeTestTable)]
+    struct EmptyUpdatePayload {
+        #[sql(bytes)]
+        #[sql(maybe_update)]
+        payload: Option<Option<EmptyTestPayload>>,
+    }
+
+    // Update to empty HashMap
+    let update_data = EmptyUpdatePayload {
+        payload: Some(Some(EmptyTestPayload {
+            data: HashMap::new(),
+        })),
+    };
+
+    query!(&mut conn,
+        UPDATE EmptyMaybeTestTable SET {update_data} WHERE EmptyMaybeTestTable.id = 1
+    )
+    .await?;
+
+    let row: EmptyMaybeTestData = query!(&mut conn,
+        SELECT EmptyMaybeTestData FROM EmptyMaybeTestTable WHERE EmptyMaybeTestTable.id = 1
+    )
+    .await?;
+
+    assert!(row.payload.is_some());
+    assert!(row.payload.unwrap().data.is_empty());
+
+    conn.rollback().await?;
+    Ok(())
+}
+
+// ==============================================
+// 3.7 ADVANCED BYTES TESTS - Custom Serialize/Deserialize
+// ==============================================
+
+/// Test bytes with custom serialize/deserialize using serde_with-style
+#[always_context(skip(!))]
+#[tokio::test]
+async fn test_query_bytes_custom_struct_with_derive() -> anyhow::Result<()> {
+    // Custom struct with derived Serialize/Deserialize that transforms data
+    #[derive(Debug, Clone, PartialEq)]
+    struct UppercaseString(String);
+
+    impl serde::Serialize for UppercaseString {
+        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: serde::Serializer,
+        {
+            serializer.serialize_str(&self.0.to_uppercase())
+        }
+    }
+
+    impl<'de> serde::Deserialize<'de> for UppercaseString {
+        fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where
+            D: serde::Deserializer<'de>,
+        {
+            let s = String::deserialize(deserializer)?;
+            Ok(UppercaseString(s))
+        }
+    }
+
+    #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+    struct CustomPayload {
+        name: UppercaseString,
+        count: i32,
+    }
+
+    #[derive(Table, Debug, Clone)]
+    #[sql(no_version)]
+    struct CustomTestTable {
+        #[sql(primary_key)]
+        #[sql(auto_increment)]
+        id: i32,
+        #[sql(bytes)]
+        data: CustomPayload,
+    }
+
+    #[derive(Insert, Output, Debug, Clone, PartialEq)]
+    #[sql(table = CustomTestTable)]
+    #[sql(default = id)]
+    struct CustomTestData {
+        #[sql(bytes)]
+        data: CustomPayload,
+    }
+
+    let db = Database::setup_for_testing::<CustomTestTable>().await?;
+    let mut conn = db.transaction().await?;
+
+    let data = CustomTestData {
+        data: CustomPayload {
+            name: UppercaseString("hello".to_string()),
+            count: 42,
+        },
+    };
+
+    query!(&mut conn, INSERT INTO CustomTestTable VALUES {data}).await?;
+
+    let row: CustomTestData = query!(&mut conn,
+        SELECT CustomTestData FROM CustomTestTable WHERE CustomTestTable.id = 1
+    )
+    .await?;
+
+    // The custom serialize converts to uppercase, deserialize keeps as-is
+    assert_eq!(row.data.count, 42);
+
+    conn.rollback().await?;
+    Ok(())
+}
+
+/// Test bytes with struct that has default values on deserialize
+#[always_context(skip(!))]
+#[tokio::test]
+async fn test_query_bytes_deserialize_with_defaults() -> anyhow::Result<()> {
+    #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+    struct DefaultFieldsPayload {
+        #[serde(default = "default_name")]
+        name: String,
+        #[serde(default = "default_count")]
+        count: i32,
+    }
+
+    fn default_name() -> String {
+        "default".to_string()
+    }
+
+    fn default_count() -> i32 {
+        100
+    }
+
+    #[derive(Table, Debug, Clone)]
+    #[sql(no_version)]
+    struct DefaultFieldsTestTable {
+        #[sql(primary_key)]
+        #[sql(auto_increment)]
+        id: i32,
+        #[sql(bytes)]
+        data: DefaultFieldsPayload,
+    }
+
+    #[derive(Insert, Output, Debug, Clone, PartialEq)]
+    #[sql(table = DefaultFieldsTestTable)]
+    #[sql(default = id)]
+    struct DefaultFieldsTestData {
+        #[sql(bytes)]
+        data: DefaultFieldsPayload,
+    }
+
+    let db = Database::setup_for_testing::<DefaultFieldsTestTable>().await?;
+    let mut conn = db.transaction().await?;
+
+    let data = DefaultFieldsTestData {
+        data: DefaultFieldsPayload {
+            name: "custom".to_string(),
+            count: 50,
+        },
+    };
+
+    query!(&mut conn, INSERT INTO DefaultFieldsTestTable VALUES {data}).await?;
+
+    let row: DefaultFieldsTestData = query!(&mut conn,
+        SELECT DefaultFieldsTestData FROM DefaultFieldsTestTable WHERE DefaultFieldsTestTable.id = 1
+    )
+    .await?;
+
+    assert_eq!(row.data.name, "custom");
+    assert_eq!(row.data.count, 50);
+
+    conn.rollback().await?;
+    Ok(())
+}
+
+// ==============================================
+// 3.8 ADVANCED BYTES TESTS - Bytes with Other SQL Attributes
+// ==============================================
+
+/// Test bytes with custom select expression
+#[always_context(skip(!))]
+#[tokio::test]
+async fn test_query_bytes_with_custom_select() -> anyhow::Result<()> {
+    #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+    struct SelectPayload {
+        value: String,
+    }
+
+    #[derive(Table, Debug, Clone)]
+    #[sql(no_version)]
+    struct SelectBytesTestTable {
+        #[sql(primary_key)]
+        id: String,
+        #[sql(bytes)]
+        data: SelectPayload,
+    }
+
+    #[derive(Insert, Debug, Clone, PartialEq)]
+    #[sql(table = SelectBytesTestTable)]
+    struct SelectBytesInsertData {
+        id: String,
+        #[sql(bytes)]
+        data: SelectPayload,
+    }
+
+    #[derive(Output, Debug, Clone, PartialEq)]
+    #[sql(table = SelectBytesTestTable)]
+    struct SelectBytesOutputData {
+        #[sql(bytes)]
+        data: SelectPayload,
+    }
+
+    let db = Database::setup_for_testing::<SelectBytesTestTable>().await?;
+    let mut conn = db.transaction().await?;
+
+    let insert_data = SelectBytesInsertData {
+        id: "test_id".to_string(),
+        data: SelectPayload {
+            value: "test_value".to_string(),
+        },
+    };
+
+    query!(&mut conn, INSERT INTO SelectBytesTestTable VALUES {insert_data}).await?;
+
+    let row: SelectBytesOutputData = query!(&mut conn,
+        SELECT SelectBytesOutputData FROM SelectBytesTestTable WHERE SelectBytesTestTable.id = "test_id"
+    )
+    .await?;
+
+    assert_eq!(row.data.value, "test_value");
 
     conn.rollback().await?;
     Ok(())
