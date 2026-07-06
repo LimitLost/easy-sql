@@ -1,283 +1,78 @@
 #!/bin/bash
 
-# test.sh - Comprehensive test script for easy-sql
-# Tests all combinations of features: postgres, sqlite, use_output_columns, migrations, check_duplicate_table_names
-# Also tests with and without math (sqlite_math + rust_decimal + LIBSQLITE3_FLAGS)
+# test-full.sh - Run the normal backend sweep plus the canonical macros UI suites.
 
-# Don't exit on error - we want to test all combinations
 set +e
 
-# Colors for output
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-CYAN='\033[0;36m'
-NC='\033[0m' # No Color
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/test-common.sh"
 
-SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
-ROOT_DIR=$(dirname "$SCRIPT_DIR")
-MAIN_DIR="$ROOT_DIR/-main"
+init_test_environment "${BASH_SOURCE[0]}" || exit 1
+cd "$ROOT_DIR" || exit 1
 
-if [ ! -d "$MAIN_DIR" ]; then
-    echo -e "${RED}Error: -main directory not found at $MAIN_DIR${NC}"
-    exit 1
-fi
+TOTAL_RUNS=0
+FAILED_RUNS=0
+declare -a FAILED_STEPS
+# Per-step wall time + status for the end-of-run summary.
+declare -a STEP_LABELS
+declare -a STEP_SECS
+declare -a STEP_OK
 
-cd "$MAIN_DIR" || exit 1
+FULL_START_TS=$(date +%s)
 
-# Counters
-TOTAL_TESTS=0
-PASSED_TESTS=0
-FAILED_TESTS=0
+run_step() {
+    local label="$1"
+    shift
 
-# Arrays to store configurations
-declare -a FAILED_CONFIGS
-declare -a PASSED_CONFIGS
-declare -a ALL_CONFIGS
+    echo -e "${BLUE}================================================${NC}"
+    echo -e "${BLUE}$label${NC}"
+    echo -e "${BLUE}================================================${NC}"
 
-print_error_context() {
-    local output="$1"
-    echo "$output" | awk '
-        /error\[E[0-9]+\]|^error:/{
-            print;
-            lines=10;
-            next;
-        }
-        lines > 0 {
-            print;
-            lines--;
-        }
-    '
-}
+    local s0
+    s0=$(date +%s)
+    "$@"
+    local status=$?
+    local secs=$(( $(date +%s) - s0 ))
 
-# Function to print section header
-print_header() {
-    echo -e "\n${BLUE}================================================${NC}"
-    echo -e "${BLUE}$1${NC}"
-    echo -e "${BLUE}================================================${NC}\n"
-}
+    ((TOTAL_RUNS++))
+    STEP_LABELS+=("$label")
+    STEP_SECS+=("$secs")
 
-# Function to print test result
-print_result() {
-    local status=$1
-    local config=$2
-    local env_info=$3
-    local full_config="$config $env_info"
-    
-    ALL_CONFIGS+=("$full_config|$status")
-    
-    if [ $status -eq 0 ]; then
-        echo -e "${GREEN}✓ PASSED${NC}: $config $env_info"
-        ((PASSED_TESTS++))
-        PASSED_CONFIGS+=("$full_config")
+    if [ $status -ne 0 ]; then
+        ((FAILED_RUNS++))
+        FAILED_STEPS+=("$label")
+        STEP_OK+=("fail")
     else
-        echo -e "${RED}✗ FAILED${NC}: $config $env_info"
-        ((FAILED_TESTS++))
-        FAILED_CONFIGS+=("$full_config")
+        STEP_OK+=("ok")
     fi
-    ((TOTAL_TESTS++))
+
+    echo ""
+    return $status
 }
 
-# Function to print summary table
-print_summary_table() {
-    echo -e "\n${CYAN}╔════════════════════════════════════════════════════════════════════════════════╗${NC}"
-    echo -e "${CYAN}║                         DETAILED TEST RESULTS                                  ║${NC}"
-    echo -e "${CYAN}╚════════════════════════════════════════════════════════════════════════════════╝${NC}\n"
-    
-    # Print passed configurations
-    if [ ${#PASSED_CONFIGS[@]} -gt 0 ]; then
-        echo -e "${GREEN}✓ PASSED CONFIGURATIONS (${#PASSED_CONFIGS[@]}):${NC}"
-        for config in "${PASSED_CONFIGS[@]}"; do
-            echo -e "  ${GREEN}✓${NC} $config"
-        done
-        echo ""
-    fi
-    
-    # Print failed configurations
-    if [ ${#FAILED_CONFIGS[@]} -gt 0 ]; then
-        echo -e "${RED}✗ FAILED CONFIGURATIONS (${#FAILED_CONFIGS[@]}):${NC}"
-        for config in "${FAILED_CONFIGS[@]}"; do
-            echo -e "  ${RED}✗${NC} $config"
-        done
-        echo ""
-    fi
-}
+run_step "Backend sweep + one macros pass" "$SCRIPT_DIR/test-all.sh" "$@"
+run_step "Macros UI: query capabilities" "$SCRIPT_DIR/test-specific.sh" --crate macros ui_query_capabilities_compile_fail
+run_step "Macros UI: migration attribute conflicts" "$SCRIPT_DIR/test-specific.sh" --crate macros ui_migration_attribute_conflicts_compile_fail
+run_step "Macros UI: unknown sql attr keys" "$SCRIPT_DIR/test-specific.sh" --crate macros ui_sql_unknown_attr_keys_compile_fail
 
-# Function to run a single test configuration
-run_test() {
-    local features=$1
-    local use_math=$2
-    local config_name=$3
-    
-    local env_info=""
-    if [ "$use_math" = "true" ]; then
-        env_info="[with math]"
-        export LIBSQLITE3_FLAGS="-DSQLITE_ENABLE_MATH_FUNCTIONS"
+echo -e "${BLUE}================================================${NC}"
+echo -e "${BLUE}Full Test Summary${NC}"
+echo -e "${BLUE}================================================${NC}"
+
+# Per-step wall time, then the whole-run wall clock.
+for i in "${!STEP_LABELS[@]}"; do
+    if [ "${STEP_OK[$i]}" = "ok" ]; then
+        printf "${GREEN}  ✓ %s${NC} (%ss)\n" "${STEP_LABELS[$i]}" "${STEP_SECS[$i]}"
     else
-        env_info="[without math]"
-        unset LIBSQLITE3_FLAGS
+        printf "${RED}  ✗ %s${NC} (%ss)\n" "${STEP_LABELS[$i]}" "${STEP_SECS[$i]}"
     fi
-
-    local full_features="$features"
-    if [ "$use_math" = "true" ]; then
-        if [ -n "$full_features" ]; then
-            full_features="$full_features,sqlite_math,rust_decimal"
-        else
-            full_features="sqlite_math,rust_decimal"
-        fi
-    fi
-
-    local display_features="$full_features"
-    if [ -z "$display_features" ]; then
-        display_features="(none)"
-    fi
-    
-    echo -e "\n${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-    echo -e "${YELLOW}Testing:${NC} $config_name $env_info"
-    echo -e "${YELLOW}Features:${NC} $display_features"
-    echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-    
-    # Build first
-    echo -e "${BLUE}[BUILD]${NC} cargo build --no-default-features --features \"$full_features\""
-    local build_output=$(cargo build --no-default-features --features "$full_features" 2>&1)
-    local build_status=$?
-    if echo "$build_output" | grep -q "error"; then
-        print_error_context "$build_output"
-    else
-        echo "$build_output" | tail -10
-    fi
-    
-    # Also check if build output contains "error" to catch compile errors
-    if echo "$build_output" | grep -q "^error"; then
-        build_status=1
-    fi
-    
-    if [ $build_status -eq 0 ]; then
-        # Run tests
-    echo -e "${BLUE}[TEST]${NC} cargo test --no-default-features --features \"$full_features\""
-    local test_output=$(cargo test --no-default-features --features "$full_features" 2>&1)
-        local test_status=$?
-        if echo "$test_output" | grep -q "error"; then
-            print_error_context "$test_output"
-        else
-            echo "$test_output" | tail -20
-        fi
-        
-        # Also check if test output contains "error" to catch test errors
-        if echo "$test_output" | grep -q "^error"; then
-            test_status=1
-        fi
-        
-        if [ $test_status -eq 0 ]; then
-            print_result 0 "$config_name" "$env_info"
-            return 0
-        else
-            print_result 1 "$config_name" "$env_info"
-            return 1
-        fi
-    else
-        echo -e "${RED}Build failed${NC}"
-        print_error_context "$build_output"
-        print_result 1 "$config_name" "$env_info"
-        return 1
-    fi
-    
-    if [ "$use_math" = "true" ]; then
-        unset LIBSQLITE3_FLAGS
-    fi
-}
-
-# Main test execution
-print_header "Starting Comprehensive Feature Tests"
-
-echo "This script will test all combinations of:"
-echo "  - postgres (feature)"
-echo "  - sqlite (feature)"
-echo "  - use_output_columns (feature)"
-echo "  - migrations (feature)"
-echo "  - check_duplicate_table_names (feature)"
-echo "  - math (sqlite_math + rust_decimal + LIBSQLITE3_FLAGS)"
-echo ""
-echo "Each combination will be built and tested with --no-default-features"
-echo ""
-
-# Generate all feature combinations
-# Features: postgres, sqlite, use_output_columns, migrations, check_duplicate_table_names
-# We'll test each combination with and without math
-
-declare -a FEATURE_COMBINATIONS=(
-    # Single features
-    "use_output_columns|use_output_columns only"
-    "migrations|migrations only"
-    "check_duplicate_table_names|check_duplicate_table_names only"
-
-    # sqlite
-    "sqlite|SQLite only"
-    "sqlite,use_output_columns|SQLite + use_output_columns"
-    "sqlite,migrations|SQLite + migrations"
-    "sqlite,migrations,check_duplicate_table_names|SQLite + migrations + check_duplicate_table_names"
-    "sqlite,use_output_columns,check_duplicate_table_names|SQLite + use_output_columns + check_duplicate_table_names"
-    "sqlite,use_output_columns,migrations|SQLite + use_output_columns + migrations"
-    
-    # Postgres
-    "postgres|Postgres only"
-    "postgres,use_output_columns|Postgres + use_output_columns"
-    "postgres,migrations|Postgres + migrations"
-    "postgres,use_output_columns,migrations|Postgres + use_output_columns + migrations"
-    "postgres,use_output_columns,check_duplicate_table_names|Postgres + use_output_columns + check_duplicate_table_names"
-    "postgres,migrations,check_duplicate_table_names|Postgres + migrations + check_duplicate_table_names"
-    
-    # Two features
-    "use_output_columns,migrations|use_output_columns + migrations"
-    "use_output_columns,check_duplicate_table_names|use_output_columns + check_duplicate_table_names"
-    "migrations,check_duplicate_table_names|migrations + check_duplicate_table_names"
-    
-    # Three features
-    
-    # Note: postgres + sqlite combination doesn't make sense as they're mutually exclusive database backends
-    # But we can test them together to verify the build handles it
-    "postgres,sqlite|Postgres + SQLite (both backends)"
-    "postgres,sqlite,use_output_columns|Postgres + SQLite + use_output_columns"
-    "postgres,sqlite,migrations|Postgres + SQLite + migrations"
-    "postgres,sqlite,use_output_columns,migrations|All features"
-    "postgres,sqlite,check_duplicate_table_names|Postgres + SQLite + check_duplicate_table_names"
-    "postgres,sqlite,migrations,check_duplicate_table_names|Postgres + SQLite + migrations + check_duplicate_table_names"
-    "postgres,sqlite,use_output_columns,check_duplicate_table_names|Postgres + SQLite + use_output_columns + check_duplicate_table_names"
-    "postgres,sqlite,use_output_columns,migrations,check_duplicate_table_names|All features + check_duplicate_table_names"
-)
-
-# Test each feature combination with and without math
-for combo in "${FEATURE_COMBINATIONS[@]}"; do
-    IFS='|' read -r features name <<< "$combo"
-    
-    # Test without math
-    run_test "$features" "false" "$name"
-    
-    # Test with math
-    run_test "$features" "true" "$name"
 done
+echo -e "${BLUE}  ── total wall $(( $(date +%s) - FULL_START_TS ))s ──${NC}"
 
-# Also test with no features at all
-print_header "Testing with no features"
-run_test "" "false" "No features"
-run_test "" "true" "Math only"
-
-# Print detailed summary table
-print_summary_table
-
-# Print summary
-print_header "Test Summary"
-echo -e "Total configurations tested: ${BLUE}$TOTAL_TESTS${NC}"
-echo -e "Passed: ${GREEN}$PASSED_TESTS${NC}"
-echo -e "Failed: ${RED}$FAILED_TESTS${NC}"
-
-if [ $FAILED_TESTS -gt 0 ]; then
-    SUCCESS_RATE=$(awk "BEGIN {printf \"%.1f\", ($PASSED_TESTS/$TOTAL_TESTS)*100}")
-    echo -e "Success rate: ${YELLOW}${SUCCESS_RATE}%${NC}"
-    echo -e "\n${RED}⚠ Some tests failed!${NC}"
+if [ $FAILED_RUNS -gt 0 ]; then
+    echo -e "${RED}✗ Failed runs: $FAILED_RUNS / $TOTAL_RUNS${NC}"
+    echo -e "${RED}Failed steps: ${FAILED_STEPS[*]}${NC}"
     exit 1
-else
-    echo -e "\n${GREEN}✓ All tests passed! 🎉${NC}"
-    exit 0
 fi
+
+echo -e "${GREEN}✓ Passed runs: $TOTAL_RUNS / $TOTAL_RUNS${NC}"
+exit 0
