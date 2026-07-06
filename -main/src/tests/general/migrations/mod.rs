@@ -973,3 +973,160 @@ async fn test_migration_add_self_referential_foreign_key() -> anyhow::Result<()>
 
     Ok(())
 }
+
+// ==============================================
+// #[sql(bytes)] storage-compatibility migrations
+// ==============================================
+// A `#[sql(bytes)]` field may change its Rust wrapper type across versions while still persisting the same
+// (nullable) blob column. Migration generation must treat that as a storage-compatible no-op instead of the
+// unsupported "type change" error. These version_test tables would fail to BUILD if the guard rejected the
+// change, so a successful compile is itself part of the proof; the tests add the runtime half.
+
+const BYTES_COMPAT_TABLE_ID: &str = "b17e5c0a-0001-4d2e-9a3f-000000000001";
+
+#[derive(Table, Debug)]
+#[sql(version_test = 1)]
+#[sql(unique_id = "b17e5c0a-0001-4d2e-9a3f-000000000001")]
+#[sql(table_name = "bytes_compat_table")]
+struct BytesCompatTableV1 {
+    #[sql(primary_key)]
+    #[sql(auto_increment)]
+    id: i32,
+    #[sql(bytes)]
+    payload: Vec<String>,
+}
+
+#[derive(Insert)]
+#[sql(table = BytesCompatTableV1)]
+#[sql(default = id)]
+struct BytesCompatInsertV1 {
+    #[sql(bytes)]
+    payload: Vec<String>,
+}
+
+// V2: same table, non-null bytes payload wrapper changed `Vec<String>` -> `HashMap<String, i32>`. Both persist
+// as a non-null blob, so generation must consider it storage-compatible (no ALTER, version bump only).
+#[derive(Table, Debug)]
+#[sql(version_test = 2)]
+#[sql(unique_id = "b17e5c0a-0001-4d2e-9a3f-000000000001")]
+#[sql(table_name = "bytes_compat_table")]
+struct BytesCompatTableV2 {
+    #[sql(primary_key)]
+    #[sql(auto_increment)]
+    id: i32,
+    #[sql(bytes)]
+    payload: std::collections::HashMap<String, i32>,
+}
+
+// Reads only the id: a v1 row holds a `Vec<String>`-serialized blob, so decoding it as the v2 type is
+// intentionally out of scope (bytes-> a different wrapper is user-managed re-encoding).
+#[derive(Output, Debug)]
+#[sql(table = BytesCompatTableV2)]
+struct BytesCompatIdRow {
+    id: i32,
+}
+
+const BYTES_COMPAT_OPT_TABLE_ID: &str = "b17e5c0a-0002-4d2e-9a3f-000000000002";
+
+#[derive(Table, Debug)]
+#[sql(version_test = 1)]
+#[sql(unique_id = "b17e5c0a-0002-4d2e-9a3f-000000000002")]
+#[sql(table_name = "bytes_compat_opt_table")]
+struct BytesCompatOptTableV1 {
+    #[sql(primary_key)]
+    #[sql(auto_increment)]
+    id: i32,
+    #[sql(bytes)]
+    payload: Option<Vec<String>>,
+}
+
+#[derive(Insert)]
+#[sql(table = BytesCompatOptTableV1)]
+#[sql(default = id)]
+struct BytesCompatOptInsertV1 {
+    #[sql(bytes)]
+    payload: Option<Vec<String>>,
+}
+
+// V2: optional bytes payload wrapper changed `Option<Vec<String>>` -> `Option<HashMap<String, i32>>`. Both
+// persist as a NULLABLE blob; normalization preserves the optionality, so they stay storage-compatible.
+#[derive(Table, Debug)]
+#[sql(version_test = 2)]
+#[sql(unique_id = "b17e5c0a-0002-4d2e-9a3f-000000000002")]
+#[sql(table_name = "bytes_compat_opt_table")]
+struct BytesCompatOptTableV2 {
+    #[sql(primary_key)]
+    #[sql(auto_increment)]
+    id: i32,
+    #[sql(bytes)]
+    payload: Option<std::collections::HashMap<String, i32>>,
+}
+
+#[derive(Output, Debug)]
+#[sql(table = BytesCompatOptTableV2)]
+struct BytesCompatOptIdRow {
+    id: i32,
+}
+
+/// A non-null `#[sql(bytes)]` field changing its wrapper type across versions migrates as a no-op: the blob
+/// column is untouched, the existing row survives, and the version advances to 2.
+#[always_context(skip(!))]
+#[tokio::test]
+async fn test_migration_bytes_wrapper_change_is_storage_compatible() -> anyhow::Result<()> {
+    let db = Database::setup_for_testing::<BytesCompatTableV1>().await?;
+    let mut conn = db.conn().await?;
+
+    let insert = BytesCompatInsertV1 {
+        payload: vec!["a".to_string(), "b".to_string()],
+    };
+    query!(&mut conn, INSERT INTO BytesCompatTableV1 VALUES {insert}).await?;
+
+    // Migrate v1 -> v2 (bytes wrapper Vec<String> -> HashMap<String, i32>): storage-compatible, must succeed.
+    <BytesCompatTableV2 as DatabaseSetup<TestDriver>>::setup(&mut &mut conn)
+        .await
+        .context("bytes wrapper change should migrate as a storage-compatible no-op")?;
+
+    let rows: Vec<BytesCompatIdRow> = query!(&mut conn,
+        SELECT Vec<BytesCompatIdRow> FROM BytesCompatTableV2 WHERE true ORDER BY id
+    )
+    .await?;
+    assert_eq!(rows.len(), 1, "the row survives the storage-compatible migration");
+    assert_eq!(rows[0].id, 1);
+
+    let table_id = BYTES_COMPAT_TABLE_ID.to_string();
+    let version = crate::EasySqlTables_get_version!(TestDriver, &mut conn, table_id);
+    assert_eq!(version, Some(2), "version advances to 2");
+
+    Ok(())
+}
+
+/// Same for an OPTIONAL `#[sql(bytes)]` field: `Option<A>` -> `Option<B>` stays storage-compatible (nullable
+/// blob, optionality preserved), so it also migrates as a no-op.
+#[always_context(skip(!))]
+#[tokio::test]
+async fn test_migration_optional_bytes_wrapper_change_is_storage_compatible() -> anyhow::Result<()> {
+    let db = Database::setup_for_testing::<BytesCompatOptTableV1>().await?;
+    let mut conn = db.conn().await?;
+
+    let insert = BytesCompatOptInsertV1 {
+        payload: Some(vec!["x".to_string()]),
+    };
+    query!(&mut conn, INSERT INTO BytesCompatOptTableV1 VALUES {insert}).await?;
+
+    <BytesCompatOptTableV2 as DatabaseSetup<TestDriver>>::setup(&mut &mut conn)
+        .await
+        .context("optional bytes wrapper change should migrate as a storage-compatible no-op")?;
+
+    let rows: Vec<BytesCompatOptIdRow> = query!(&mut conn,
+        SELECT Vec<BytesCompatOptIdRow> FROM BytesCompatOptTableV2 WHERE true ORDER BY id
+    )
+    .await?;
+    assert_eq!(rows.len(), 1);
+    assert_eq!(rows[0].id, 1);
+
+    let table_id = BYTES_COMPAT_OPT_TABLE_ID.to_string();
+    let version = crate::EasySqlTables_get_version!(TestDriver, &mut conn, table_id);
+    assert_eq!(version, Some(2));
+
+    Ok(())
+}

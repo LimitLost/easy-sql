@@ -430,6 +430,112 @@ CompilationData(
             },
             latest_version: 2,
         ),
+        "b17e5c0a-0001-4d2e-9a3f-000000000001": TableData(
+            saved_versions: {
+                1: TableDataVersion(
+                    table_name: "bytes_compat_table",
+                    fields: [
+                        TableField(
+                            name: "id",
+                            ty_to_bytes: false,
+                            field_type: "i32",
+                            default: None,
+                            is_unique: false,
+                        ),
+                        TableField(
+                            name: "payload",
+                            ty_to_bytes: true,
+                            field_type: "Vec<String>",
+                            default: None,
+                            is_unique: false,
+                        ),
+                    ],
+                    primary_keys: [
+                        "id",
+                    ],
+                    auto_increment: true,
+                    foreign_keys: {},
+                ),
+                2: TableDataVersion(
+                    table_name: "bytes_compat_table",
+                    fields: [
+                        TableField(
+                            name: "id",
+                            ty_to_bytes: false,
+                            field_type: "i32",
+                            default: None,
+                            is_unique: false,
+                        ),
+                        TableField(
+                            name: "payload",
+                            ty_to_bytes: true,
+                            field_type: "std::collections::HashMap<String,i32>",
+                            default: None,
+                            is_unique: false,
+                        ),
+                    ],
+                    primary_keys: [
+                        "id",
+                    ],
+                    auto_increment: true,
+                    foreign_keys: {},
+                ),
+            },
+            latest_version: 2,
+        ),
+        "b17e5c0a-0002-4d2e-9a3f-000000000002": TableData(
+            saved_versions: {
+                1: TableDataVersion(
+                    table_name: "bytes_compat_opt_table",
+                    fields: [
+                        TableField(
+                            name: "id",
+                            ty_to_bytes: false,
+                            field_type: "i32",
+                            default: None,
+                            is_unique: false,
+                        ),
+                        TableField(
+                            name: "payload",
+                            ty_to_bytes: true,
+                            field_type: "Option<Vec<String>>",
+                            default: None,
+                            is_unique: false,
+                        ),
+                    ],
+                    primary_keys: [
+                        "id",
+                    ],
+                    auto_increment: true,
+                    foreign_keys: {},
+                ),
+                2: TableDataVersion(
+                    table_name: "bytes_compat_opt_table",
+                    fields: [
+                        TableField(
+                            name: "id",
+                            ty_to_bytes: false,
+                            field_type: "i32",
+                            default: None,
+                            is_unique: false,
+                        ),
+                        TableField(
+                            name: "payload",
+                            ty_to_bytes: true,
+                            field_type: "Option<std::collections::HashMap<String,i32>>",
+                            default: None,
+                            is_unique: false,
+                        ),
+                    ],
+                    primary_keys: [
+                        "id",
+                    ],
+                    auto_increment: true,
+                    foreign_keys: {},
+                ),
+            },
+            latest_version: 2,
+        ),
         "f726b8aa-6d36-4c0a-92c4-9f6f0e8df5d1": TableData(
             saved_versions: {
                 1: TableDataVersion(

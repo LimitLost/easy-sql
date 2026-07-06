@@ -3,6 +3,8 @@ use std::{
     path::PathBuf,
     str::FromStr,
 };
+#[cfg(feature = "migrations")]
+use std::borrow::Cow;
 
 use anyhow::{self, Context};
 use quote::ToTokens;
@@ -28,6 +30,32 @@ pub struct TableField {
     pub default: Option<String>,
     pub is_unique: bool,
 }
+
+#[cfg(feature = "migrations")]
+impl TableField {
+    /// Returns the normalized persisted storage type used by migration comparisons.
+    /// Reason: `#[sql(bytes)]` fields may legitimately change Rust wrapper types while still storing the same nullable blob column, so migration generation must compare the storage contract instead of the wrapper name.
+    fn migration_storage_type(&self) -> Cow<'_, str> {
+        // Normalize bytes-backed fields to the blob type they actually persist while preserving optionality.
+        if self.ty_to_bytes {
+            if self.field_type.starts_with("Option<") && self.field_type.ends_with('>') {
+                return Cow::Borrowed("Option<Vec<u8>>");
+            }
+
+            return Cow::Borrowed("Vec<u8>");
+        }
+
+        // Keep non-bytes fields on their declared type so true schema changes still fail migration generation.
+        Cow::Borrowed(&self.field_type)
+    }
+
+    /// Returns whether two field definitions keep the same persisted storage contract.
+    /// Reason: migration generation should reject only real schema-shape changes, not bytes-wrapper differences that still map to the same SQL blob representation.
+    fn is_migration_storage_compatible_with(&self, other: &Self) -> bool {
+        self.migration_storage_type() == other.migration_storage_type()
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize, Eq, PartialEq)]
 pub struct TableDataVersion {
     pub table_name: String,
@@ -404,7 +432,8 @@ impl CompilationData {
                     });
                 }
                 //Everything else on old column is not supported
-                if old_field.field_type != new_field.field_type {
+                // Compare persisted storage compatibility so `#[sql(bytes)]` wrapper changes do not trip the unsupported type-change guard.
+                if !old_field.is_migration_storage_compatible_with(new_field) {
                     anyhow::bail!(
                         "Field type change is not supported (yet) (only rename) -> Latest Version: {:?} ||| Version {}: {:?}",
                         latest_version.fields,
