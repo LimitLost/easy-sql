@@ -80,7 +80,6 @@ impl SqlxPoolTestResource {
     }
 
     async fn cleanup_inner(
-        pool: sqlx::Pool<sqlx::Postgres>,
         test_database: String,
         host: String,
         port: u16,
@@ -89,8 +88,14 @@ impl SqlxPoolTestResource {
     ) -> anyhow::Result<()> {
         use sqlx::postgres::PgConnectOptions;
 
-        pool.close().await;
-
+        // Drop the per-test database from a fresh maintenance connection, `WITH (FORCE)`.
+        // Reason: the previous teardown first awaited `self.pool.close()` from THIS separate cleanup
+        // runtime, but the pool's connections' tokio reactor lived on the test's own runtime — whose
+        // only worker thread is blocked in this Drop's `join()`. That cross-runtime close deadlocked
+        // the tail of the run (hung at ~319/320 forever). We no longer touch the test pool here (it is
+        // just dropped, non-blocking, when `SqlxPoolTestResource` drops); `FORCE` terminates whatever
+        // backends it still had open, so the drop succeeds without a prior close — which also stops the
+        // "database is being accessed by other users" failures that used to leak test databases.
         let maintenance_pool = sqlx::Pool::<sqlx::Postgres>::connect_with(
             PgConnectOptions::new()
                 .host(&host)
@@ -101,7 +106,7 @@ impl SqlxPoolTestResource {
         .await?;
 
         sqlx::query(&format!(
-            "DROP DATABASE IF EXISTS \"{}\"",
+            "DROP DATABASE IF EXISTS \"{}\" WITH (FORCE)",
             test_database.replace('"', "\"\"")
         ))
         .execute(&maintenance_pool)
@@ -115,7 +120,10 @@ impl SqlxPoolTestResource {
 #[cfg(all(feature = "postgres", not(feature = "sqlite")))]
 impl Drop for SqlxPoolTestResource {
     fn drop(&mut self) {
-        let pool = self.pool.clone();
+        // Clone only the identifiers the maintenance drop needs — deliberately NOT the test pool.
+        // Reason: the test pool is released when this struct drops (non-blocking); its backends are
+        // terminated server-side by the `FORCE` drop. Cloning + awaiting the test pool's close across
+        // runtimes is exactly what deadlocked before.
         let test_database = self.test_database.clone();
         let host = self.host.clone();
         let port = self.port;
@@ -130,7 +138,6 @@ impl Drop for SqlxPoolTestResource {
             match runtime {
                 Ok(runtime) => {
                     if let Err(error) = runtime.block_on(SqlxPoolTestResource::cleanup_inner(
-                        pool,
                         test_database,
                         host,
                         port,
@@ -169,7 +176,7 @@ pub async fn setup_sqlx_pool_for_testing<T: crate::DatabaseSetup<TestDriver>>()
     };
     use crate::tests::init_test_logger;
     use crate::{Connection, EasySqlTables};
-    use sqlx::postgres::PgConnectOptions;
+    use sqlx::postgres::{PgConnectOptions, PgPoolOptions};
 
     init_test_logger();
 
@@ -191,20 +198,26 @@ pub async fn setup_sqlx_pool_for_testing<T: crate::DatabaseSetup<TestDriver>>()
     let test_database = generate_postgres_test_database_name(&db_prefix)?;
     recreate_postgres_test_database(&host, port, &username, &password, &test_database).await?;
 
-    let pool = sqlx::Pool::<sqlx::Postgres>::connect_with(
-        PgConnectOptions::new()
-            .host(&host)
-            .port(port)
-            .username(&username)
-            .password(&password)
-            .database(&test_database),
-    )
-    .await?;
+    // Bounded pool: with libtest running ~one test per core, an unbounded (default 10) pool per test
+    // can pile connections against the server's limit; 5 keeps concurrent runs comfortably under it.
+    let pool = PgPoolOptions::new()
+        .max_connections(5)
+        .min_connections(0)
+        .connect_with(
+            PgConnectOptions::new()
+                .host(&host)
+                .port(port)
+                .username(&username)
+                .password(&password)
+                .database(&test_database),
+        )
+        .await?;
 
     let mut conn = Connection::new(pool.acquire().await?);
 
     <EasySqlTables as crate::DatabaseSetup<TestDriver>>::setup(&mut &mut conn).await?;
     <T as crate::DatabaseSetup<TestDriver>>::setup(&mut &mut conn).await?;
+    drop(conn);
 
     Ok(SqlxPoolTestResource {
         pool,

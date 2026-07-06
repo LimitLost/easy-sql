@@ -15,8 +15,13 @@ impl SetupSql<Postgres> for TableExists {
     type Output = bool;
 
     async fn query(self, exec: &mut impl EasyExecutor<Postgres>) -> anyhow::Result<Self::Output> {
+        // Scope the existence check to the connection's active schema via `current_schema()` (the head of
+        // `search_path`) instead of a hardcoded `'public'`. Reason: schema-per-test isolation puts each test's
+        // tables in its own schema, and other tests' schemas hold identically-named tables in the same database;
+        // a `'public'`-only check would never see them (always false) and misfire migrations. In the default
+        // per-database mode `current_schema()` resolves to `public`, so behavior is unchanged.
         let query = format!(
-            "SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_schema = 'public' AND table_name = '{}')",
+            "SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_schema = current_schema() AND table_name = '{}')",
             self.name
         );
         #[no_context]
