@@ -20,6 +20,21 @@ pub enum AlterTableSingle {
         old_column_name: &'static str,
         new_column_name: &'static str,
     },
+    /// Add a foreign-key constraint to an existing table.
+    ///
+    /// SQLite cannot `ALTER TABLE ADD CONSTRAINT`, so its driver implements this with a table rebuild (the
+    /// supported 12-step recipe); Postgres uses `ALTER TABLE ... ADD CONSTRAINT` directly. Only *adding* a
+    /// foreign key is supported — removing or redefining one is not (the migration generator rejects those).
+    AddForeignKey {
+        /// The local columns that make up the foreign key.
+        columns: Vec<&'static str>,
+        /// The referenced table's name.
+        referenced_table: &'static str,
+        /// The referenced table's primary-key columns (the targets of `columns`).
+        referenced_columns: Vec<&'static str>,
+        /// Whether the constraint cascades on delete/update (vs. the default no-action).
+        cascade: bool,
+    },
 }
 
 /// Collection of alter-table operations for a single table.

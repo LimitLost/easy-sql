@@ -172,9 +172,13 @@ fn struct_table_handle(
     #[cfg(feature = "migrations")]
     let has_version_attr = !get_attributes!(item, #[sql(version = __unknown__)]).is_empty();
 
+    #[cfg(feature = "migrations")]
+    let has_version_test_attr = !get_attributes!(item, #[sql(version_test = __unknown__)]).is_empty();
+
     // Skip migrations if no_version is set
     #[cfg(feature = "migrations")]
-    let skip_migrations = _no_version || !has_version_attr;
+    // Treat `version_test` as a real migration-version source so build-only historical snapshots can populate `easy_sql.ron`.
+    let skip_migrations = _no_version || !(has_version_attr || has_version_test_attr);
 
     #[cfg(feature = "migrations")]
     let mut version_test: Option<LitInt> = None;

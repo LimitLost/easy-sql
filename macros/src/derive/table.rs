@@ -127,33 +127,33 @@ pub fn table(item: proc_macro::TokenStream) -> anyhow::Result<proc_macro::TokenS
     let compilation_data = CompilationData::load_in_macro()?;
 
     #[cfg(feature = "check_duplicate_table_names")]
-    if let Some(entries) = compilation_data.used_table_names.get(&table_name) {
-        if entries.len() > 1 {
-            let mut lines = entries
-                .iter()
-                .map(|entry| format!("- {} (file: {})", entry.struct_name, entry.filename))
-                .collect::<Vec<_>>();
-            lines.sort();
+    if let Some(entries) = compilation_data.used_table_names.get(&table_name)
+        && entries.len() > 1
+    {
+        let mut lines = entries
+            .iter()
+            .map(|entry| format!("- {} (file: {})", entry.struct_name, entry.filename))
+            .collect::<Vec<_>>();
+        lines.sort();
 
-            if table_name_attr_used {
-                anyhow::bail!(
-                    "Multiple tables use the same table name `{}`.\n\
+        if table_name_attr_used {
+            anyhow::bail!(
+                "Multiple tables use the same table name `{}`.\n\
 Each table name must be unique.\n\
 Found in:\n{}\n\
 Tip: change `#[sql(table_name = ...)]`",
-                    table_name,
-                    lines.join("\n")
-                );
-            } else {
-                anyhow::bail!(
-                    "Multiple tables use the same table name `{}`.\n\
+                table_name,
+                lines.join("\n")
+            );
+        } else {
+            anyhow::bail!(
+                "Multiple tables use the same table name `{}`.\n\
 Each table name must be unique.\n\
 Found in:\n{}\n\
 Tip: Use `#[sql(table_name = ...)]` or rename one of the structs",
-                    table_name,
-                    lines.join("\n")
-                );
-            }
+                table_name,
+                lines.join("\n")
+            );
         }
     }
 
@@ -179,8 +179,8 @@ Tip: Use `#[sql(table_name = ...)]` or rename one of the structs",
     if no_version && (table_version.is_some() || version_test.is_some()) {
         return Err(syn::Error::new_spanned(
             &item.ident,
-            "#[sql(no_version)] and #[sql(version = ...)] are mutually exclusive. \
-             Use #[sql(no_version)] to disable migrations, or #[sql(version = ...)] to enable them, but not both."
+            "#[sql(no_version)] is mutually exclusive with #[sql(version = ...)]. \
+             Use #[sql(no_version)] to disable migrations, or #[sql(version = ...)] to enable them."
         ).into());
     }
 
@@ -188,7 +188,7 @@ Tip: Use `#[sql(table_name = ...)]` or rename one of the structs",
     if version_test.is_some() && table_version.is_some() {
         return Err(syn::Error::new_spanned(
             &item.ident,
-            "#[sql(version_test = ...)] replaces #[sql(version = ...)] and they cannot be used together."
+            "#[sql(version = ...)] and #[sql(version_test = ...)] are strictly mutually exclusive; use exactly one."
         ).into());
     }
 
@@ -206,9 +206,6 @@ Tip: Use `#[sql(table_name = ...)]` or rename one of the structs",
         #[no_context_inputs]
         let table_version =
             table_version.with_context(context!("Either #[sql(version = x)] (enable migrations) or #[sql(no_version)] (skip migrations) attribute is required"))?;
-
-        //Sqlite doesn't support unsigned integers, so we need to do this
-        let table_version_i64 = table_version as i64;
 
         let unique_id_attr = get_attributes!(item, #[sql(unique_id = __unknown__)])
             .into_iter()
@@ -255,7 +252,7 @@ Tip: Use `#[sql(table_name = ...)]` or rename one of the structs",
         };
 
         let unique_id = unique_id_lit.to_token_stream();
-        (table_version_i64, migrations, unique_id)
+        (table_version, migrations, unique_id)
     };
 
     #[cfg(not(feature = "migrations"))]

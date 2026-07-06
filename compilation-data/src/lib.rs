@@ -339,14 +339,33 @@ impl CompilationData {
                     version_data.primary_keys
                 );
             }
-            //Foreign Key Check (Must be equal)
-            if version_data.foreign_keys != latest_version.foreign_keys {
-                anyhow::bail!(
-                    "Foreign key change is not supported (yet) -> Latest Version: {:?} ||| Version {}: {:?}",
-                    latest_version.foreign_keys,
-                    version_number,
-                    version_data.foreign_keys
-                );
+            // Foreign key diff. Only ADDING a foreign key is generated (a table rebuild on SQLite / ADD CONSTRAINT
+            // on Postgres): emit one for every foreign key present in the latest version but absent from this older
+            // saved version. Every other difference is intentionally ignored — mirroring how a column removal is a
+            // no-op here — which is also what keeps this correct while expanding an OLDER version's struct (where
+            // the `latest_version` passed in legitimately has FEWER foreign keys than a newer saved version). The
+            // snapshot key encodes the referenced struct plus an optional `,cascade` (e.g. "NoteFolder" or
+            // "NoteFolder,cascade"), so the on-delete action is parsed from it. Applied AFTER the column changes
+            // below (so a rebuild sees any newly-added columns) — see where `fk_additions` is drained.
+            let mut fk_additions = Vec::new();
+            for (fk_key, latest_columns) in latest_version.foreign_keys.iter() {
+                if version_data.foreign_keys.contains_key(fk_key) {
+                    continue; // already present in this older version — unchanged, nothing to add
+                }
+                let cascade = fk_key.split(',').any(|part| part.trim() == "cascade");
+                let struct_name = fk_key.split(',').next().unwrap_or(fk_key.as_str()).trim();
+                let fk_path: syn::Path = syn::parse_str(struct_name).with_context(|| {
+                    format!("Foreign key target `{struct_name}` is not a valid type path")
+                })?;
+                let local_columns: Vec<&str> = latest_columns.iter().map(String::as_str).collect();
+                fk_additions.push(quote! {
+                    #sql_crate::driver::AlterTableSingle::AddForeignKey {
+                        columns: vec![#(#local_columns),*],
+                        referenced_table: <#fk_path as #sql_crate::Table<_EasySqlMigrationDriver>>::table_name(),
+                        referenced_columns: <#fk_path as #sql_crate::Table<_EasySqlMigrationDriver>>::primary_keys(),
+                        cascade: #cascade,
+                    }
+                });
             }
             //Auto increment check (Must be equal)
             if version_data.auto_increment != latest_version.auto_increment {
@@ -436,9 +455,7 @@ impl CompilationData {
                     let default_value = default_expr;
                     let default_context = format!(
                         "Converting default value for field `{}` in struct `{}` (table `{}`)",
-                        field_name,
-                        item_name,
-                        latest_version.table_name
+                        field_name, item_name, latest_version.table_name
                     );
 
                     quote! {
@@ -481,26 +498,61 @@ impl CompilationData {
                 });
             }
 
+            // Apply foreign-key additions after the column changes (a SQLite rebuild reads the table's current
+            // DDL, so any AddColumn above must already be applied) but before a rename.
+            changes_needed.append(&mut fk_additions);
+
             if let Some(rename_table) = rename_table {
                 changes_needed.push(rename_table);
             }
 
-            //Generate Migration (if needed)
-            if !changes_needed.is_empty() {
-                let version_number = *version_number;
-                let table_name = version_data.table_name.as_str();
+            let version_number = *version_number;
+            let table_name = version_data.table_name.as_str();
+            let has_schema_changes = !changes_needed.is_empty();
 
-                result.add(quote! {
-                    if current_version_number == #version_number{
-                        #sql_crate::EasyExecutor::query_setup(conn, #sql_crate::driver::AlterTable{
-                            table_name: #table_name,
-                            alters: vec![#(#changes_needed),*],
-                        }).await?;
-                        #sql_crate::EasySqlTables_update_version!(_EasySqlMigrationDriver, *conn, #current_unique_id, #latest_version_number);
-                        return Ok(());
+            let apply_alter = if has_schema_changes {
+                quote! {
+                    #sql_crate::EasyExecutor::query_setup(conn, #sql_crate::driver::AlterTable{
+                        table_name: #table_name,
+                        alters: vec![#(#changes_needed),*],
+                    })
+                    .await
+                    .with_context(#macro_support::context!(
+                        "setup failed: operation=apply_migration_alter, table={}, unique_id={}, from_version={}, to_version={}, driver={}",
+                        #table_name,
+                        #current_unique_id,
+                        #version_number,
+                        #latest_version_number,
+                        stringify!(_EasySqlMigrationDriver)
+                    ))?;
+                }
+            } else {
+                quote! {}
+            };
+
+            result.add(quote! {
+                if current_version_number == #version_number{
+                    use #macro_support::Context;
+                    #apply_alter
+
+                    {
+                        let __easy_sql_update_version_result: #macro_support::Result<()> = async {
+                            #sql_crate::EasySqlTables_update_version!(_EasySqlMigrationDriver, *conn, #current_unique_id, #latest_version_number);
+                            Ok(())
+                        }
+                        .await;
+
+                        __easy_sql_update_version_result.with_context(#macro_support::context!(
+                            "setup failed: operation=update_version_after_migration, table={}, unique_id={}, from_version={}, to_version={}, driver={}",
+                            #table_name,
+                            #current_unique_id,
+                            #version_number,
+                            #latest_version_number,
+                            stringify!(_EasySqlMigrationDriver)
+                        ))?;
                     }
-                });
-            }
+                }
+            });
         }
 
         Ok(result.finalize())

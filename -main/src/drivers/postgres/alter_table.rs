@@ -79,6 +79,54 @@ impl SetupSql<Postgres> for AlterTable {
 
                     queries_done.push(query);
                 }
+                AlterTableSingle::AddForeignKey {
+                    columns,
+                    referenced_table,
+                    referenced_columns,
+                    cascade,
+                } => {
+                    // Postgres supports adding a foreign key in place — no table rebuild needed (unlike SQLite).
+                    let on_actions = if cascade {
+                        " ON DELETE CASCADE ON UPDATE CASCADE"
+                    } else {
+                        ""
+                    };
+                    let quoted_columns = columns
+                        .iter()
+                        .map(|column| format!("\"{column}\""))
+                        .collect::<Vec<_>>()
+                        .join(", ");
+                    let quoted_referenced = referenced_columns
+                        .iter()
+                        .map(|column| format!("\"{column}\""))
+                        .collect::<Vec<_>>()
+                        .join(", ");
+                    // A deterministic constraint name keyed on the local columns keeps the migration idempotent-ish
+                    // and the error messages legible.
+                    let constraint = format!("fk_{}_{}", self.table_name, columns.join("_"));
+                    let query = format!(
+                        "ALTER TABLE \"{}\" ADD CONSTRAINT \"{}\" FOREIGN KEY ({}) REFERENCES \"{}\"({}){}",
+                        self.table_name,
+                        constraint,
+                        quoted_columns,
+                        referenced_table,
+                        quoted_referenced,
+                        on_actions
+                    );
+
+                    #[no_context]
+                    sqlx::query(&query)
+                        .execute(exec.executor())
+                        .await
+                        .with_context(context!(
+                            "table_name: {:?} | query: {:?} | queries_before: {:?}",
+                            self.table_name,
+                            query,
+                            queries_done
+                        ))?;
+
+                    queries_done.push(query);
+                }
             }
         }
 
