@@ -13,18 +13,21 @@ use easy_macros::{add_code, always_context};
     Database::setup_for_testing::<DocSchema>().await?;
     assert_eq!(
         <DocUsers as Table<ExampleDriver>>::table_name(),
-        "doc_users"
+        "setup_basic_users"
     );
     assert_eq!(
         <DocPosts as Table<ExampleDriver>>::table_name(),
-        "doc_posts"
+        "setup_basic_posts"
     );
     Ok(())
 })]
 #[docify::export_content]
 #[allow(dead_code)]
 async fn database_setup_basic_example() -> anyhow::Result<()> {
+    // Explicit table names keep these example tables globally unique (table names are unique across the crate;
+    // the table-macro docs already use `doc_users`/`doc_posts`).
     #[derive(Table)]
+    #[sql(table_name = "setup_basic_users")]
     struct DocUsers {
         #[sql(primary_key)]
         id: i32,
@@ -32,6 +35,7 @@ async fn database_setup_basic_example() -> anyhow::Result<()> {
     }
 
     #[derive(Table)]
+    #[sql(table_name = "setup_basic_posts")]
     struct DocPosts {
         #[sql(primary_key)]
         id: i32,
@@ -53,14 +57,17 @@ async fn database_setup_basic_example() -> anyhow::Result<()> {
     ContentTables::setup(&mut &mut conn).await?;
     assert_eq!(
         <DocComments as Table<ExampleDriver>>::table_name(),
-        "doc_comments"
+        "setup_nested_comments"
     );
     Ok(())
 })]
 #[allow(dead_code)]
 #[docify::export_content]
 async fn database_setup_nested_example() -> anyhow::Result<()> {
+    // Explicit table names keep these example tables globally unique (the basic example above and the table-macro
+    // docs use their own names; table names are unique across the crate).
     #[derive(Table)]
+    #[sql(table_name = "setup_nested_users")]
     struct DocUsers {
         #[sql(primary_key)]
         id: i32,
@@ -68,6 +75,7 @@ async fn database_setup_nested_example() -> anyhow::Result<()> {
     }
 
     #[derive(Table)]
+    #[sql(table_name = "setup_nested_posts")]
     struct DocPosts {
         #[sql(primary_key)]
         id: i32,
@@ -77,6 +85,7 @@ async fn database_setup_nested_example() -> anyhow::Result<()> {
     }
 
     #[derive(Table)]
+    #[sql(table_name = "setup_nested_comments")]
     struct DocComments {
         #[sql(primary_key)]
         id: i32,
