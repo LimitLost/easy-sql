@@ -30,11 +30,15 @@ lazy_static = "1.5.0"
 easy-macros = { version = "1.1.1", features = ["build"] }
 
 [dev-dependencies]
+async-trait = "0.1"
+easy-sql = { path = "../-main", default-features = false, features = ["sqlite"] }
 trybuild = "1"
 
 [features]
 default = []
-use_output_columns = []
+# opt-in switch for the trybuild UI compile-fail suites. Not a public feature.
+_ui_tests = []
+use_output_columns = ["easy-sql/use_output_columns"]
 parse_debug = []
-migrations = ["easy-sql-compilation-data/migrations"]
-check_duplicate_table_names = ["easy-sql-compilation-data/check_duplicate_table_names"]
+migrations = ["easy-sql/migrations", "easy-sql-compilation-data/migrations"]
+check_duplicate_table_names = ["easy-sql/check_duplicate_table_names", "easy-sql-compilation-data/check_duplicate_table_names"]

@@ -5,7 +5,7 @@ fn compile_fail_fixture(path: &str) {
 
 #[test]
 fn invalid_migration_mode_no_version_and_version_compile_fail() {
-    if !cfg!(feature = "sqlite") || !cfg!(feature = "migrations") {
+    if !cfg!(feature = "_ui_tests") || !cfg!(feature = "migrations") {
         return;
     }
 
@@ -14,7 +14,7 @@ fn invalid_migration_mode_no_version_and_version_compile_fail() {
 
 #[test]
 fn invalid_migration_mode_no_version_and_version_test_compile_fail() {
-    if !cfg!(feature = "sqlite") || !cfg!(feature = "migrations") {
+    if !cfg!(feature = "_ui_tests") || !cfg!(feature = "migrations") {
         return;
     }
 
@@ -23,7 +23,7 @@ fn invalid_migration_mode_no_version_and_version_test_compile_fail() {
 
 #[test]
 fn invalid_migration_mode_version_and_version_test_compile_fail() {
-    if !cfg!(feature = "sqlite") || !cfg!(feature = "migrations") {
+    if !cfg!(feature = "_ui_tests") || !cfg!(feature = "migrations") {
         return;
     }
 
@@ -32,7 +32,7 @@ fn invalid_migration_mode_version_and_version_test_compile_fail() {
 
 #[test]
 fn invalid_migration_mode_required_compile_fail() {
-    if !cfg!(feature = "sqlite") || !cfg!(feature = "migrations") {
+    if !cfg!(feature = "_ui_tests") || !cfg!(feature = "migrations") {
         return;
     }
 

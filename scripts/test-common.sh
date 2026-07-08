@@ -141,7 +141,7 @@ build_macros_features_string() {
 
 build_macros_full_suite_features_string() {
     build_macros_features_string
-    append_feature_to_csv_var "MACROS_FEATURES" "sqlite"
+    append_feature_to_csv_var "MACROS_FEATURES" "_ui_tests"
 }
 
 macros_feature_display() {
@@ -207,7 +207,7 @@ resolve_macros_test_features() {
                 echo -e "${RED}Error: $test_target does not accept $ignored_flags${NC}"
                 return 1
             fi
-            MACROS_TARGET_FEATURES="sqlite"
+            MACROS_TARGET_FEATURES="_ui_tests"
             MACROS_TARGET_KIND="integration-test"
             return 0
             ;;
@@ -217,7 +217,7 @@ resolve_macros_test_features() {
                 echo -e "${RED}Error: $test_target does not accept $ignored_flags${NC}"
                 return 1
             fi
-            MACROS_TARGET_FEATURES="sqlite,migrations"
+            MACROS_TARGET_FEATURES="_ui_tests,migrations"
             MACROS_TARGET_KIND="integration-test"
             return 0
             ;;
