@@ -34,7 +34,8 @@ pub struct TableField {
 #[cfg(feature = "migrations")]
 impl TableField {
     /// Returns the normalized persisted storage type used by migration comparisons.
-    /// Reason: `#[sql(bytes)]` fields may legitimately change Rust wrapper types while still storing the same nullable blob column, so migration generation must compare the storage contract instead of the wrapper name.
+    ///
+    /// `#[sql(bytes)]` fields may legitimately change Rust wrapper types while still storing the same nullable blob column, so migration generation must compare the storage contract instead of the wrapper name.
     fn migration_storage_type(&self) -> Cow<'_, str> {
         // Normalize bytes-backed fields to the blob type they actually persist while preserving optionality.
         if self.ty_to_bytes {
@@ -50,7 +51,8 @@ impl TableField {
     }
 
     /// Returns whether two field definitions keep the same persisted storage contract.
-    /// Reason: migration generation should reject only real schema-shape changes, not bytes-wrapper differences that still map to the same SQL blob representation.
+    ///
+    /// Migration generation should reject only real schema-shape changes, not bytes-wrapper differences that still map to the same SQL blob representation.
     fn is_migration_storage_compatible_with(&self, other: &Self) -> bool {
         self.migration_storage_type() == other.migration_storage_type()
     }

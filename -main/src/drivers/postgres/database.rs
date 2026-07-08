@@ -75,7 +75,8 @@ impl Database {
     }
 
     /// Database-per-test isolation: a fresh, dedicated database per test.
-    /// Reason: opt-in debugging aid via `EASY_SQL_PG_DEBUG=true` (one test = one inspectable database), and the
+    ///
+    /// Opt-in debugging aid via `EASY_SQL_PG_DEBUG=true` (one test = one inspectable database), and the
     /// benchmark's per-database baseline, independent of whatever `setup_for_testing` currently defaults to.
     #[cfg(test)]
     #[always_context(skip(!))]
@@ -109,7 +110,8 @@ impl Database {
 
     /// Schema-per-test isolation: one shared database, each test scoped to its own Postgres `SCHEMA`.
     ///
-    /// Reason: gives real isolation (own tables + sequences, so `id == 1` holds) without the per-test
+    ///
+    /// Gives real isolation (own tables + sequences, so `id == 1` holds) without the per-test
     /// `CREATE`/`DROP DATABASE` cost that makes the per-database path slow and prone to connection-exhaustion
     /// hangs. Every pooled connection is pinned to the schema via `after_connect` `SET search_path`, so existing
     /// test code (`db.transaction()`, `db.conn()`, concurrent `tokio::spawn`) works unchanged.
@@ -121,16 +123,16 @@ impl Database {
         init_test_logger();
         let _ = dotenvy::dotenv();
 
-        // Step 1: connection params + the single shared database name.
+        // - Connection params + the single shared database name.
         let (host, port, username, password) = pg_test_conn_params()?;
         let db_prefix = std::env::var("POSTGRES_TEST_DB_PREFIX")
             .context("POSTGRES_TEST_DB_PREFIX .env variable must be set for tests")?;
         let database = shared_test_db_name();
 
-        // Step 2: create the shared database exactly once per process (race-safe).
+        // - Create the shared database exactly once per process (race-safe).
         ensure_shared_test_db(&host, port, &username, &password, &database).await?;
 
-        // Step 3: reap leftover schemas/databases from previous runs, exactly once per process. `get_or_try_init`
+        // - Reap leftover schemas/databases from previous runs, exactly once per process. `get_or_try_init`
         // serializes first-callers, so this runs before any test schema exists — it never drops a live one.
         // Assumes one test process per shared database at a time (the test scripts run sequentially).
         static REAPED_ONCE: tokio::sync::OnceCell<()> = tokio::sync::OnceCell::const_new();
@@ -139,10 +141,10 @@ impl Database {
             .await;
         reap_result.context("reaping leftover per-test schemas/databases from a previous run")?;
 
-        // Step 4: unique, 63-byte-safe schema name (reuses the DB-name generator — same identifier rules).
+        // - Unique, 63-byte-safe schema name (reuses the DB-name generator — same identifier rules).
         let schema = generate_postgres_test_database_name(&db_prefix)?;
 
-        // Step 5: per-test pool pinned to the schema. `after_connect` runs on EVERY connection the pool opens
+        // - Per-test pool pinned to the schema. `after_connect` runs on EVERY connection the pool opens
         // (including those a concurrent `tokio::spawn` test acquires), so all of a test's work resolves to its
         // own schema. Bounded connections keep the shared server well under its connection limit.
         let schema_for_hook = schema.clone();
@@ -172,7 +174,7 @@ impl Database {
             // has no `Debug`), which it otherwise tries to format for the auto-generated context message.
             .context("creating schema-per-test connection pool")?;
 
-        // Step 6: create the schema, then the metadata + application tables inside it (unqualified names
+        // - Create the schema, then the metadata + application tables inside it (unqualified names
         // resolve via search_path).
         let safe_schema = schema.replace('"', "\"\"");
         sqlx::query(&format!("CREATE SCHEMA IF NOT EXISTS \"{safe_schema}\""))
@@ -188,7 +190,9 @@ impl Database {
     }
 
     /// Drops leftover per-test resources from this process's prefix: leaked per-test databases and per-test
-    /// schemas in the shared database. Reason: the per-database path leaks databases (no `Drop`), and a crashed
+    /// schemas in the shared database.
+    ///
+    /// The per-database path leaks databases (no `Drop`), and a crashed
     /// schema-per-test run can leave schemas behind; `WITH (FORCE)` avoids the "database in use" hang.
     #[cfg(test)]
     #[always_context(skip(!))]
@@ -382,7 +386,8 @@ mod test {
     }
 
     /// Guards the one-time creation of the shared schema-per-test database.
-    /// Reason: `get_or_try_init` runs the creation on exactly one task even under concurrent first-touch.
+    ///
+    /// `get_or_try_init` runs the creation on exactly one task even under concurrent first-touch.
     static SHARED_TEST_DB_READY: tokio::sync::OnceCell<()> = tokio::sync::OnceCell::const_new();
 
     /// The single database that schema-per-test isolation runs inside (override via `POSTGRES_TEST_DB`).
@@ -392,7 +397,8 @@ mod test {
 
     #[always_context(skip(!))]
     /// Reads the four PostgreSQL connection parameters shared by every test-setup path.
-    /// Reason: one place for the host/port/user/password lookups instead of repeating them per entry point.
+    ///
+    /// One place for the host/port/user/password lookups instead of repeating them per entry point.
     pub(crate) fn pg_test_conn_params() -> anyhow::Result<(String, u16, String, String)> {
         let host = std::env::var("POSTGRES_HOST")
             .context("POSTGRES_HOST .env variable must be set for tests")?;
@@ -409,7 +415,8 @@ mod test {
 
     #[always_context(skip(!))]
     /// Creates the shared schema-per-test database once per process (idempotent + race-safe).
-    /// Reason: the schema-per-test path needs a single database to hold every test's schema; creation must
+    ///
+    /// The schema-per-test path needs a single database to hold every test's schema; creation must
     /// happen exactly once, and tolerate the database already existing (prior run or a concurrent process).
     pub(crate) async fn ensure_shared_test_db(
         host: &str,

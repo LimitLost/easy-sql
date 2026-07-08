@@ -89,7 +89,8 @@ impl SqlxPoolTestResource {
         use sqlx::postgres::PgConnectOptions;
 
         // Drop the per-test database from a fresh maintenance connection, `WITH (FORCE)`.
-        // Reason: the previous teardown first awaited `self.pool.close()` from THIS separate cleanup
+        //
+        // The previous teardown first awaited `self.pool.close()` from THIS separate cleanup
         // runtime, but the pool's connections' tokio reactor lived on the test's own runtime — whose
         // only worker thread is blocked in this Drop's `join()`. That cross-runtime close deadlocked
         // the tail of the run (hung at ~319/320 forever). We no longer touch the test pool here (it is
@@ -121,7 +122,8 @@ impl SqlxPoolTestResource {
 impl Drop for SqlxPoolTestResource {
     fn drop(&mut self) {
         // Clone only the identifiers the maintenance drop needs — deliberately NOT the test pool.
-        // Reason: the test pool is released when this struct drops (non-blocking); its backends are
+        //
+        // The test pool is released when this struct drops (non-blocking); its backends are
         // terminated server-side by the `FORCE` drop. Cloning + awaiting the test pool's close across
         // runtimes is exactly what deadlocked before.
         let test_database = self.test_database.clone();

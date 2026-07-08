@@ -28,13 +28,14 @@ shell commands — use `./-main` or `--` (e.g. `ls -- -main`, `cd ./-main`).
 
 ## Documentation conventions (load-bearing)
 
-- Every public item (Rust `///`, modules `//!`) opens with a one-sentence purpose, then a
-  `Reason: ...` line explaining the design choice. Reason justifies existence.
-- Document the steps inside a function: sequential steps use `// Step N: ...`; a set of
-  non-sequential items inside one comment block uses `// - ...` per item.
+- Every public item (Rust `///`, modules `//!`) opens with a one-sentence purpose.
+- Justify a non-obvious design choice with a reason placed one blank comment line below what it
+  explains — a purpose line or a step — with no `Reason:` label. The reason justifies existence.
+- Prefix every step inside a function with `// - ...` — always `- `, never `Step N:` / `Step:`.
+  The `- ` marks a line as a step, distinguishing steps from ordinary `//` comments.
 - Document struct **fields** / enum **variants**, not the type as a whole. Each enum
   (tagged-union) variant describes its own distinguished case.
-- Docs should read faster than the code. `Reason:` is exempt — it may be longer when needed.
+- Docs should read faster than the code. A reason paragraph is exempt — it may run longer when needed.
 
 ## Structure rules
 

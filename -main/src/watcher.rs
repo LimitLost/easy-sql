@@ -30,13 +30,15 @@ pub struct RowChange {
 
 /// A sink for committed row mutations, registered once at database creation.
 ///
-/// Reason: the SQLite commit hook runs synchronously on the driver's worker thread, so `on_commit` must be
+///
+/// The SQLite commit hook runs synchronously on the driver's worker thread, so `on_commit` must be
 /// cheap and non-blocking — the canonical implementation just hands `changes` to a channel that a background
 /// task drains (reading the actual rows, building the outbound oplog, pushing them upstream). It is never given
 /// the work of an uncommitted transaction: a rolled-back transaction's buffered changes are discarded.
 pub trait ChangeWatcher: Send + Sync + std::fmt::Debug {
     /// Called once per committed transaction with every row mutation that transaction produced, in order.
-    /// Reason: batching by transaction lets the consumer apply a unit of work atomically downstream and keeps
+    ///
+    /// Batching by transaction lets the consumer apply a unit of work atomically downstream and keeps
     /// the per-row hook overhead off the critical path.
     fn on_commit(&self, changes: Vec<RowChange>);
 }

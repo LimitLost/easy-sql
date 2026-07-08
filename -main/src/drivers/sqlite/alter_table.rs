@@ -127,7 +127,8 @@ impl SetupSql<Sqlite> for AlterTable {
 /// Adds a foreign-key constraint to an existing SQLite table via the documented table-rebuild recipe
 /// (<https://sqlite.org/lang_altertable.html> §7): build a new table that carries the extra constraint, copy the
 /// rows in, swap it into place, and restore the indexes/triggers.
-/// Reason: SQLite has no `ALTER TABLE ADD CONSTRAINT`. The new table's column definitions are taken verbatim from
+///
+/// SQLite has no `ALTER TABLE ADD CONSTRAINT`. The new table's column definitions are taken verbatim from
 /// the existing table's `sqlite_master` DDL (so columns/defaults are preserved exactly) and only the new
 /// `FOREIGN KEY` clause is injected. Data is copied into a *temporary-named* table, so the copy never appears under
 /// the real table name to any change-watcher armed on the connection (the watcher filters by table name).
@@ -140,7 +141,7 @@ async fn add_foreign_key_via_rebuild(
     referenced_columns: &[&str],
     cascade: bool,
 ) -> anyhow::Result<()> {
-    // Step 1: read the table's current CREATE statement and its index/trigger DDLs (before any change).
+    // - Read the table's current CREATE statement and its index/trigger DDLs (before any change).
     let old_ddl: String =
         sqlx::query_scalar("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = ?")
             .bind(table_name)
@@ -155,7 +156,7 @@ async fn add_foreign_key_via_rebuild(
     .await
     .with_context(|| format!("reading indexes/triggers for table `{table_name}`"))?;
 
-    // Step 2: build the new table's body by injecting the foreign-key clause before the closing paren of the
+    // - Build the new table's body by injecting the foreign-key clause before the closing paren of the
     // existing definition. Taking the body from the first '(' discards the original `CREATE TABLE [IF NOT EXISTS]
     // name` header, so the temp name can be substituted cleanly.
     let on_actions = if cascade {
@@ -180,7 +181,7 @@ async fn add_foreign_key_via_rebuild(
     let new_body = format!("{}, {}{}", &body[..close], fk_clause, &body[close..]);
     let tmp_name = format!("_easy_sql_fkrebuild_{table_name}");
 
-    // Step 3: run the rebuild. `PRAGMA foreign_keys=OFF` must be set OUTSIDE a transaction (it is a no-op
+    // - Run the rebuild. `PRAGMA foreign_keys=OFF` must be set OUTSIDE a transaction (it is a no-op
     // inside one), then the swap runs in a transaction for atomicity.
     run(exec, "PRAGMA foreign_keys = OFF").await?;
     run(exec, "BEGIN").await?;
@@ -198,7 +199,7 @@ async fn add_foreign_key_via_rebuild(
         run(exec, ddl).await?;
     }
 
-    // Step 4: fail loudly if existing rows violate the new constraint (no silent data loss).
+    // - Fail loudly if existing rows violate the new constraint (no silent data loss).
     let violations = sqlx::query(&format!("PRAGMA foreign_key_check({table_name})"))
         .fetch_all(exec.executor())
         .await

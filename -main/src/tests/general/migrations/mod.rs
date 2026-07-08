@@ -837,7 +837,7 @@ struct FkRebuildChildRow {
 #[always_context(skip(!))]
 #[tokio::test]
 async fn test_migration_add_foreign_key_preserves_data() -> anyhow::Result<()> {
-    // Step 1: bring up the parent + child(v1) and seed a valid (non-orphan) child row.
+    // - Bring up the parent + child(v1) and seed a valid (non-orphan) child row.
     let db = Database::setup_for_testing::<FkRebuildParent>().await?;
     let mut conn = db.conn().await?;
     <FkRebuildChildV1 as DatabaseSetup<TestDriver>>::setup(&mut &mut conn).await?;
@@ -852,10 +852,10 @@ async fn test_migration_add_foreign_key_preserves_data() -> anyhow::Result<()> {
     };
     query!(&mut conn, INSERT INTO FkRebuildChildV1 VALUES {child}).await?;
 
-    // Step 2: migrate child v1 -> v2 (adds the foreign key via a full table rebuild).
+    // - Migrate child v1 -> v2 (adds the foreign key via a full table rebuild).
     <FkRebuildChildV2 as DatabaseSetup<TestDriver>>::setup(&mut &mut conn).await?;
 
-    // Step 3: the rebuild preserved the row verbatim.
+    // - The rebuild preserved the row verbatim.
     let rows: Vec<FkRebuildChildRow> = query!(&mut conn,
         SELECT Vec<FkRebuildChildRow> FROM FkRebuildChildV2 WHERE true ORDER BY id
     )
@@ -864,7 +864,7 @@ async fn test_migration_add_foreign_key_preserves_data() -> anyhow::Result<()> {
     assert_eq!(rows[0].parent_id, 1);
     assert_eq!(rows[0].note, "kept", "column data survives the rebuild");
 
-    // Step 4: the version advanced to 2.
+    // - The version advanced to 2.
     let table_id = "a1b2c3d4-0002-4abc-8def-000000000002".to_string();
     let version = crate::EasySqlTables_get_version!(TestDriver, &mut conn, table_id);
     assert_eq!(version, Some(2), "child table version is bumped to 2");
@@ -875,7 +875,7 @@ async fn test_migration_add_foreign_key_preserves_data() -> anyhow::Result<()> {
 #[always_context(skip(!))]
 #[tokio::test]
 async fn test_migration_add_foreign_key_fails_loudly_on_orphans() -> anyhow::Result<()> {
-    // Step 1: parent table exists but is empty; seed a child that references a non-existent parent (an orphan).
+    // - Parent table exists but is empty; seed a child that references a non-existent parent (an orphan).
     let db = Database::setup_for_testing::<FkRebuildParent>().await?;
     let mut conn = db.conn().await?;
     <FkRebuildChildV1 as DatabaseSetup<TestDriver>>::setup(&mut &mut conn).await?;
@@ -886,7 +886,7 @@ async fn test_migration_add_foreign_key_fails_loudly_on_orphans() -> anyhow::Res
     };
     query!(&mut conn, INSERT INTO FkRebuildChildV1 VALUES {orphan}).await?;
 
-    // Step 2: migrating to v2 must FAIL — `foreign_key_check` sees the orphan row violating the new constraint.
+    // - Migrating to v2 must FAIL — `foreign_key_check` sees the orphan row violating the new constraint.
     // (Proves the rebuilt table really carries the foreign key, and that orphans are surfaced, not swallowed.)
     let result = <FkRebuildChildV2 as DatabaseSetup<TestDriver>>::setup(&mut &mut conn).await;
     assert!(
@@ -944,7 +944,7 @@ struct FkSelfRefRow {
 #[always_context(skip(!))]
 #[tokio::test]
 async fn test_migration_add_self_referential_foreign_key() -> anyhow::Result<()> {
-    // Step 1: build a small hierarchy in v1 (a root + a child pointing at it).
+    // - Build a small hierarchy in v1 (a root + a child pointing at it).
     let db = Database::setup_for_testing::<FkSelfRefV1>().await?;
     let mut conn = db.conn().await?;
 
@@ -959,10 +959,10 @@ async fn test_migration_add_self_referential_foreign_key() -> anyhow::Result<()>
     };
     query!(&mut conn, INSERT INTO FkSelfRefV1 VALUES {child}).await?;
 
-    // Step 2: migrate to v2 — adds the self-referential foreign key via the table rebuild.
+    // - Migrate to v2 — adds the self-referential foreign key via the table rebuild.
     <FkSelfRefV2 as DatabaseSetup<TestDriver>>::setup(&mut &mut conn).await?;
 
-    // Step 3: both rows survive, and the parent/child link is intact.
+    // - Both rows survive, and the parent/child link is intact.
     let rows: Vec<FkSelfRefRow> = query!(&mut conn,
         SELECT Vec<FkSelfRefRow> FROM FkSelfRefV2 WHERE true ORDER BY id
     )

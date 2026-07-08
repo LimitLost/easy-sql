@@ -140,7 +140,8 @@ impl Database {
 
     /// Returns the underlying connection pool — needed by sync layers that arm sqlite hooks on connections
     /// they open themselves, or that run raw `sqlx` against sync-owned bookkeeping tables to avoid recursion.
-    /// Reason: the watcher reports changes but a sync engine also needs direct pool access for its side tables.
+    ///
+    /// The watcher reports changes but a sync engine also needs direct pool access for its side tables.
     #[cfg(feature = "watcher")]
     pub fn pool(&self) -> &sqlx::Pool<Db> {
         &self.connection_pool
@@ -184,7 +185,8 @@ impl Database {
 }
 
 /// Arms sqlite's update/commit/rollback hooks on one connection, buffering row changes until commit.
-/// Reason: the update hook fires per row *during* a transaction, so the changes are only real once it commits —
+///
+/// The update hook fires per row *during* a transaction, so the changes are only real once it commits —
 /// the commit hook flushes the buffer to the watcher (and lets the commit proceed), the rollback hook discards
 /// it. Installed per connection by `setup_with_watcher`'s `after_connect`.
 #[cfg(feature = "watcher")]
